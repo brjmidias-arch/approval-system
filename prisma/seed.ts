@@ -9,7 +9,7 @@ async function main() {
   });
 
   if (!existing) {
-    const password = await bcrypt.hash("brjmidias2024", 12);
+    const password = await bcrypt.hash("#GrupoBRJ123", 12);
     await prisma.user.create({
       data: {
         email: "admin@brjmidias.com.br",
@@ -17,10 +17,10 @@ async function main() {
         name: "Admin BRJ Mídias",
       },
     });
-    console.log("✅ Admin criado: admin@brjmidias.com.br / brjmidias2024");
+    console.log("✅ Admin criado: admin@brjmidias.com.br / #GrupoBRJ123");
   } else {
     console.log("Admin já existe, atualizando senha...");
-    const password = await bcrypt.hash("brjmidias2024", 12);
+    const password = await bcrypt.hash("#GrupoBRJ123", 12);
     await prisma.user.update({
       where: { email: "admin@brjmidias.com.br" },
       data: { password },

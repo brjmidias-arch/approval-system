@@ -14,6 +14,7 @@ interface ContentItem {
   caption: string | null;
   scheduledDate: string | null;
   contentType: ContentType;
+  groupId: string | null;
   approvalItem: { status: Status; clientComment: string | null } | null;
 }
 
@@ -38,19 +39,17 @@ const MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","A
 
 function buildGroups(items: ContentItem[]): Group[] {
   const groups: Group[] = [];
-  let i = 0;
-  while (i < items.length) {
-    if (items[i].contentType === "CARROSSEL") {
-      const slides: ContentItem[] = [items[i]];
-      while (i + 1 < items.length && items[i + 1].contentType === "CARROSSEL") {
-        i++;
-        slides.push(items[i]);
-      }
-      groups.push({ type: "carousel", items: slides, groupKey: slides[0].id });
+  const seenGroups = new Set<string>();
+
+  for (const item of items) {
+    if (item.contentType === "CARROSSEL" && item.groupId) {
+      if (seenGroups.has(item.groupId)) continue;
+      seenGroups.add(item.groupId);
+      const slides = items.filter((i) => i.groupId === item.groupId);
+      groups.push({ type: "carousel", items: slides, groupKey: item.groupId });
     } else {
-      groups.push({ type: "single", item: items[i], groupKey: items[i].id });
+      groups.push({ type: "single", item, groupKey: item.id });
     }
-    i++;
   }
   return groups;
 }

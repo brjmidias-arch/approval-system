@@ -8,7 +8,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { fileUrl, fileType, caption, scheduledDate, contentType, order } = body;
+  const { fileUrl, fileType, caption, scheduledDate, contentType, order, groupId } = body;
 
   if (!fileUrl || !fileType || !contentType) {
     return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
@@ -22,6 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       caption,
       scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
       contentType,
+      groupId: groupId || null,
       order: order ?? 0,
     },
   });

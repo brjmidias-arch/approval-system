@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { v4 as uuidv4 } from "uuid";
 import { CONTENT_TYPE_LABELS, APPROVAL_STATUS_LABELS, APPROVAL_STATUS_COLORS } from "@/types";
 import type { ContentType, ApprovalStatus } from "@/types";
 
@@ -20,6 +21,7 @@ interface ContentItem {
   caption: string | null;
   scheduledDate: string | null;
   contentType: ContentType;
+  groupId: string | null;
   order: number;
   approvalItem: ApprovalItem | null;
 }
@@ -83,6 +85,8 @@ export default function CampaignPage() {
     setUploading(true);
 
     const baseOrder = (campaign?.contentItems.length || 0) + 1;
+    // Generate one groupId per carousel batch
+    const groupId = uploadForm.contentType === "CARROSSEL" ? uuidv4() : null;
 
     for (let i = 0; i < selectedFiles.length; i++) {
       const file = selectedFiles[i];
@@ -108,6 +112,7 @@ export default function CampaignPage() {
           caption: uploadForm.caption,
           scheduledDate: uploadForm.scheduledDate || null,
           contentType: uploadForm.contentType,
+          groupId,
           order: baseOrder + i,
         }),
       });
@@ -161,29 +166,23 @@ export default function CampaignPage() {
   const isExpired = new Date() > new Date(campaign.expiresAt) && campaign.status === "OPEN";
   const approvalUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/aprovar/${campaign.token}`;
 
-  // Group carousel items together for display
+  // Group carousel items by groupId
   type GroupedItem =
     | { type: "single"; item: ContentItem }
     | { type: "carousel"; items: ContentItem[] };
 
   const grouped: GroupedItem[] = [];
-  let i = 0;
-  while (i < campaign.contentItems.length) {
-    const item = campaign.contentItems[i];
-    if (item.contentType === "CARROSSEL") {
-      const slides: ContentItem[] = [item];
-      while (
-        i + 1 < campaign.contentItems.length &&
-        campaign.contentItems[i + 1].contentType === "CARROSSEL"
-      ) {
-        i++;
-        slides.push(campaign.contentItems[i]);
-      }
+  const seenGroupIds = new Set<string>();
+
+  for (const item of campaign.contentItems) {
+    if (item.contentType === "CARROSSEL" && item.groupId) {
+      if (seenGroupIds.has(item.groupId)) continue;
+      seenGroupIds.add(item.groupId);
+      const slides = campaign.contentItems.filter((c) => c.groupId === item.groupId);
       grouped.push({ type: "carousel", items: slides });
     } else {
       grouped.push({ type: "single", item });
     }
-    i++;
   }
 
   return (
