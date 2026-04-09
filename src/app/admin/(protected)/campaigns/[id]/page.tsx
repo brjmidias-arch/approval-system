@@ -471,6 +471,12 @@ export default function CampaignPage() {
                   {firstItem.caption && (
                     <p className="text-sm text-gray-400 mt-2 line-clamp-2">{firstItem.caption}</p>
                   )}
+                  {slides[0].approvalItem?.clientComment && (
+                    <div className="mt-2 text-xs text-amber-400 bg-amber-900/20 rounded-lg px-2.5 py-1.5">
+                      <span className="text-amber-500/70">Comentário do cliente: </span>
+                      {slides[0].approvalItem.clientComment}
+                    </div>
+                  )}
                 </div>
               );
             })}

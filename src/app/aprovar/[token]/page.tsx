@@ -457,13 +457,13 @@ export default function ApprovalPage() {
         <div className="sticky bottom-4 pt-2">
           <button
             onClick={handleSubmit}
-            disabled={!allDone || submitting}
+            disabled={!allDone || submitting || savingGroup !== null}
             className={`w-full py-4 rounded-xl text-base font-semibold transition-all ${
               allDone ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/40"
               : "bg-white/5 text-gray-500 cursor-not-allowed"
             }`}
           >
-            {submitting ? "Enviando..." : allDone ? "Finalizar e Enviar Revisão" : `Revise todos os itens (${reviewedCount}/${total})`}
+            {submitting ? "Enviando..." : savingGroup !== null ? "Salvando..." : allDone ? "Finalizar e Enviar Revisão" : `Revise todos os itens (${reviewedCount}/${total})`}
           </button>
         </div>
       </main>
