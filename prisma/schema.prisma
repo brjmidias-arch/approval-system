@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+}
+
+model Client {
+  id        String     @id @default(cuid())
+  name      String
+  email     String
+  whatsapp  String?
+  createdAt DateTime   @default(now())
+  campaigns Campaign[]
+}
+
+model Campaign {
+  id            String          @id @default(cuid())
+  clientId      String
+  client        Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name          String
+  month         Int
+  year          Int
+  token         String          @unique @default(uuid())
+  expiresAt     DateTime
+  status        String          @default("OPEN")
+  createdAt     DateTime        @default(now())
+  contentItems  ContentItem[]
+  approvalItems ApprovalItem[]
+}
+
+model ContentItem {
+  id            String        @id @default(cuid())
+  campaignId    String
+  campaign      Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  fileUrl       String
+  fileType      String
+  caption       String?
+  scheduledDate DateTime?
+  contentType   String
+  order         Int           @default(0)
+  createdAt     DateTime      @default(now())
+  approvalItem  ApprovalItem?
+}
+
+model ApprovalItem {
+  id            String      @id @default(cuid())
+  contentItemId String      @unique
+  contentItem   ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  campaignId    String
+  campaign      Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  status        String      @default("PENDING")
+  clientComment String?
+  reviewedAt    DateTime?
+  createdAt     DateTime    @default(now())
+}
