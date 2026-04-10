@@ -11,7 +11,7 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { title, caption, scheduledDate, fileUrl, fileType } = body;
+  const { title, caption, scheduledDate, fileUrl, fileType, resetApproval } = body;
 
   const item = await prisma.contentItem.update({
     where: { id: params.itemId },
@@ -25,6 +25,13 @@ export async function PATCH(
       ...(fileType !== undefined && { fileType }),
     },
   });
+
+  if (resetApproval) {
+    await prisma.approvalItem.updateMany({
+      where: { contentItemId: params.itemId },
+      data: { status: "PENDING", clientComment: null, reviewedAt: null },
+    });
+  }
 
   return NextResponse.json(item);
 }

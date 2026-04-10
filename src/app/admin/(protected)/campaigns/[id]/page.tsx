@@ -290,6 +290,16 @@ export default function CampaignPage() {
     fetchCampaign();
   }
 
+  async function handleReopen() {
+    if (!confirm("Isso vai reabrir a campanha e notificar o cliente por e-mail para revisar novamente. Continuar?")) return;
+    const res = await fetch(`/api/admin/campaigns/${id}/reopen`, { method: "POST" });
+    if (res.ok) {
+      fetchCampaign();
+    } else {
+      alert("Erro ao reabrir campanha.");
+    }
+  }
+
   if (loading) return <div className="text-gray-400 p-8">Carregando...</div>;
   if (!campaign) return <div className="text-red-400 p-8">Campanha não encontrada.</div>;
 
@@ -425,6 +435,24 @@ export default function CampaignPage() {
           </div>
         ))}
       </div>
+
+      {/* Reopen banner — shown when campaign is CLOSED and has adjustments pending */}
+      {campaign.status === "CLOSED" && (adjustment > 0 || rejected > 0) && (
+        <div className="bg-amber-900/20 border border-amber-500/30 rounded-xl px-5 py-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-amber-400 font-medium text-sm">Ajustes solicitados pelo cliente</p>
+            <p className="text-amber-400/70 text-xs mt-0.5">
+              {adjustment + rejected} {adjustment + rejected === 1 ? "post precisa" : "posts precisam"} de correção. Faça as alterações e envie para o cliente revisar novamente.
+            </p>
+          </div>
+          <button
+            onClick={handleReopen}
+            className="shrink-0 bg-amber-500 hover:bg-amber-400 text-black font-semibold text-sm px-4 py-2.5 rounded-lg transition-colors"
+          >
+            Enviar para aprovação
+          </button>
+        </div>
+      )}
 
       {/* Approval URL */}
       <div className="bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">

@@ -79,6 +79,7 @@ function SortableSlide({
   onDelete,
   onPreview,
   onReplaced,
+  onStatusReset,
 }: {
   slide: SlideItem;
   index: number;
@@ -86,11 +87,13 @@ function SortableSlide({
   onDelete: (id: string) => void;
   onPreview: (index: number) => void;
   onReplaced: (id: string, fileUrl: string, fileType: string) => void;
+  onStatusReset: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: slide.id });
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const [replacing, setReplacing] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -108,11 +111,27 @@ function SortableSlide({
     try {
       const { fileUrl, fileType } = await uploadReplacement(campaignId, slide.id, file);
       onReplaced(slide.id, fileUrl, fileType);
-    } catch (err) {
+    } catch {
       alert("Erro ao substituir imagem. Tente novamente.");
     } finally {
       setReplacing(false);
       if (replaceInputRef.current) replaceInputRef.current.value = "";
+    }
+  }
+
+  async function handleMarkDone() {
+    setResetting(true);
+    try {
+      await fetch(`/api/admin/campaigns/${campaignId}/items/${slide.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resetApproval: true }),
+      });
+      onStatusReset(slide.id);
+    } catch {
+      alert("Erro ao marcar ajuste. Tente novamente.");
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -128,10 +147,10 @@ function SortableSlide({
           <span className="text-white/60 text-xs select-none">⠿ arrastar</span>
         </div>
 
-        {/* Replace overlay when replacing */}
-        {replacing && (
+        {/* Overlay when uploading/resetting */}
+        {(replacing || resetting) && (
           <div className="absolute inset-0 bg-black/70 z-20 flex items-center justify-center">
-            <span className="text-white text-xs">...</span>
+            <span className="text-white text-xs">{replacing ? "Enviando..." : "..."}</span>
           </div>
         )}
 
@@ -163,7 +182,7 @@ function SortableSlide({
         </button>
       </div>
       {needsAdjustment && (
-        <>
+        <div className="flex flex-col gap-1 mt-1">
           <input
             ref={replaceInputRef}
             type="file"
@@ -173,12 +192,19 @@ function SortableSlide({
           />
           <button
             onClick={() => replaceInputRef.current?.click()}
-            disabled={replacing}
-            className="mt-1 w-full text-xs px-1.5 py-1 bg-amber-900/40 hover:bg-amber-900/60 text-amber-400 border border-amber-500/30 rounded-lg transition-colors disabled:opacity-50"
+            disabled={replacing || resetting}
+            className="w-full text-xs px-1.5 py-1 bg-amber-900/40 hover:bg-amber-900/60 text-amber-400 border border-amber-500/30 rounded-lg transition-colors disabled:opacity-50"
           >
             {replacing ? "Enviando..." : "Substituir"}
           </button>
-        </>
+          <button
+            onClick={handleMarkDone}
+            disabled={replacing || resetting}
+            className="w-full text-xs px-1.5 py-1 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/30 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {resetting ? "..." : "Ajuste feito"}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -262,6 +288,16 @@ export default function CarouselCard({
     setSlides((prev) => prev.map((s) => s.id === id ? { ...s, fileUrl, fileType } : s));
   }
 
+  function handleStatusReset(id: string) {
+    setSlides((prev) =>
+      prev.map((s) =>
+        s.id === id
+          ? { ...s, approvalItem: s.approvalItem ? { ...s.approvalItem, status: "PENDING" as ApprovalStatus, clientComment: null } : null }
+          : s
+      )
+    );
+  }
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
@@ -306,6 +342,7 @@ export default function CarouselCard({
                 onDelete={onDelete}
                 onPreview={setPreviewIndex}
                 onReplaced={handleReplaced}
+                onStatusReset={handleStatusReset}
               />
             ))}
           </div>
