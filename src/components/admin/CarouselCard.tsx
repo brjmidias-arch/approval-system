@@ -79,7 +79,6 @@ function SortableSlide({
   onDelete,
   onPreview,
   onReplaced,
-  onStatusReset,
 }: {
   slide: SlideItem;
   index: number;
