@@ -56,6 +56,7 @@ export default function CampaignPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
+  const [uploadPercent, setUploadPercent] = useState(0);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [liveStatus, setLiveStatus] = useState<{ reviewed: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -104,18 +105,33 @@ export default function CampaignPage() {
     return () => clearInterval(interval);
   }, [id]);
 
+  function uploadWithProgress(signedUrl: string, file: File, onProgress: (pct: number) => void): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", signedUrl);
+      xhr.setRequestHeader("Content-Type", file.type);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Status ${xhr.status}`)));
+      xhr.onerror = () => reject(new Error("Falha na conexão"));
+      xhr.send(file);
+    });
+  }
+
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
     if (selectedFiles.length === 0) return;
     setUploading(true);
+    setUploadPercent(0);
 
     const baseOrder = (campaign?.contentItems.length || 0) + 1;
-    // Generate one groupId per carousel batch
     const groupId = uploadForm.contentType === "CARROSSEL" ? uuidv4() : null;
 
     for (let i = 0; i < selectedFiles.length; i++) {
       const file = selectedFiles[i];
-      setUploadProgress(`Enviando ${i + 1}/${selectedFiles.length}...`);
+      setUploadProgress(`Arquivo ${i + 1} de ${selectedFiles.length}: ${file.name}`);
+      setUploadPercent(0);
 
       // Step 1: get signed URL
       const signRes = await fetch("/api/upload-url", {
@@ -131,25 +147,19 @@ export default function CampaignPage() {
 
       const { signedUrl, publicUrl, fileType } = await signRes.json();
 
-      // Step 2: upload directly to Supabase (bypasses Vercel 4.5MB limit)
-      const uploadRes = await fetch(signedUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-
-      if (!uploadRes.ok) {
-        alert(`Erro ao enviar o arquivo "${file.name}".`);
+      // Step 2: upload with progress tracking
+      try {
+        await uploadWithProgress(signedUrl, file, (pct) => setUploadPercent(pct));
+      } catch {
+        alert(`Erro ao enviar "${file.name}". Verifique sua conexão e tente novamente.`);
         continue;
       }
-
-      const url = publicUrl;
 
       await fetch(`/api/admin/campaigns/${id}/items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fileUrl: url,
+          fileUrl: publicUrl,
           fileType,
           title: uploadForm.title || null,
           caption: uploadForm.caption,
@@ -163,6 +173,7 @@ export default function CampaignPage() {
 
     setUploading(false);
     setUploadProgress("");
+    setUploadPercent(0);
     setShowUploadForm(false);
     setSelectedFiles([]);
     setUploadForm({ title: "", caption: "", scheduledDate: "", contentType: "CARROSSEL" });
@@ -609,11 +620,27 @@ export default function CampaignPage() {
                 />
               </div>
 
+              {uploading && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-400 truncate max-w-[80%]">{uploadProgress}</span>
+                    <span className="text-emerald-400 font-medium">{uploadPercent}%</span>
+                  </div>
+                  <div className="w-full bg-white/5 rounded-full h-2">
+                    <div
+                      className="bg-emerald-500 h-2 rounded-full transition-all duration-200"
+                      style={{ width: `${uploadPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-1">
                 <button
                   type="button"
                   onClick={() => { setShowUploadForm(false); setSelectedFiles([]); }}
-                  className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 py-2.5 rounded-lg text-sm transition-colors"
+                  disabled={uploading}
+                  className="flex-1 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-gray-300 py-2.5 rounded-lg text-sm transition-colors"
                 >
                   Cancelar
                 </button>
@@ -622,7 +649,7 @@ export default function CampaignPage() {
                   disabled={uploading || selectedFiles.length === 0}
                   className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm transition-colors font-medium"
                 >
-                  {uploading ? uploadProgress : `Enviar${selectedFiles.length > 1 ? ` (${selectedFiles.length} arquivos)` : ""}`}
+                  {uploading ? "Enviando..." : `Enviar${selectedFiles.length > 1 ? ` (${selectedFiles.length} arquivos)` : ""}`}
                 </button>
               </div>
             </form>
