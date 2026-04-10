@@ -60,6 +60,9 @@ export default function CampaignPage() {
   const [liveStatus, setLiveStatus] = useState<{ reviewed: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addFilesRef = useRef<HTMLInputElement>(null);
+  const replaceItemRef = useRef<HTMLInputElement>(null);
+  const [replacingItemId, setReplacingItemId] = useState<string | null>(null);
+  const [markingDoneItemId, setMarkingDoneItemId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
 
@@ -288,6 +291,48 @@ export default function CampaignPage() {
       body: JSON.stringify({ status: newStatus }),
     });
     fetchCampaign();
+  }
+
+  async function handleReplaceItem(itemId: string, file: File) {
+    setReplacingItemId(itemId);
+    try {
+      const signRes = await fetch("/api/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentType: file.type, fileName: file.name }),
+      });
+      if (!signRes.ok) throw new Error();
+      const { signedUrl, publicUrl, fileType } = await signRes.json();
+      const uploadRes = await fetch(signedUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+      if (!uploadRes.ok) throw new Error();
+      await fetch(`/api/admin/campaigns/${id}/items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileUrl: publicUrl, fileType }),
+      });
+      fetchCampaign();
+    } catch {
+      alert("Erro ao substituir arquivo. Tente novamente.");
+    } finally {
+      setReplacingItemId(null);
+      if (replaceItemRef.current) replaceItemRef.current.value = "";
+    }
+  }
+
+  async function handleMarkItemDone(itemId: string) {
+    setMarkingDoneItemId(itemId);
+    try {
+      await fetch(`/api/admin/campaigns/${id}/items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resetApproval: true }),
+      });
+      fetchCampaign();
+    } catch {
+      alert("Erro ao marcar ajuste. Tente novamente.");
+    } finally {
+      setMarkingDoneItemId(null);
+    }
   }
 
   async function handleReopen() {
@@ -665,6 +710,18 @@ export default function CampaignPage() {
         </div>
       )}
 
+      {/* Hidden file input for replacing single post */}
+      <input
+        ref={replaceItemRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/webp,video/mp4,application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && replacingItemId) handleReplaceItem(replacingItemId, file);
+        }}
+      />
+
       {/* Content Items */}
       <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden">
         <div className="px-5 py-3.5 border-b border-white/10">
@@ -722,10 +779,28 @@ export default function CampaignPage() {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${APPROVAL_STATUS_COLORS[statusKey]}`}>
                         {APPROVAL_STATUS_LABELS[statusKey]}
                       </span>
+                      {(statusKey === "ADJUSTMENT" || statusKey === "REJECTED") && (
+                        <>
+                          <button
+                            onClick={() => { setReplacingItemId(item.id); replaceItemRef.current?.click(); }}
+                            disabled={replacingItemId === item.id}
+                            className="text-xs px-2.5 py-1 bg-amber-900/40 hover:bg-amber-900/60 text-amber-400 border border-amber-500/30 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {replacingItemId === item.id ? "Enviando..." : "Substituir"}
+                          </button>
+                          <button
+                            onClick={() => handleMarkItemDone(item.id)}
+                            disabled={markingDoneItemId === item.id}
+                            className="text-xs px-2.5 py-1 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/30 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {markingDoneItemId === item.id ? "..." : "Ajuste feito"}
+                          </button>
+                        </>
+                      )}
                       <button onClick={() => openEditGroup([item])} className="text-gray-400 hover:text-white text-sm transition-colors">
                         Editar
                       </button>
