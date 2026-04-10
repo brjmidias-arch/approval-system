@@ -112,16 +112,33 @@ export default function CampaignPage() {
       const file = selectedFiles[i];
       setUploadProgress(`Enviando ${i + 1}/${selectedFiles.length}...`);
 
-      const formData = new FormData();
-      formData.append("file", file);
-      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+      // Step 1: get signed URL
+      const signRes = await fetch("/api/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentType: file.type, fileName: file.name }),
+      });
+
+      if (!signRes.ok) {
+        alert(`Erro ao preparar upload de "${file.name}".`);
+        continue;
+      }
+
+      const { signedUrl, publicUrl, fileType } = await signRes.json();
+
+      // Step 2: upload directly to Supabase (bypasses Vercel 4.5MB limit)
+      const uploadRes = await fetch(signedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
 
       if (!uploadRes.ok) {
         alert(`Erro ao enviar o arquivo "${file.name}".`);
         continue;
       }
 
-      const { url, fileType } = await uploadRes.json();
+      const url = publicUrl;
 
       await fetch(`/api/admin/campaigns/${id}/items`, {
         method: "POST",
@@ -180,11 +197,21 @@ export default function CampaignPage() {
     if (newSlides.length > 0) {
       const baseOrder = editingGroup.items[editingGroup.items.length - 1].order + 1;
       for (let i = 0; i < newSlides.length; i++) {
-        const formData = new FormData();
-        formData.append("file", newSlides[i]);
-        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+        const file = newSlides[i];
+        const signRes = await fetch("/api/upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contentType: file.type, fileName: file.name }),
+        });
+        if (!signRes.ok) continue;
+        const { signedUrl, publicUrl, fileType } = await signRes.json();
+        const uploadRes = await fetch(signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
         if (!uploadRes.ok) continue;
-        const { url, fileType } = await uploadRes.json();
+        const url = publicUrl;
         await fetch(`/api/admin/campaigns/${id}/items`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
