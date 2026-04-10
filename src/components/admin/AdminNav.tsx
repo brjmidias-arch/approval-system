@@ -9,6 +9,7 @@ export default function AdminNav() {
   const links = [
     { href: "/admin", label: "Dashboard" },
     { href: "/admin/clients", label: "Clientes" },
+    { href: "/admin/programacao", label: "Programação" },
   ];
 
   return (
