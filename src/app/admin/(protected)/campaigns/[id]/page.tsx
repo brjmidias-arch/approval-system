@@ -24,6 +24,7 @@ interface ContentItem {
   scheduledDate: string | null;
   contentType: ContentType;
   groupId: string | null;
+  driveUrl: string | null;
   order: number;
   approvalItem: ApprovalItem | null;
 }
@@ -51,6 +52,7 @@ export default function CampaignPage() {
     title: "",
     caption: "",
     scheduledDate: "",
+    driveUrl: "",
     contentType: "CARROSSEL" as ContentType,
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -164,6 +166,7 @@ export default function CampaignPage() {
           title: uploadForm.title || null,
           caption: uploadForm.caption,
           scheduledDate: uploadForm.scheduledDate || null,
+          driveUrl: uploadForm.driveUrl || null,
           contentType: uploadForm.contentType,
           groupId,
           order: baseOrder + i,
@@ -176,7 +179,7 @@ export default function CampaignPage() {
     setUploadPercent(0);
     setShowUploadForm(false);
     setSelectedFiles([]);
-    setUploadForm({ title: "", caption: "", scheduledDate: "", contentType: "CARROSSEL" });
+    setUploadForm({ title: "", caption: "", scheduledDate: "", driveUrl: "", contentType: "CARROSSEL" });
     if (fileInputRef.current) fileInputRef.current.value = "";
     fetchCampaign();
   }
@@ -620,6 +623,19 @@ export default function CampaignPage() {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">
+                  Link do Drive <span className="text-gray-600">(opcional)</span>
+                </label>
+                <input
+                  type="url"
+                  value={uploadForm.driveUrl}
+                  onChange={(e) => setUploadForm({ ...uploadForm, driveUrl: e.target.value })}
+                  placeholder="https://drive.google.com/..."
+                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
               {uploading && (
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
@@ -808,6 +824,11 @@ export default function CampaignPage() {
                         )}
                       </div>
                       {item.caption && <p className="text-sm text-gray-300 line-clamp-2">{item.caption}</p>}
+                      {item.driveUrl && (
+                        <a href={item.driveUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                          🔗 Ver no Drive
+                        </a>
+                      )}
                       {item.approvalItem?.clientComment && (
                         <div className="mt-1.5 text-xs text-gray-400 bg-white/5 rounded-lg px-2.5 py-1.5">
                           <span className="text-gray-500">Comentário: </span>

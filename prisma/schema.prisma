@@ -51,6 +51,7 @@ model ContentItem {
   scheduledDate DateTime?
   contentType   String
   groupId       String?
+  driveUrl      String?
   order         Int           @default(0)
   createdAt     DateTime      @default(now())
   approvalItem  ApprovalItem?

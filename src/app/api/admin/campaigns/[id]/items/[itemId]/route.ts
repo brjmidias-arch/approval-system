@@ -7,7 +7,7 @@ export async function PATCH(
 ) {
 
   const body = await req.json();
-  const { title, caption, scheduledDate, fileUrl, fileType, resetApproval } = body;
+  const { title, caption, scheduledDate, fileUrl, fileType, driveUrl, resetApproval } = body;
 
   const item = await prisma.contentItem.update({
     where: { id: params.itemId },
@@ -19,6 +19,7 @@ export async function PATCH(
       }),
       ...(fileUrl !== undefined && { fileUrl }),
       ...(fileType !== undefined && { fileType }),
+      ...(driveUrl !== undefined && { driveUrl: driveUrl || null }),
     },
   });
 
