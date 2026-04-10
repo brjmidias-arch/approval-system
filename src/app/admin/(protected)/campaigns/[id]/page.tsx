@@ -335,6 +335,12 @@ export default function CampaignPage() {
     }
   }
 
+  async function handleResetApprovals() {
+    if (!confirm("Isso vai apagar todas as aprovações, ajustes e reprovações do cliente, resetando tudo para Pendente. A campanha será reaberta. Continuar?")) return;
+    await fetch(`/api/admin/campaigns/${id}/reset-approvals`, { method: "POST" });
+    fetchCampaign();
+  }
+
   async function handleReopen() {
     if (!confirm("Isso vai reabrir a campanha e notificar o cliente por e-mail para revisar novamente. Continuar?")) return;
     const res = await fetch(`/api/admin/campaigns/${id}/reopen`, { method: "POST" });
@@ -457,6 +463,9 @@ export default function CampaignPage() {
             </button>
             <button onClick={() => setShowUploadForm(true)} className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
               + Upload
+            </button>
+            <button onClick={handleResetApprovals} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg transition-colors">
+              Resetar Aprovações
             </button>
             <button onClick={handleDeleteCampaign} className="text-sm px-3 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded-lg transition-colors">
               Excluir Campanha
