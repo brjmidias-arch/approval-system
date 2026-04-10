@@ -128,10 +128,10 @@ function SortableSlide({
           <span className="text-white/60 text-xs select-none">⠿ arrastar</span>
         </div>
 
-        {/* Overlay when uploading/resetting */}
-        {(replacing || resetting) && (
+        {/* Overlay when uploading */}
+        {replacing && (
           <div className="absolute inset-0 bg-black/70 z-20 flex items-center justify-center">
-            <span className="text-white text-xs">{replacing ? "Enviando..." : "..."}</span>
+            <span className="text-white text-xs">Enviando...</span>
           </div>
         )}
 
