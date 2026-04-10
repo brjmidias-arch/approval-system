@@ -108,138 +108,153 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      {/* Clients list */}
-      <div className="space-y-4">
-        {clients.length === 0 ? (
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-8 text-center">
-            <p className="text-gray-400">Nenhum cliente cadastrado ainda.</p>
-            <Link href="/admin/clients" className="inline-block mt-3 text-emerald-400 hover:text-emerald-300 text-sm">
-              Cadastrar primeiro cliente →
-            </Link>
-          </div>
-        ) : (
-          clients.map((client) => (
-            <div key={client.id} className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden">
-              <div className="px-5 py-4 flex items-center justify-between border-b border-white/5">
-                <div>
-                  <h2 className="text-white font-medium">{client.name}</h2>
-                  {client.email && <p className="text-gray-400 text-sm">{client.email}</p>}
-                </div>
-                <Link href={`/admin/clients/${client.id}`} className="text-gray-400 hover:text-white text-sm transition-colors">
-                  Ver cliente →
+      {/* Campaigns sorted by urgency */}
+      {(() => {
+        // Flatten all campaigns with client info
+        const allCampaigns = clients.flatMap((client) =>
+          client.campaigns.map((campaign) => ({ campaign, client }))
+        );
+
+        // Score for sorting: waitingClient → days (higher = more urgent), others → -1
+        function urgencyScore(campaign: typeof allCampaigns[0]["campaign"]) {
+          const counts = getStatusCounts(campaign);
+          const isExpired = new Date() > new Date(campaign.expiresAt) && campaign.status === "OPEN";
+          const waitingClient = campaign.status === "OPEN" && counts.pending > 0 && !isExpired;
+          if (waitingClient) {
+            return Math.floor((Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+          }
+          return -1;
+        }
+
+        const sorted = [...allCampaigns].sort((a, b) => urgencyScore(b.campaign) - urgencyScore(a.campaign));
+
+        return (
+          <div className="space-y-4">
+            {sorted.length === 0 ? (
+              <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-8 text-center">
+                <p className="text-gray-400">Nenhum cliente cadastrado ainda.</p>
+                <Link href="/admin/clients" className="inline-block mt-3 text-emerald-400 hover:text-emerald-300 text-sm">
+                  Cadastrar primeiro cliente →
                 </Link>
               </div>
+            ) : (
+              <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden divide-y divide-white/5">
+                {sorted.map(({ campaign, client }) => {
+                  const counts = getStatusCounts(campaign);
+                  const isExpired = new Date() > new Date(campaign.expiresAt) && campaign.status === "OPEN";
+                  const daysSinceCreated = Math.floor(
+                    (Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+                  );
+                  const hasAdjustment = counts.adjustment > 0 || counts.rejected > 0;
+                  const isFullyApproved = counts.total > 0 && counts.approved === counts.total;
+                  const clientFinished = campaign.status === "CLOSED" && counts.total > 0;
+                  const waitingClient = campaign.status === "OPEN" && counts.pending > 0 && !isExpired;
 
-              {client.campaigns.length === 0 ? (
-                <div className="px-5 py-4 text-sm text-gray-500">Nenhuma campanha.</div>
-              ) : (
-                <div className="divide-y divide-white/5">
-                  {client.campaigns.slice(0, 3).map((campaign) => {
-                    const counts = getStatusCounts(campaign);
-                    const isExpired = new Date() > new Date(campaign.expiresAt) && campaign.status === "OPEN";
+                  let rowBg = "";
+                  let alertBadge = null;
 
-                    // Days since campaign was created
-                    const daysSinceCreated = Math.floor(
-                      (Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+                  if (clientFinished && hasAdjustment) {
+                    rowBg = "bg-amber-900/10";
+                    alertBadge = (
+                      <span className="flex items-center gap-1 text-xs font-semibold text-amber-400 bg-amber-900/30 border border-amber-500/30 px-2.5 py-1 rounded-full animate-pulse">
+                        ⚠️ Revisar ajustes
+                      </span>
                     );
-
-                    // Determine visual state
-                    const hasAdjustment = counts.adjustment > 0 || counts.rejected > 0;
-                    const isFullyApproved = counts.total > 0 && counts.approved === counts.total;
-                    const clientFinished = campaign.status === "CLOSED" && counts.total > 0;
-                    const waitingClient = campaign.status === "OPEN" && counts.pending > 0 && !isExpired;
-
-                    let rowBg = "";
-                    let alertBadge = null;
-
-                    if (clientFinished && hasAdjustment) {
-                      rowBg = "bg-amber-900/10";
-                      alertBadge = (
-                        <span className="flex items-center gap-1 text-xs font-semibold text-amber-400 bg-amber-900/30 border border-amber-500/30 px-2.5 py-1 rounded-full animate-pulse">
-                          ⚠️ Revisar ajustes
-                        </span>
-                      );
-                    } else if (clientFinished && isFullyApproved) {
-                      rowBg = "bg-emerald-900/10";
-                      alertBadge = (
-                        <span className="flex items-center gap-1 text-xs font-semibold text-emerald-400 bg-emerald-900/30 border border-emerald-500/30 px-2.5 py-1 rounded-full">
-                          ✅ Tudo aprovado — publicar
-                        </span>
-                      );
-                    } else if (clientFinished) {
-                      rowBg = "bg-blue-900/10";
-                      alertBadge = (
-                        <span className="flex items-center gap-1 text-xs font-semibold text-blue-400 bg-blue-900/30 border border-blue-500/30 px-2.5 py-1 rounded-full">
-                          📋 Cliente finalizou revisão
-                        </span>
-                      );
-                    } else if (waitingClient) {
-                      alertBadge = (
-                        <span className="text-xs text-gray-500">
-                          Aguardando cliente
-                        </span>
-                      );
-                    }
-
-                    return (
-                      <Link
-                        key={campaign.id}
-                        href={`/admin/campaigns/${campaign.id}`}
-                        className={`px-5 py-3.5 flex items-center gap-4 hover:bg-white/[0.03] transition-colors cursor-pointer block ${rowBg}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white text-sm font-medium truncate">{campaign.name}</p>
-                          <p className="text-gray-500 text-xs mt-0.5">
-                            {counts.total} {counts.total === 1 ? "post" : "posts"} · expira{" "}
-                            {new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}
-                            {waitingClient && (
-                              <span className={`ml-2 font-medium ${daysSinceCreated >= 3 ? "text-red-400" : "text-amber-400"}`}>
-                                · {daysSinceCreated === 0 ? "enviado hoje" : daysSinceCreated === 1 ? "há 1 dia" : `há ${daysSinceCreated} dias`} sem aprovação
-                              </span>
-                            )}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-3 text-xs shrink-0">
-                          {alertBadge}
-                          {!clientFinished && (
-                            <>
-                              {counts.approved > 0 && <span className="text-emerald-400">✅ {counts.approved}</span>}
-                              {counts.adjustment > 0 && <span className="text-amber-400">✏️ {counts.adjustment}</span>}
-                              {counts.rejected > 0 && <span className="text-red-400">❌ {counts.rejected}</span>}
-                              {counts.pending > 0 && <span className="text-gray-400">⏳ {counts.pending}</span>}
-                            </>
-                          )}
-                          {clientFinished && !alertBadge?.props?.children?.includes("publicar") && (
-                            <div className="flex items-center gap-2 text-xs">
-                              {counts.approved > 0 && <span className="text-emerald-400">✅ {counts.approved}</span>}
-                              {counts.adjustment > 0 && <span className="text-amber-400">✏️ {counts.adjustment}</span>}
-                              {counts.rejected > 0 && <span className="text-red-400">❌ {counts.rejected}</span>}
-                            </div>
-                          )}
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
-                            : isExpired ? "bg-red-900/30 text-red-400"
-                            : "bg-emerald-900/30 text-emerald-400"
-                          }`}>
-                            {campaign.status === "CLOSED" ? "Fechado" : isExpired ? "Expirado" : "Aberto"}
-                          </span>
-                        </div>
-                      </Link>
+                  } else if (clientFinished && isFullyApproved) {
+                    rowBg = "bg-emerald-900/10";
+                    alertBadge = (
+                      <span className="flex items-center gap-1 text-xs font-semibold text-emerald-400 bg-emerald-900/30 border border-emerald-500/30 px-2.5 py-1 rounded-full">
+                        ✅ Tudo aprovado — publicar
+                      </span>
                     );
-                  })}
-                  {client.campaigns.length > 3 && (
-                    <div className="px-5 py-2.5">
-                      <Link href={`/admin/clients/${client.id}`} className="text-gray-500 hover:text-gray-300 text-xs transition-colors">
-                        +{client.campaigns.length - 3} campanhas mais →
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))
-        )}
+                  } else if (clientFinished) {
+                    rowBg = "bg-blue-900/10";
+                    alertBadge = (
+                      <span className="flex items-center gap-1 text-xs font-semibold text-blue-400 bg-blue-900/30 border border-blue-500/30 px-2.5 py-1 rounded-full">
+                        📋 Cliente finalizou revisão
+                      </span>
+                    );
+                  } else if (waitingClient) {
+                    alertBadge = (
+                      <span className="text-xs text-gray-500">Aguardando cliente</span>
+                    );
+                  }
+
+                  return (
+                    <Link
+                      key={campaign.id}
+                      href={`/admin/campaigns/${campaign.id}`}
+                      className={`px-5 py-3.5 flex items-center gap-4 hover:bg-white/[0.03] transition-colors cursor-pointer block ${rowBg}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-medium truncate">{campaign.name}</p>
+                        <p className="text-gray-500 text-xs mt-0.5">
+                          <Link
+                            href={`/admin/clients/${client.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-gray-400 hover:text-white transition-colors"
+                          >
+                            {client.name}
+                          </Link>
+                          {" · "}{counts.total} {counts.total === 1 ? "post" : "posts"} · expira{" "}
+                          {new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}
+                          {waitingClient && (
+                            <span className={`ml-2 font-medium ${daysSinceCreated >= 3 ? "text-red-400" : "text-amber-400"}`}>
+                              · {daysSinceCreated === 0 ? "enviado hoje" : daysSinceCreated === 1 ? "há 1 dia" : `há ${daysSinceCreated} dias`} sem aprovação
+                            </span>
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-xs shrink-0">
+                        {alertBadge}
+                        {!clientFinished && (
+                          <>
+                            {counts.approved > 0 && <span className="text-emerald-400">✅ {counts.approved}</span>}
+                            {counts.adjustment > 0 && <span className="text-amber-400">✏️ {counts.adjustment}</span>}
+                            {counts.rejected > 0 && <span className="text-red-400">❌ {counts.rejected}</span>}
+                            {counts.pending > 0 && <span className="text-gray-400">⏳ {counts.pending}</span>}
+                          </>
+                        )}
+                        {clientFinished && !alertBadge?.props?.children?.includes("publicar") && (
+                          <div className="flex items-center gap-2 text-xs">
+                            {counts.approved > 0 && <span className="text-emerald-400">✅ {counts.approved}</span>}
+                            {counts.adjustment > 0 && <span className="text-amber-400">✏️ {counts.adjustment}</span>}
+                            {counts.rejected > 0 && <span className="text-red-400">❌ {counts.rejected}</span>}
+                          </div>
+                        )}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
+                          : isExpired ? "bg-red-900/30 text-red-400"
+                          : "bg-emerald-900/30 text-emerald-400"
+                        }`}>
+                          {campaign.status === "CLOSED" ? "Fechado" : isExpired ? "Expirado" : "Aberto"}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Clients quick access */}
+      <div className="space-y-2">
+        <p className="text-xs text-gray-500 uppercase tracking-wider">Clientes</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {clients.map((client) => (
+            <Link
+              key={client.id}
+              href={`/admin/clients/${client.id}`}
+              className="bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 hover:bg-white/[0.05] transition-colors"
+            >
+              <p className="text-white text-sm font-medium truncate">{client.name}</p>
+              <p className="text-gray-500 text-xs mt-0.5">{client.campaigns.length} {client.campaigns.length === 1 ? "campanha" : "campanhas"}</p>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );
