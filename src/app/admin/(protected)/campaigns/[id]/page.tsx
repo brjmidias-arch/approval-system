@@ -235,6 +235,14 @@ export default function CampaignPage() {
     fetchCampaign();
   }
 
+  async function handleDeleteGroup(items: ContentItem[]) {
+    if (!confirm(`Excluir este post (${items.length} ${items.length === 1 ? "slide" : "slides"})? Esta ação não pode ser desfeita.`)) return;
+    for (const item of items) {
+      await fetch(`/api/admin/campaigns/${id}/items/${item.id}`, { method: "DELETE" });
+    }
+    fetchCampaign();
+  }
+
   async function handleDeleteItem(itemId: string) {
     if (!confirm("Remover este item?")) return;
     await fetch(`/api/admin/campaigns/${id}/items/${itemId}`, { method: "DELETE" });
@@ -671,18 +679,26 @@ export default function CampaignPage() {
               const firstItem = slides[0];
               return (
                 <div key={`carousel-${gi}`} className="px-5 py-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    {firstItem.title && (
-                      <span className="text-white text-sm font-medium">{firstItem.title}</span>
-                    )}
-                    <span className="text-xs font-medium text-purple-400 bg-purple-900/20 px-2 py-0.5 rounded">
-                      Carrossel — {slides.length} slides
-                    </span>
-                    {firstItem.scheduledDate && (
-                      <span className="text-xs text-gray-500">
-                        {new Date(firstItem.scheduledDate).toLocaleDateString("pt-BR")}
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2">
+                      {firstItem.title && (
+                        <span className="text-white text-sm font-medium">{firstItem.title}</span>
+                      )}
+                      <span className="text-xs font-medium text-purple-400 bg-purple-900/20 px-2 py-0.5 rounded">
+                        Carrossel — {slides.length} slides
                       </span>
-                    )}
+                      {firstItem.scheduledDate && (
+                        <span className="text-xs text-gray-500">
+                          {new Date(firstItem.scheduledDate).toLocaleDateString("pt-BR")}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleDeleteGroup(slides)}
+                      className="text-xs px-2.5 py-1 bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-lg transition-colors shrink-0"
+                    >
+                      Excluir post
+                    </button>
                   </div>
                   <CarouselCard
                     campaignId={id}
