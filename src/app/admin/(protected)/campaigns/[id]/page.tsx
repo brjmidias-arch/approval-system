@@ -145,6 +145,12 @@ export default function CampaignPage() {
     alert("E-mail reenviado com sucesso!");
   }
 
+  async function handleDeleteCampaign() {
+    if (!confirm(`Excluir a campanha "${campaign!.name}" e todos os conteúdos? Esta ação não pode ser desfeita.`)) return;
+    await fetch(`/api/admin/campaigns/${id}`, { method: "DELETE" });
+    window.location.href = `/admin/clients/${campaign!.client.id}`;
+  }
+
   async function handleToggleStatus() {
     const newStatus = campaign!.status === "OPEN" ? "CLOSED" : "OPEN";
     await fetch(`/api/admin/campaigns/${id}`, {
@@ -234,6 +240,9 @@ export default function CampaignPage() {
             </button>
             <button onClick={() => setShowUploadForm(true)} className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
               + Upload
+            </button>
+            <button onClick={handleDeleteCampaign} className="text-sm px-3 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded-lg transition-colors">
+              Excluir Campanha
             </button>
           </div>
         </div>
