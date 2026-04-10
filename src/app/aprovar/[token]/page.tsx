@@ -342,7 +342,7 @@ export default function ApprovalPage() {
                             <div className="relative">
                               <video src={item.fileUrl} controls className="w-full max-h-[500px]" id={`video-${item.id}`} />
                               <button
-                                onClick={() => { const v = document.getElementById(`video-${item.id}`) as HTMLVideoElement; v?.requestFullscreen?.(); }}
+                                onClick={() => { const v = document.getElementById(`video-${item.id}`) as HTMLVideoElement & { webkitEnterFullscreen?: () => void }; v?.requestFullscreen?.() ?? v?.webkitEnterFullscreen?.(); }}
                                 className="absolute bottom-12 right-2 bg-black/60 hover:bg-black/80 text-white text-xs px-2.5 py-1.5 rounded-lg transition-colors"
                               >
                                 ⛶ Tela cheia
@@ -381,7 +381,7 @@ export default function ApprovalPage() {
                     <div className="relative">
                       <video src={currentItem.fileUrl} controls className="w-full max-h-[500px]" id={`video-single-${currentItem.id}`} />
                       <button
-                        onClick={() => { const v = document.getElementById(`video-single-${currentItem.id}`) as HTMLVideoElement; v?.requestFullscreen?.(); }}
+                        onClick={() => { const v = document.getElementById(`video-single-${currentItem.id}`) as HTMLVideoElement & { webkitEnterFullscreen?: () => void }; v?.requestFullscreen?.() ?? v?.webkitEnterFullscreen?.(); }}
                         className="absolute bottom-12 right-2 bg-black/60 hover:bg-black/80 text-white text-xs px-2.5 py-1.5 rounded-lg transition-colors"
                       >
                         ⛶ Tela cheia
