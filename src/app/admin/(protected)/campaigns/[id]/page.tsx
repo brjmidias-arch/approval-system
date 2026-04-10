@@ -38,7 +38,7 @@ interface Campaign {
   contentItems: ContentItem[];
 }
 
-const CONTENT_TYPES: ContentType[] = ["POST_FEED", "CARROSSEL", "REELS", "STORIES"];
+const CONTENT_TYPES: ContentType[] = ["CARROSSEL", "POST_FEED", "REELS", "STORIES"];
 
 export default function CampaignPage() {
   const { id } = useParams<{ id: string }>();
@@ -48,7 +48,7 @@ export default function CampaignPage() {
   const [uploadForm, setUploadForm] = useState({
     caption: "",
     scheduledDate: "",
-    contentType: "POST_FEED" as ContentType,
+    contentType: "CARROSSEL" as ContentType,
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
