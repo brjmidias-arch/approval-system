@@ -6,6 +6,7 @@ import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import { CONTENT_TYPE_LABELS, APPROVAL_STATUS_LABELS, APPROVAL_STATUS_COLORS } from "@/types";
 import type { ContentType, ApprovalStatus } from "@/types";
+import CarouselCard from "@/components/admin/CarouselCard";
 
 interface ApprovalItem {
   id: string;
@@ -59,6 +60,8 @@ export default function CampaignPage() {
   const [liveStatus, setLiveStatus] = useState<{ reviewed: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addFilesRef = useRef<HTMLInputElement>(null);
+
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   // Edit modal
   const [editingGroup, setEditingGroup] = useState<{ groupId: string | null; firstItemId: string; items: ContentItem[] } | null>(null);
@@ -467,6 +470,21 @@ export default function CampaignPage() {
         </div>
       )}
 
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <div className="relative max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setLightboxUrl(null)} className="absolute -top-10 right-0 text-white/60 hover:text-white text-sm">
+              ✕ Fechar
+            </button>
+            <img src={lightboxUrl} alt="" className="w-full rounded-xl object-contain max-h-[85vh]" />
+          </div>
+        </div>
+      )}
+
       {/* Edit Modal */}
       {editingGroup && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -564,7 +582,12 @@ export default function CampaignPage() {
                   <div key={item.id} className="flex items-start gap-4 px-5 py-4">
                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-black/40 shrink-0 flex items-center justify-center">
                       {item.fileType === "IMAGE" ? (
-                        <img src={item.fileUrl} alt="" className="w-full h-full object-cover" />
+                        <img
+                          src={item.fileUrl}
+                          alt=""
+                          className="w-full h-full object-cover cursor-zoom-in"
+                          onClick={() => setLightboxUrl(item.fileUrl)}
+                        />
                       ) : item.fileType === "VIDEO" ? (
                         <span className="text-2xl">🎬</span>
                       ) : (
@@ -626,50 +649,17 @@ export default function CampaignPage() {
                       </span>
                     )}
                   </div>
-                  <div className="flex gap-2 overflow-x-auto pb-2">
-                    {slides.map((slide, si) => {
-                      const statusKey = (slide.approvalItem?.status || "PENDING") as ApprovalStatus;
-                      return (
-                        <div key={slide.id} className="shrink-0 w-24">
-                          <div className="w-24 h-24 rounded-lg overflow-hidden bg-black/40 relative">
-                            {slide.fileType === "IMAGE" ? (
-                              <img src={slide.fileUrl} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-2xl">🎬</div>
-                            )}
-                            <span className="absolute bottom-1 left-1 text-xs bg-black/60 text-white px-1 rounded">
-                              {si + 1}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between mt-1">
-                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${APPROVAL_STATUS_COLORS[statusKey]}`}>
-                              {APPROVAL_STATUS_LABELS[statusKey]}
-                            </span>
-                            <button onClick={() => handleDeleteItem(slide.id)} className="text-red-500 hover:text-red-400 text-xs">
-                              ✕
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {firstItem.caption && (
-                    <p className="text-sm text-gray-400 mt-2 line-clamp-2">{firstItem.caption}</p>
-                  )}
-                  {slides[0].approvalItem?.clientComment && (
-                    <div className="mt-2 text-xs text-amber-400 bg-amber-900/20 rounded-lg px-2.5 py-1.5">
-                      <span className="text-amber-500/70">Comentário do cliente: </span>
-                      {slides[0].approvalItem.clientComment}
-                    </div>
-                  )}
-                  <div className="flex gap-2 mt-3">
-                    <button
-                      onClick={() => openEditGroup(slides)}
-                      className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors"
-                    >
-                      Editar / Adicionar slides
-                    </button>
-                  </div>
+                  <CarouselCard
+                    campaignId={id}
+                    slides={slides}
+                    title={firstItem.title}
+                    caption={firstItem.caption}
+                    scheduledDate={firstItem.scheduledDate}
+                    clientComment={slides[0].approvalItem?.clientComment || null}
+                    onDelete={handleDeleteItem}
+                    onEdit={() => openEditGroup(slides)}
+                    onReorder={() => {}}
+                  />
                 </div>
               );
             })}
