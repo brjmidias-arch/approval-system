@@ -60,6 +60,8 @@ export default function CampaignPage() {
   const [liveStatus, setLiveStatus] = useState<{ reviewed: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addFilesRef = useRef<HTMLInputElement>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState("");
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
@@ -261,6 +263,17 @@ export default function CampaignPage() {
     alert("E-mail reenviado com sucesso!");
   }
 
+  async function handleSaveName() {
+    if (!nameValue.trim()) return;
+    await fetch(`/api/admin/campaigns/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: nameValue.trim() }),
+    });
+    setEditingName(false);
+    fetchCampaign();
+  }
+
   async function handleDeleteCampaign() {
     if (!confirm(`Excluir a campanha "${campaign!.name}" e todos os conteúdos? Esta ação não pode ser desfeita.`)) return;
     await fetch(`/api/admin/campaigns/${id}`, { method: "DELETE" });
@@ -334,7 +347,29 @@ export default function CampaignPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold text-white">{campaign.name}</h1>
+              {editingName ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    value={nameValue}
+                    onChange={(e) => setNameValue(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSaveName(); if (e.key === "Escape") setEditingName(false); }}
+                    className="bg-[#0f0f0f] border border-emerald-500 rounded-lg px-3 py-1.5 text-white text-lg font-semibold focus:outline-none w-64"
+                  />
+                  <button onClick={handleSaveName} className="text-emerald-400 hover:text-emerald-300 text-sm">Salvar</button>
+                  <button onClick={() => setEditingName(false)} className="text-gray-500 hover:text-gray-300 text-sm">Cancelar</button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-semibold text-white">{campaign.name}</h1>
+                  <button
+                    onClick={() => { setNameValue(campaign.name); setEditingName(true); }}
+                    className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
+                  >
+                    ✏️
+                  </button>
+                </div>
+              )}
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                 campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
                 : isExpired ? "bg-red-900/30 text-red-400"
