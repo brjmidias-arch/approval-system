@@ -138,6 +138,11 @@ export default async function AdminDashboard() {
                     const counts = getStatusCounts(campaign);
                     const isExpired = new Date() > new Date(campaign.expiresAt) && campaign.status === "OPEN";
 
+                    // Days since campaign was created
+                    const daysSinceCreated = Math.floor(
+                      (Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+                    );
+
                     // Determine visual state
                     const hasAdjustment = counts.adjustment > 0 || counts.rejected > 0;
                     const isFullyApproved = counts.total > 0 && counts.approved === counts.total;
@@ -187,6 +192,11 @@ export default async function AdminDashboard() {
                           <p className="text-gray-500 text-xs mt-0.5">
                             {counts.total} {counts.total === 1 ? "post" : "posts"} · expira{" "}
                             {new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}
+                            {waitingClient && (
+                              <span className={`ml-2 font-medium ${daysSinceCreated >= 3 ? "text-red-400" : "text-amber-400"}`}>
+                                · {daysSinceCreated === 0 ? "enviado hoje" : daysSinceCreated === 1 ? "há 1 dia" : `há ${daysSinceCreated} dias`} sem aprovação
+                              </span>
+                            )}
                           </p>
                         </div>
 
