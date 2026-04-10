@@ -271,69 +271,109 @@ export default function ApprovalPage() {
               )}
 
               {/* Media */}
-              <div className="relative bg-black">
-                {currentItem.fileType === "IMAGE" && (
-                  <div className="relative">
-                    <img
-                      src={currentItem.fileUrl}
-                      alt=""
-                      className="w-full max-h-[500px] object-contain"
-                    />
-                    <div className="absolute inset-0 flex items-end justify-end p-3 pointer-events-none">
-                      <span className="text-white/30 text-xs font-medium tracking-wider select-none">
-                        PRÉVIA · BRJ Mídias
-                      </span>
+              {isCarousel && items.length > 1 ? (
+                // Carousel with swipe support
+                <div className="relative bg-black select-none">
+                  {/* Preload all images */}
+                  <div className="hidden">
+                    {items.filter(i => i.fileType === "IMAGE").map(i => (
+                      <img key={i.id} src={i.fileUrl} alt="" />
+                    ))}
+                  </div>
+
+                  {/* Sliding track */}
+                  <div
+                    className="overflow-hidden"
+                    onTouchStart={(e) => {
+                      const touch = e.touches[0];
+                      (e.currentTarget as HTMLDivElement).dataset.startX = String(touch.clientX);
+                      (e.currentTarget as HTMLDivElement).dataset.startY = String(touch.clientY);
+                    }}
+                    onTouchEnd={(e) => {
+                      const startX = Number((e.currentTarget as HTMLDivElement).dataset.startX);
+                      const startY = Number((e.currentTarget as HTMLDivElement).dataset.startY);
+                      const endX = e.changedTouches[0].clientX;
+                      const endY = e.changedTouches[0].clientY;
+                      const diffX = startX - endX;
+                      const diffY = Math.abs(startY - e.changedTouches[0].clientY);
+                      // Only swipe if horizontal movement dominates
+                      if (Math.abs(diffX) < 40 || diffY > Math.abs(diffX)) return;
+                      if (diffX > 0) {
+                        setCarouselSlide((prev) => ({ ...prev, [group.groupKey]: Math.min(items.length - 1, currentSlide + 1) }));
+                      } else {
+                        setCarouselSlide((prev) => ({ ...prev, [group.groupKey]: Math.max(0, currentSlide - 1) }));
+                      }
+                    }}
+                  >
+                    <div
+                      className="flex transition-transform duration-300 ease-out"
+                      style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+                    >
+                      {items.map((item) => (
+                        <div key={item.id} className="w-full shrink-0 relative">
+                          {item.fileType === "IMAGE" ? (
+                            <>
+                              <img src={item.fileUrl} alt="" className="w-full max-h-[500px] object-contain" />
+                              <div className="absolute inset-0 flex items-end justify-end p-3 pointer-events-none">
+                                <span className="text-white/30 text-xs font-medium tracking-wider select-none">PRÉVIA · BRJ Mídias</span>
+                              </div>
+                            </>
+                          ) : (
+                            <video src={item.fileUrl} controls className="w-full max-h-[500px]" />
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
-                )}
-                {currentItem.fileType === "VIDEO" && (
-                  <div className="relative">
-                    <video src={currentItem.fileUrl} controls className="w-full max-h-[500px]" />
-                    <div className="absolute top-2 right-2 pointer-events-none">
-                      <span className="text-white/40 text-xs bg-black/50 px-2 py-1 rounded select-none">
-                        PRÉVIA · BRJ Mídias
-                      </span>
+
+                  {/* Arrows — visible on desktop, subtle on mobile */}
+                  <button
+                    onClick={() => setCarouselSlide((prev) => ({ ...prev, [group.groupKey]: Math.max(0, currentSlide - 1) }))}
+                    disabled={currentSlide === 0}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 text-white text-xl flex items-center justify-center disabled:opacity-20 transition-opacity"
+                  >‹</button>
+                  <button
+                    onClick={() => setCarouselSlide((prev) => ({ ...prev, [group.groupKey]: Math.min(items.length - 1, currentSlide + 1) }))}
+                    disabled={currentSlide === items.length - 1}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 text-white text-xl flex items-center justify-center disabled:opacity-20 transition-opacity"
+                  >›</button>
+                </div>
+              ) : (
+                // Single item
+                <div className="relative bg-black">
+                  {currentItem.fileType === "IMAGE" && (
+                    <div className="relative">
+                      <img src={currentItem.fileUrl} alt="" className="w-full max-h-[500px] object-contain" />
+                      <div className="absolute inset-0 flex items-end justify-end p-3 pointer-events-none">
+                        <span className="text-white/30 text-xs font-medium tracking-wider select-none">PRÉVIA · BRJ Mídias</span>
+                      </div>
                     </div>
-                  </div>
-                )}
-                {currentItem.fileType === "PDF" && (
-                  <div className="flex items-center justify-center h-32 gap-3">
-                    <span className="text-3xl">📄</span>
-                    <a href={currentItem.fileUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-400 text-sm">
-                      Abrir PDF →
-                    </a>
-                  </div>
-                )}
+                  )}
+                  {currentItem.fileType === "VIDEO" && (
+                    <div className="relative">
+                      <video src={currentItem.fileUrl} controls className="w-full max-h-[500px]" />
+                      <div className="absolute top-2 right-2 pointer-events-none">
+                        <span className="text-white/40 text-xs bg-black/50 px-2 py-1 rounded select-none">PRÉVIA · BRJ Mídias</span>
+                      </div>
+                    </div>
+                  )}
+                  {currentItem.fileType === "PDF" && (
+                    <div className="flex items-center justify-center h-32 gap-3">
+                      <span className="text-3xl">📄</span>
+                      <a href={currentItem.fileUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-400 text-sm">Abrir PDF →</a>
+                    </div>
+                  )}
+                </div>
+              )}
 
-                {/* Carousel navigation arrows */}
-                {isCarousel && items.length > 1 && (
-                  <>
-                    <button
-                      onClick={() => setCarouselSlide((prev) => ({ ...prev, [group.groupKey]: Math.max(0, currentSlide - 1) }))}
-                      disabled={currentSlide === 0}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center disabled:opacity-30 hover:bg-black/80 transition-colors"
-                    >
-                      ‹
-                    </button>
-                    <button
-                      onClick={() => setCarouselSlide((prev) => ({ ...prev, [group.groupKey]: Math.min(items.length - 1, currentSlide + 1) }))}
-                      disabled={currentSlide === items.length - 1}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center disabled:opacity-30 hover:bg-black/80 transition-colors"
-                    >
-                      ›
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {/* Carousel dots */}
+              {/* Dots */}
               {isCarousel && items.length > 1 && (
                 <div className="flex justify-center gap-1.5 py-2 bg-black">
                   {items.map((_, si) => (
                     <button
                       key={si}
                       onClick={() => setCarouselSlide((prev) => ({ ...prev, [group.groupKey]: si }))}
-                      className={`w-1.5 h-1.5 rounded-full transition-colors ${si === currentSlide ? "bg-white" : "bg-white/30"}`}
+                      className={`w-2 h-2 rounded-full transition-all ${si === currentSlide ? "bg-white scale-125" : "bg-white/30"}`}
                     />
                   ))}
                 </div>
