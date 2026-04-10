@@ -63,6 +63,14 @@ export default function CampaignPage() {
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setLightboxUrl(null);
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
+
   // Edit modal
   const [editingGroup, setEditingGroup] = useState<{ groupId: string | null; firstItemId: string; items: ContentItem[] } | null>(null);
   const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "" });
@@ -478,7 +486,7 @@ export default function CampaignPage() {
         >
           <div className="relative max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
             <button onClick={() => setLightboxUrl(null)} className="absolute -top-10 right-0 text-white/60 hover:text-white text-sm">
-              ✕ Fechar
+              ✕ Fechar (Esc)
             </button>
             <img src={lightboxUrl} alt="" className="w-full rounded-xl object-contain max-h-[85vh]" />
           </div>

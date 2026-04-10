@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   DndContext,
   closestCenter,
@@ -63,31 +63,30 @@ function SortableSlide({
 
   return (
     <div ref={setNodeRef} style={style} className="shrink-0 w-24">
-      <div
-        className="w-24 h-24 rounded-lg overflow-hidden bg-black/40 relative cursor-grab active:cursor-grabbing"
-        {...attributes}
-        {...listeners}
-      >
+      <div className="w-24 h-24 rounded-lg overflow-hidden bg-black/40 relative">
+        {/* Drag handle — área superior */}
+        <div
+          className="absolute top-0 left-0 right-0 h-7 cursor-grab active:cursor-grabbing z-10 flex items-center justify-center bg-gradient-to-b from-black/50 to-transparent"
+          {...attributes}
+          {...listeners}
+        >
+          <span className="text-white/60 text-xs select-none">⠿ arrastar</span>
+        </div>
+
+        {/* Imagem clicável para preview */}
         {slide.fileType === "IMAGE" ? (
           <img
             src={slide.fileUrl}
             alt=""
-            className="w-full h-full object-cover"
-            onClick={(e) => {
-              e.stopPropagation();
-              onPreview(slide.fileUrl);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            style={{ cursor: "zoom-in" }}
+            className="w-full h-full object-cover cursor-zoom-in"
+            onClick={() => onPreview(slide.fileUrl)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-2xl">🎬</div>
         )}
+
         <span className="absolute bottom-1 left-1 text-xs bg-black/60 text-white px-1 rounded pointer-events-none">
           {index + 1}
-        </span>
-        <span className="absolute top-1 right-1 text-xs bg-black/60 text-white px-1 rounded pointer-events-none">
-          ⠿
         </span>
       </div>
       <div className="flex items-center justify-between mt-1">
@@ -100,6 +99,33 @@ function SortableSlide({
         >
           ✕
         </button>
+      </div>
+    </div>
+  );
+}
+
+function Lightbox({ url, onClose }: { url: string; onClose: () => void }) {
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div className="relative max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={onClose}
+          className="absolute -top-10 right-0 text-white/60 hover:text-white text-sm"
+        >
+          ✕ Fechar (Esc)
+        </button>
+        <img src={url} alt="" className="w-full rounded-xl object-contain max-h-[85vh]" />
       </div>
     </div>
   );
@@ -119,7 +145,9 @@ export default function CarouselCard({
   const [slides, setSlides] = useState(initialSlides);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -141,23 +169,7 @@ export default function CarouselCard({
 
   return (
     <>
-      {/* Lightbox */}
-      {previewUrl && (
-        <div
-          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
-          onClick={() => setPreviewUrl(null)}
-        >
-          <div className="relative max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setPreviewUrl(null)}
-              className="absolute -top-10 right-0 text-white/60 hover:text-white text-sm"
-            >
-              ✕ Fechar
-            </button>
-            <img src={previewUrl} alt="" className="w-full rounded-xl object-contain max-h-[85vh]" />
-          </div>
-        </div>
-      )}
+      {previewUrl && <Lightbox url={previewUrl} onClose={() => setPreviewUrl(null)} />}
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={slides.map((s) => s.id)} strategy={horizontalListSortingStrategy}>
