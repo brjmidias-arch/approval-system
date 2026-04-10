@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
 
 export default function AdminNav() {
   const pathname = usePathname();
@@ -33,12 +32,6 @@ export default function AdminNav() {
             ))}
           </div>
         </div>
-        <button
-          onClick={() => signOut({ callbackUrl: "/admin/login" })}
-          className="text-gray-400 hover:text-white text-sm transition-colors"
-        >
-          Sair
-        </button>
       </div>
     </nav>
   );
