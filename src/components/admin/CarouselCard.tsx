@@ -48,7 +48,7 @@ function SortableSlide({
   slide: SlideItem;
   index: number;
   onDelete: (id: string) => void;
-  onPreview: (url: string) => void;
+  onPreview: (index: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: slide.id });
@@ -79,7 +79,7 @@ function SortableSlide({
             src={slide.fileUrl}
             alt=""
             className="w-full h-full object-cover cursor-zoom-in"
-            onClick={() => onPreview(slide.fileUrl)}
+            onClick={() => onPreview(index)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-2xl">🎬</div>
@@ -104,28 +104,60 @@ function SortableSlide({
   );
 }
 
-function Lightbox({ url, onClose }: { url: string; onClose: () => void }) {
+function Lightbox({
+  urls,
+  initialIndex,
+  onClose,
+}: {
+  urls: string[];
+  initialIndex: number;
+  onClose: () => void;
+}) {
+  const [index, setIndex] = useState(initialIndex);
+
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") setIndex((i) => Math.min(i + 1, urls.length - 1));
+      if (e.key === "ArrowLeft") setIndex((i) => Math.max(i - 1, 0));
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
+  }, [onClose, urls.length]);
 
   return (
     <div
       className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
-      <div className="relative max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
+      <div className="relative max-w-4xl w-full flex items-center" onClick={(e) => e.stopPropagation()}>
+        {/* Seta esquerda */}
         <button
-          onClick={onClose}
-          className="absolute -top-10 right-0 text-white/60 hover:text-white text-sm"
+          onClick={() => setIndex((i) => Math.max(i - 1, 0))}
+          disabled={index === 0}
+          className="absolute -left-12 text-white/60 hover:text-white text-4xl disabled:opacity-20 transition-colors select-none"
         >
-          ✕ Fechar (Esc)
+          ‹
         </button>
-        <img src={url} alt="" className="w-full rounded-xl object-contain max-h-[85vh]" />
+
+        <div className="flex-1">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-white/40 text-xs">{index + 1} / {urls.length}</span>
+            <button onClick={onClose} className="text-white/60 hover:text-white text-sm">
+              ✕ Fechar (Esc)
+            </button>
+          </div>
+          <img src={urls[index]} alt="" className="w-full rounded-xl object-contain max-h-[85vh]" />
+        </div>
+
+        {/* Seta direita */}
+        <button
+          onClick={() => setIndex((i) => Math.min(i + 1, urls.length - 1))}
+          disabled={index === urls.length - 1}
+          className="absolute -right-12 text-white/60 hover:text-white text-4xl disabled:opacity-20 transition-colors select-none"
+        >
+          ›
+        </button>
       </div>
     </div>
   );
@@ -143,7 +175,8 @@ export default function CarouselCard({
   onReorder,
 }: Props) {
   const [slides, setSlides] = useState(initialSlides);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const imageUrls = slides.filter((s) => s.fileType === "IMAGE").map((s) => s.fileUrl);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -169,7 +202,13 @@ export default function CarouselCard({
 
   return (
     <>
-      {previewUrl && <Lightbox url={previewUrl} onClose={() => setPreviewUrl(null)} />}
+      {previewIndex !== null && (
+        <Lightbox
+          urls={imageUrls}
+          initialIndex={previewIndex}
+          onClose={() => setPreviewIndex(null)}
+        />
+      )}
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={slides.map((s) => s.id)} strategy={horizontalListSortingStrategy}>
@@ -180,7 +219,7 @@ export default function CarouselCard({
                 slide={slide}
                 index={si}
                 onDelete={onDelete}
-                onPreview={setPreviewUrl}
+                onPreview={setPreviewIndex}
               />
             ))}
           </div>
