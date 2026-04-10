@@ -15,6 +15,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   if (!campaign) return NextResponse.json({ error: "Campanha não encontrada" }, { status: 404 });
 
+  if (!campaign.client.email) {
+    return NextResponse.json({ error: "Cliente não possui e-mail cadastrado" }, { status: 400 });
+  }
+
   const approvalUrl = `${process.env.NEXTAUTH_URL}/aprovar/${campaign.token}`;
 
   const transporter = nodemailer.createTransport({
