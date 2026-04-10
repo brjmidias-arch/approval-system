@@ -4,13 +4,37 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
 function getStatusCounts(campaign: {
-  approvalItems: { status: string }[];
-  contentItems: { id: string }[];
+  approvalItems: { status: string; contentItemId: string }[];
+  contentItems: { id: string; groupId: string | null; contentType: string }[];
 }) {
-  const total = campaign.contentItems.length;
-  const approved = campaign.approvalItems.filter((a) => a.status === "APPROVED").length;
-  const adjustment = campaign.approvalItems.filter((a) => a.status === "ADJUSTMENT").length;
-  const rejected = campaign.approvalItems.filter((a) => a.status === "REJECTED").length;
+  // Count posts: carousels with same groupId = 1 post, others = 1 each
+  const seenGroupIds = new Set<string>();
+  const posts: { id: string; groupId: string | null }[] = [];
+  for (const item of campaign.contentItems) {
+    if (item.contentType === "CARROSSEL" && item.groupId) {
+      if (seenGroupIds.has(item.groupId)) continue;
+      seenGroupIds.add(item.groupId);
+      posts.push({ id: item.id, groupId: item.groupId });
+    } else {
+      posts.push({ id: item.id, groupId: null });
+    }
+  }
+
+  // For each post, find its approval status (first item of the group)
+  const getPostStatus = (post: { id: string; groupId: string | null }) => {
+    if (post.groupId) {
+      const groupItems = campaign.contentItems.filter((c) => c.groupId === post.groupId);
+      const approval = campaign.approvalItems.find((a) => a.contentItemId === groupItems[0]?.id);
+      return approval?.status || "PENDING";
+    }
+    const approval = campaign.approvalItems.find((a) => a.contentItemId === post.id);
+    return approval?.status || "PENDING";
+  };
+
+  const total = posts.length;
+  const approved = posts.filter((p) => getPostStatus(p) === "APPROVED").length;
+  const adjustment = posts.filter((p) => getPostStatus(p) === "ADJUSTMENT").length;
+  const rejected = posts.filter((p) => getPostStatus(p) === "REJECTED").length;
   const pending = total - approved - adjustment - rejected;
   return { total, approved, adjustment, rejected, pending };
 }
@@ -21,7 +45,7 @@ export default async function AdminDashboard() {
       campaigns: {
         include: {
           approvalItems: true,
-          contentItems: true,
+          contentItems: { select: { id: true, groupId: true, contentType: true } },
         },
         orderBy: { createdAt: "desc" },
       },
@@ -114,7 +138,7 @@ export default async function AdminDashboard() {
                             {campaign.name}
                           </Link>
                           <p className="text-gray-500 text-xs mt-0.5">
-                            {counts.total} itens · expira{" "}
+                            {counts.total} {counts.total === 1 ? "post" : "posts"} · expira{" "}
                             {new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
