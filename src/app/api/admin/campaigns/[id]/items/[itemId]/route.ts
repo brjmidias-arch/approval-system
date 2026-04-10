@@ -2,8 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import path from "path";
-import fs from "fs/promises";
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string; itemId: string } }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json();
+  const { title, caption, scheduledDate } = body;
+
+  const item = await prisma.contentItem.update({
+    where: { id: params.itemId },
+    data: {
+      ...(title !== undefined && { title: title || null }),
+      ...(caption !== undefined && { caption: caption || null }),
+      ...(scheduledDate !== undefined && {
+        scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+      }),
+    },
+  });
+
+  return NextResponse.json(item);
+}
 
 export async function DELETE(
   req: NextRequest,
@@ -17,16 +39,6 @@ export async function DELETE(
   });
 
   if (!item) return NextResponse.json({ error: "Item não encontrado" }, { status: 404 });
-
-  // Try to delete the file from disk
-  if (item.fileUrl.startsWith("/uploads/")) {
-    const filePath = path.join(process.cwd(), "public", item.fileUrl);
-    try {
-      await fs.unlink(filePath);
-    } catch {
-      // File may already be deleted, ignore
-    }
-  }
 
   await prisma.contentItem.delete({ where: { id: params.itemId } });
   return NextResponse.json({ success: true });

@@ -46,6 +46,7 @@ model ContentItem {
   campaign      Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   fileUrl       String
   fileType      String
+  title         String?
   caption       String?
   scheduledDate DateTime?
   contentType   String

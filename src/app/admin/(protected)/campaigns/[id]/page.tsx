@@ -18,6 +18,7 @@ interface ContentItem {
   id: string;
   fileUrl: string;
   fileType: string;
+  title: string | null;
   caption: string | null;
   scheduledDate: string | null;
   contentType: ContentType;
@@ -46,6 +47,7 @@ export default function CampaignPage() {
   const [loading, setLoading] = useState(true);
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [uploadForm, setUploadForm] = useState({
+    title: "",
     caption: "",
     scheduledDate: "",
     contentType: "CARROSSEL" as ContentType,
@@ -56,6 +58,13 @@ export default function CampaignPage() {
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [liveStatus, setLiveStatus] = useState<{ reviewed: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addFilesRef = useRef<HTMLInputElement>(null);
+
+  // Edit modal
+  const [editingGroup, setEditingGroup] = useState<{ groupId: string | null; firstItemId: string; items: ContentItem[] } | null>(null);
+  const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "" });
+  const [addingSlides, setAddingSlides] = useState(false);
+  const [newSlides, setNewSlides] = useState<File[]>([]);
 
   const isCarousel = uploadForm.contentType === "CARROSSEL";
 
@@ -109,6 +118,7 @@ export default function CampaignPage() {
         body: JSON.stringify({
           fileUrl: url,
           fileType,
+          title: uploadForm.title || null,
           caption: uploadForm.caption,
           scheduledDate: uploadForm.scheduledDate || null,
           contentType: uploadForm.contentType,
@@ -122,8 +132,68 @@ export default function CampaignPage() {
     setUploadProgress("");
     setShowUploadForm(false);
     setSelectedFiles([]);
-    setUploadForm({ caption: "", scheduledDate: "", contentType: "POST_FEED" });
+    setUploadForm({ title: "", caption: "", scheduledDate: "", contentType: "CARROSSEL" });
     if (fileInputRef.current) fileInputRef.current.value = "";
+    fetchCampaign();
+  }
+
+  function openEditGroup(items: ContentItem[]) {
+    const first = items[0];
+    setEditingGroup({ groupId: first.groupId, firstItemId: first.id, items });
+    setEditForm({
+      title: first.title || "",
+      caption: first.caption || "",
+      scheduledDate: first.scheduledDate ? first.scheduledDate.split("T")[0] : "",
+    });
+    setNewSlides([]);
+  }
+
+  async function handleEditSave() {
+    if (!editingGroup) return;
+    setAddingSlides(true);
+
+    // Update title/caption/date for all items in group
+    for (const item of editingGroup.items) {
+      await fetch(`/api/admin/campaigns/${id}/items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editForm.title || null,
+          caption: editForm.caption || null,
+          scheduledDate: editForm.scheduledDate || null,
+        }),
+      });
+    }
+
+    // Upload new slides if any
+    if (newSlides.length > 0) {
+      const baseOrder = editingGroup.items[editingGroup.items.length - 1].order + 1;
+      for (let i = 0; i < newSlides.length; i++) {
+        const formData = new FormData();
+        formData.append("file", newSlides[i]);
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+        if (!uploadRes.ok) continue;
+        const { url, fileType } = await uploadRes.json();
+        await fetch(`/api/admin/campaigns/${id}/items`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileUrl: url,
+            fileType,
+            title: editForm.title || null,
+            caption: editForm.caption || null,
+            scheduledDate: editForm.scheduledDate || null,
+            contentType: "CARROSSEL",
+            groupId: editingGroup.groupId,
+            order: baseOrder + i,
+          }),
+        });
+      }
+    }
+
+    setAddingSlides(false);
+    setEditingGroup(null);
+    setNewSlides([]);
     fetchCampaign();
   }
 
@@ -292,6 +362,19 @@ export default function CampaignPage() {
             <form onSubmit={handleUpload} className="space-y-4">
 
               <div>
+                <label className="block text-sm text-gray-400 mb-1.5">
+                  Nome do post <span className="text-gray-600">(para identificação interna)</span>
+                </label>
+                <input
+                  type="text"
+                  value={uploadForm.title}
+                  onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
+                  placeholder="Ex: Post motivacional semana 1"
+                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
                 <label className="block text-sm text-gray-400 mb-1.5">Tipo de conteúdo</label>
                 <select
                   value={uploadForm.contentType}
@@ -384,6 +467,80 @@ export default function CampaignPage() {
         </div>
       )}
 
+      {/* Edit Modal */}
+      {editingGroup && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h2 className="text-white font-medium mb-4">Editar Post</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Nome do post</label>
+                <input
+                  type="text"
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  placeholder="Ex: Post motivacional semana 1"
+                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Legenda</label>
+                <textarea
+                  value={editForm.caption}
+                  onChange={(e) => setEditForm({ ...editForm, caption: e.target.value })}
+                  rows={3}
+                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Data de publicação</label>
+                <input
+                  type="date"
+                  value={editForm.scheduledDate}
+                  onChange={(e) => setEditForm({ ...editForm, scheduledDate: e.target.value })}
+                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {editingGroup.groupId && (
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">
+                    Adicionar slides ao carrossel <span className="text-gray-600">(opcional)</span>
+                  </label>
+                  <input
+                    ref={addFilesRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,video/mp4"
+                    multiple
+                    onChange={(e) => setNewSlides(Array.from(e.target.files || []))}
+                    className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 file:mr-3 file:py-1 file:px-3 file:bg-white/10 file:text-gray-300 file:rounded file:border-0 file:text-sm cursor-pointer"
+                  />
+                  {newSlides.length > 0 && (
+                    <p className="text-emerald-400 text-xs mt-1">{newSlides.length} slide(s) serão adicionados</p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => { setEditingGroup(null); setNewSlides([]); }}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 py-2.5 rounded-lg text-sm transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleEditSave}
+                  disabled={addingSlides}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm transition-colors font-medium"
+                >
+                  {addingSlides ? "Salvando..." : "Salvar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Content Items */}
       <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden">
         <div className="px-5 py-3.5 border-b border-white/10">
@@ -415,6 +572,9 @@ export default function CampaignPage() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
+                      {item.title && (
+                        <p className="text-white text-sm font-medium mb-0.5">{item.title}</p>
+                      )}
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="text-xs font-medium text-gray-400 bg-white/5 px-2 py-0.5 rounded">
                           {CONTENT_TYPE_LABELS[item.contentType]}
@@ -437,6 +597,9 @@ export default function CampaignPage() {
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${APPROVAL_STATUS_COLORS[statusKey]}`}>
                         {APPROVAL_STATUS_LABELS[statusKey]}
                       </span>
+                      <button onClick={() => openEditGroup([item])} className="text-gray-400 hover:text-white text-sm transition-colors">
+                        Editar
+                      </button>
                       <button onClick={() => handleDeleteItem(item.id)} className="text-red-500 hover:text-red-400 text-sm transition-colors">
                         Remover
                       </button>
@@ -451,6 +614,9 @@ export default function CampaignPage() {
               return (
                 <div key={`carousel-${gi}`} className="px-5 py-4">
                   <div className="flex items-center gap-2 mb-3">
+                    {firstItem.title && (
+                      <span className="text-white text-sm font-medium">{firstItem.title}</span>
+                    )}
                     <span className="text-xs font-medium text-purple-400 bg-purple-900/20 px-2 py-0.5 rounded">
                       Carrossel — {slides.length} slides
                     </span>
@@ -496,6 +662,14 @@ export default function CampaignPage() {
                       {slides[0].approvalItem.clientComment}
                     </div>
                   )}
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => openEditGroup(slides)}
+                      className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors"
+                    >
+                      Editar / Adicionar slides
+                    </button>
+                  </div>
                 </div>
               );
             })}
