@@ -76,6 +76,30 @@ export default async function AdminDashboard() {
     0
   );
 
+  // Flatten and sort all campaigns by urgency (most days waiting = top)
+  type CampaignWithClient = {
+    campaign: (typeof clients)[0]["campaigns"][0];
+    client: (typeof clients)[0];
+  };
+
+  const allCampaigns: CampaignWithClient[] = clients.flatMap((client) =>
+    client.campaigns.map((campaign) => ({ campaign, client }))
+  );
+
+  function urgencyScore(campaign: CampaignWithClient["campaign"]) {
+    const counts = getStatusCounts(campaign);
+    const isExpired = new Date() > new Date(campaign.expiresAt) && campaign.status === "OPEN";
+    const waitingClient = campaign.status === "OPEN" && counts.pending > 0 && !isExpired;
+    if (waitingClient) {
+      return Math.floor((Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+    }
+    return -1;
+  }
+
+  const sortedCampaigns = [...allCampaigns].sort(
+    (a, b) => urgencyScore(b.campaign) - urgencyScore(a.campaign)
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -109,37 +133,17 @@ export default async function AdminDashboard() {
       </div>
 
       {/* Campaigns sorted by urgency */}
-      {(() => {
-        // Flatten all campaigns with client info
-        const allCampaigns = clients.flatMap((client) =>
-          client.campaigns.map((campaign) => ({ campaign, client }))
-        );
-
-        // Score for sorting: waitingClient → days (higher = more urgent), others → -1
-        function urgencyScore(campaign: typeof allCampaigns[0]["campaign"]) {
-          const counts = getStatusCounts(campaign);
-          const isExpired = new Date() > new Date(campaign.expiresAt) && campaign.status === "OPEN";
-          const waitingClient = campaign.status === "OPEN" && counts.pending > 0 && !isExpired;
-          if (waitingClient) {
-            return Math.floor((Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-          }
-          return -1;
-        }
-
-        const sorted = [...allCampaigns].sort((a, b) => urgencyScore(b.campaign) - urgencyScore(a.campaign));
-
-        return (
-          <div className="space-y-4">
-            {sorted.length === 0 ? (
+      <div className="space-y-4">
+        {sortedCampaigns.length === 0 ? (
               <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-8 text-center">
                 <p className="text-gray-400">Nenhum cliente cadastrado ainda.</p>
                 <Link href="/admin/clients" className="inline-block mt-3 text-emerald-400 hover:text-emerald-300 text-sm">
                   Cadastrar primeiro cliente →
                 </Link>
               </div>
-            ) : (
-              <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden divide-y divide-white/5">
-                {sorted.map(({ campaign, client }) => {
+        ) : (
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden divide-y divide-white/5">
+            {sortedCampaigns.map(({ campaign, client }) => {
                   const counts = getStatusCounts(campaign);
                   const isExpired = new Date() > new Date(campaign.expiresAt) && campaign.status === "OPEN";
                   const daysSinceCreated = Math.floor(
@@ -233,12 +237,10 @@ export default async function AdminDashboard() {
                       </div>
                     </Link>
                   );
-                })}
-              </div>
-            )}
+              })}
           </div>
-        );
-      })()}
+        )}
+      </div>
 
       {/* Clients quick access */}
       <div className="space-y-2">
