@@ -339,7 +339,15 @@ export default function ApprovalPage() {
                               </div>
                             </>
                           ) : (
-                            <video src={item.fileUrl} controls className="w-full max-h-[500px]" />
+                            <div className="relative">
+                              <video src={item.fileUrl} controls className="w-full max-h-[500px]" id={`video-${item.id}`} />
+                              <button
+                                onClick={() => { const v = document.getElementById(`video-${item.id}`) as HTMLVideoElement; v?.requestFullscreen?.(); }}
+                                className="absolute bottom-12 right-2 bg-black/60 hover:bg-black/80 text-white text-xs px-2.5 py-1.5 rounded-lg transition-colors"
+                              >
+                                ⛶ Tela cheia
+                              </button>
+                            </div>
                           )}
                         </div>
                       ))}
@@ -371,10 +379,13 @@ export default function ApprovalPage() {
                   )}
                   {currentItem.fileType === "VIDEO" && (
                     <div className="relative">
-                      <video src={currentItem.fileUrl} controls className="w-full max-h-[500px]" />
-                      <div className="absolute top-2 right-2 pointer-events-none">
-                        <span className="text-white/40 text-xs bg-black/50 px-2 py-1 rounded select-none">PRÉVIA · BRJ Mídias</span>
-                      </div>
+                      <video src={currentItem.fileUrl} controls className="w-full max-h-[500px]" id={`video-single-${currentItem.id}`} />
+                      <button
+                        onClick={() => { const v = document.getElementById(`video-single-${currentItem.id}`) as HTMLVideoElement; v?.requestFullscreen?.(); }}
+                        className="absolute bottom-12 right-2 bg-black/60 hover:bg-black/80 text-white text-xs px-2.5 py-1.5 rounded-lg transition-colors"
+                      >
+                        ⛶ Tela cheia
+                      </button>
                     </div>
                   )}
                   {currentItem.fileType === "PDF" && (
