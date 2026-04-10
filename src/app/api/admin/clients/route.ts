@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { name, email, whatsapp } = body;
 
-  if (!name || !email) {
-    return NextResponse.json({ error: "Nome e email são obrigatórios" }, { status: 400 });
+  if (!name) {
+    return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 });
   }
 
   const client = await prisma.client.create({
