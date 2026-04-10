@@ -11,7 +11,7 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { title, caption, scheduledDate } = body;
+  const { title, caption, scheduledDate, fileUrl, fileType } = body;
 
   const item = await prisma.contentItem.update({
     where: { id: params.itemId },
@@ -21,6 +21,8 @@ export async function PATCH(
       ...(scheduledDate !== undefined && {
         scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
       }),
+      ...(fileUrl !== undefined && { fileUrl }),
+      ...(fileType !== undefined && { fileType }),
     },
   });
 

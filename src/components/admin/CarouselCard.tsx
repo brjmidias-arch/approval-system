@@ -27,6 +27,39 @@ interface SlideItem {
   approvalItem: { status: ApprovalStatus; clientComment: string | null } | null;
 }
 
+async function uploadReplacement(
+  campaignId: string,
+  itemId: string,
+  file: File
+): Promise<{ fileUrl: string; fileType: string }> {
+  // Get signed upload URL
+  const urlRes = await fetch("/api/upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contentType: file.type, fileName: file.name }),
+  });
+  if (!urlRes.ok) throw new Error("Erro ao obter URL de upload");
+  const { signedUrl, publicUrl, fileType } = await urlRes.json();
+
+  // Upload directly to Supabase
+  const uploadRes = await fetch(signedUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  if (!uploadRes.ok) throw new Error("Erro ao fazer upload");
+
+  // Update item in DB
+  const patchRes = await fetch(`/api/admin/campaigns/${campaignId}/items/${itemId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fileUrl: publicUrl, fileType }),
+  });
+  if (!patchRes.ok) throw new Error("Erro ao atualizar item");
+
+  return { fileUrl: publicUrl, fileType };
+}
+
 interface Props {
   campaignId: string;
   slides: SlideItem[];
@@ -42,16 +75,22 @@ interface Props {
 function SortableSlide({
   slide,
   index,
+  campaignId,
   onDelete,
   onPreview,
+  onReplaced,
 }: {
   slide: SlideItem;
   index: number;
+  campaignId: string;
   onDelete: (id: string) => void;
   onPreview: (index: number) => void;
+  onReplaced: (id: string, fileUrl: string, fileType: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: slide.id });
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const [replacing, setReplacing] = useState(false);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -60,6 +99,22 @@ function SortableSlide({
   };
 
   const statusKey = (slide.approvalItem?.status || "PENDING") as ApprovalStatus;
+  const needsAdjustment = statusKey === "ADJUSTMENT" || statusKey === "REJECTED";
+
+  async function handleReplaceFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setReplacing(true);
+    try {
+      const { fileUrl, fileType } = await uploadReplacement(campaignId, slide.id, file);
+      onReplaced(slide.id, fileUrl, fileType);
+    } catch (err) {
+      alert("Erro ao substituir imagem. Tente novamente.");
+    } finally {
+      setReplacing(false);
+      if (replaceInputRef.current) replaceInputRef.current.value = "";
+    }
+  }
 
   return (
     <div ref={setNodeRef} style={style} className="shrink-0 w-24">
@@ -72,6 +127,13 @@ function SortableSlide({
         >
           <span className="text-white/60 text-xs select-none">⠿ arrastar</span>
         </div>
+
+        {/* Replace overlay when replacing */}
+        {replacing && (
+          <div className="absolute inset-0 bg-black/70 z-20 flex items-center justify-center">
+            <span className="text-white text-xs">...</span>
+          </div>
+        )}
 
         {/* Imagem clicável para preview */}
         {slide.fileType === "IMAGE" ? (
@@ -100,6 +162,24 @@ function SortableSlide({
           ✕
         </button>
       </div>
+      {needsAdjustment && (
+        <>
+          <input
+            ref={replaceInputRef}
+            type="file"
+            accept="image/*,video/mp4"
+            className="hidden"
+            onChange={handleReplaceFile}
+          />
+          <button
+            onClick={() => replaceInputRef.current?.click()}
+            disabled={replacing}
+            className="mt-1 w-full text-xs px-1.5 py-1 bg-amber-900/40 hover:bg-amber-900/60 text-amber-400 border border-amber-500/30 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {replacing ? "Enviando..." : "Substituir"}
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -178,6 +258,10 @@ export default function CarouselCard({
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const imageUrls = slides.filter((s) => s.fileType === "IMAGE").map((s) => s.fileUrl);
 
+  function handleReplaced(id: string, fileUrl: string, fileType: string) {
+    setSlides((prev) => prev.map((s) => s.id === id ? { ...s, fileUrl, fileType } : s));
+  }
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
@@ -218,8 +302,10 @@ export default function CarouselCard({
                 key={slide.id}
                 slide={slide}
                 index={si}
+                campaignId={campaignId}
                 onDelete={onDelete}
                 onPreview={setPreviewIndex}
+                onReplaced={handleReplaced}
               />
             ))}
           </div>
