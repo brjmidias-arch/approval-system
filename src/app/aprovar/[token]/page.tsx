@@ -134,8 +134,19 @@ export default function ApprovalPage() {
     setActiveGroup(null);
   }
 
+  // Split groups: already approved vs needs review
+  // (computed here so handleSubmit can use it)
+  const alreadyApprovedGroups = groups.filter((g) => {
+    const firstItem = g.type === "single" ? g.item : g.items[0];
+    return firstItem.approvalItem?.status === "APPROVED";
+  });
+  const needsReviewGroups = groups.filter((g) => {
+    const firstItem = g.type === "single" ? g.item : g.items[0];
+    return firstItem.approvalItem?.status !== "APPROVED";
+  });
+
   async function handleSubmit() {
-    const allDone = groups.every((g) => {
+    const allDone = needsReviewGroups.every((g) => {
       const r = reviews[g.groupKey];
       return r && r.status !== "PENDING";
     });
@@ -199,11 +210,14 @@ export default function ApprovalPage() {
 
   if (!campaign) return null;
 
-  const reviewedCount = groups.filter((g) => {
+  const alreadyApproved = alreadyApprovedGroups;
+  const needsReview = needsReviewGroups;
+
+  const reviewedCount = needsReview.filter((g) => {
     const r = reviews[g.groupKey];
     return r && r.status !== "PENDING";
   }).length;
-  const total = groups.length;
+  const total = needsReview.length;
   const progress = total > 0 ? Math.round((reviewedCount / total) * 100) : 0;
   const allDone = reviewedCount === total && total > 0;
 
@@ -232,11 +246,17 @@ export default function ApprovalPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
-        <p className="text-gray-400 text-sm">
-          Revise cada item abaixo. Clique em <span className="text-emerald-400">Aprovar</span> para confirmar, ou solicite ajuste/reprovação com um comentário.
-        </p>
+        {alreadyApproved.length > 0 && needsReview.length > 0 ? (
+          <p className="text-gray-400 text-sm">
+            Fizemos os ajustes solicitados. Revise os itens abaixo e aprove ou solicite novos ajustes.
+          </p>
+        ) : (
+          <p className="text-gray-400 text-sm">
+            Revise cada item abaixo. Clique em <span className="text-emerald-400">Aprovar</span> para confirmar, ou solicite ajuste/reprovação com um comentário.
+          </p>
+        )}
 
-        {groups.map((group, gi) => {
+        {needsReview.map((group, gi) => {
           const review = reviews[group.groupKey];
           const status = review?.status || "PENDING";
           const isActive = activeGroup === group.groupKey;
@@ -491,6 +511,37 @@ export default function ApprovalPage() {
             </div>
           );
         })}
+
+        {/* Already approved section */}
+        {alreadyApproved.length > 0 && (
+          <div className="mt-6">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">
+              Já aprovados anteriormente ({alreadyApproved.length})
+            </p>
+            <div className="space-y-2">
+              {alreadyApproved.map((group) => {
+                const items = group.type === "single" ? [group.item] : group.items;
+                const firstItem = items[0];
+                return (
+                  <div key={group.groupKey} className="bg-[#1a1a1a] border border-emerald-500/20 rounded-xl px-4 py-3 flex items-center gap-3 opacity-60">
+                    {firstItem.fileType === "IMAGE" && (
+                      <img src={firstItem.fileUrl} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-gray-300 text-sm truncate">
+                        {group.type === "carousel" ? `Carrossel — ${items.length} slides` : CONTENT_TYPE_LABELS[firstItem.contentType]}
+                      </p>
+                      {firstItem.caption && (
+                        <p className="text-gray-500 text-xs truncate mt-0.5">{firstItem.caption}</p>
+                      )}
+                    </div>
+                    <span className="text-xs text-emerald-400 font-medium shrink-0">✅ Aprovado</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Submit */}
         <div className="sticky bottom-4 pt-2">
