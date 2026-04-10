@@ -164,11 +164,6 @@ export default function CampaignPage() {
   if (loading) return <div className="text-gray-400 p-8">Carregando...</div>;
   if (!campaign) return <div className="text-red-400 p-8">Campanha não encontrada.</div>;
 
-  const total = campaign.contentItems.length;
-  const approved = campaign.contentItems.filter((i) => i.approvalItem?.status === "APPROVED").length;
-  const adjustment = campaign.contentItems.filter((i) => i.approvalItem?.status === "ADJUSTMENT").length;
-  const rejected = campaign.contentItems.filter((i) => i.approvalItem?.status === "REJECTED").length;
-  const pending = total - approved - adjustment - rejected;
   const isExpired = new Date() > new Date(campaign.expiresAt) && campaign.status === "OPEN";
   const approvalUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/aprovar/${campaign.token}`;
 
@@ -190,6 +185,22 @@ export default function CampaignPage() {
       grouped.push({ type: "single", item });
     }
   }
+
+  // Stats by group (1 carousel = 1 post)
+  const total = grouped.length;
+  const approved = grouped.filter((g) => {
+    const rep = g.type === "single" ? g.item.approvalItem : g.items[0].approvalItem;
+    return rep?.status === "APPROVED";
+  }).length;
+  const adjustment = grouped.filter((g) => {
+    const rep = g.type === "single" ? g.item.approvalItem : g.items[0].approvalItem;
+    return rep?.status === "ADJUSTMENT";
+  }).length;
+  const rejected = grouped.filter((g) => {
+    const rep = g.type === "single" ? g.item.approvalItem : g.items[0].approvalItem;
+    return rep?.status === "REJECTED";
+  }).length;
+  const pending = total - approved - adjustment - rejected;
 
   return (
     <div className="space-y-6">
@@ -376,7 +387,7 @@ export default function CampaignPage() {
       {/* Content Items */}
       <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden">
         <div className="px-5 py-3.5 border-b border-white/10">
-          <h2 className="text-white font-medium text-sm">Conteúdos ({total} itens)</h2>
+          <h2 className="text-white font-medium text-sm">Conteúdos ({total} {total === 1 ? "post" : "posts"})</h2>
         </div>
 
         {total === 0 ? (
