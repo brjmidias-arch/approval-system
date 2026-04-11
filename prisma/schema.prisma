@@ -52,6 +52,8 @@ model ContentItem {
   contentType   String
   groupId       String?
   driveUrl      String?
+  coverUrl      String?
+  coverDriveUrl String?
   order         Int           @default(0)
   createdAt     DateTime      @default(now())
   approvalItem  ApprovalItem?

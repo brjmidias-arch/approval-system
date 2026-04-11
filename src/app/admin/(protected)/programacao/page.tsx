@@ -40,6 +40,8 @@ export default async function ProgramacaoPage() {
       title: string | null;
       caption: string | null;
       driveUrl: string | null;
+      coverUrl: string | null;
+      coverDriveUrl: string | null;
       scheduledDate: Date | null;
       contentType: string;
       fileType: string;
@@ -58,6 +60,8 @@ export default async function ProgramacaoPage() {
           title: item.title,
           caption: item.caption,
           driveUrl: item.driveUrl,
+          coverUrl: item.coverUrl,
+          coverDriveUrl: item.coverDriveUrl,
           scheduledDate: item.scheduledDate,
           contentType: item.contentType,
           fileType: item.fileType,
@@ -70,6 +74,8 @@ export default async function ProgramacaoPage() {
           title: item.title,
           caption: item.caption,
           driveUrl: item.driveUrl,
+          coverUrl: item.coverUrl,
+          coverDriveUrl: item.coverDriveUrl,
           scheduledDate: item.scheduledDate,
           contentType: item.contentType,
           fileType: item.fileType,
@@ -156,18 +162,30 @@ export default async function ProgramacaoPage() {
                           <span className="text-xs text-emerald-400">✅ Aprovado</span>
                         </div>
 
-                        {/* Drive link */}
-                        {post.driveUrl ? (
-                          <a
-                            href={post.driveUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/20 border border-blue-500/20 px-3 py-1.5 rounded-lg transition-colors mt-1"
-                          >
-                            🔗 Baixar arquivo original (Drive)
-                          </a>
-                        ) : (
-                          <span className="text-xs text-gray-600 mt-1 inline-block">Sem link do Drive</span>
+                        {/* Drive links */}
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {post.driveUrl ? (
+                            <a href={post.driveUrl} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/20 border border-blue-500/20 px-3 py-1.5 rounded-lg transition-colors">
+                              🔗 Arquivo no Drive
+                            </a>
+                          ) : (
+                            <span className="text-xs text-gray-600 inline-block self-center">Sem link do Drive</span>
+                          )}
+                          {post.contentType === "REELS" && post.coverDriveUrl && (
+                            <a href={post.coverDriveUrl} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 bg-purple-900/20 border border-purple-500/20 px-3 py-1.5 rounded-lg transition-colors">
+                              🖼️ Capa no Drive
+                            </a>
+                          )}
+                        </div>
+
+                        {/* Cover preview */}
+                        {post.contentType === "REELS" && post.coverUrl && (
+                          <div className="mt-2">
+                            <p className="text-xs text-gray-500 mb-1">Capa do Reels</p>
+                            <img src={post.coverUrl} alt="Capa" className="w-20 h-20 object-cover rounded-lg border border-white/10" />
+                          </div>
                         )}
                       </div>
                     </div>

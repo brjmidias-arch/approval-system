@@ -25,6 +25,8 @@ interface ContentItem {
   contentType: ContentType;
   groupId: string | null;
   driveUrl: string | null;
+  coverUrl: string | null;
+  coverDriveUrl: string | null;
   order: number;
   approvalItem: ApprovalItem | null;
 }
@@ -53,8 +55,11 @@ export default function CampaignPage() {
     caption: "",
     scheduledDate: "",
     driveUrl: "",
+    coverDriveUrl: "",
     contentType: "CARROSSEL" as ContentType,
   });
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
@@ -157,6 +162,23 @@ export default function CampaignPage() {
         continue;
       }
 
+      // Upload cover image if Reels and cover file selected (only on first file)
+      let coverUrl: string | null = null;
+      if (uploadForm.contentType === "REELS" && coverFile && i === 0) {
+        const covSignRes = await fetch("/api/upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contentType: coverFile.type, fileName: coverFile.name }),
+        });
+        if (covSignRes.ok) {
+          const { signedUrl: covSignedUrl, publicUrl: covPublicUrl } = await covSignRes.json();
+          try {
+            await uploadWithProgress(covSignedUrl, coverFile, () => {});
+            coverUrl = covPublicUrl;
+          } catch { /* ignore cover upload error */ }
+        }
+      }
+
       await fetch(`/api/admin/campaigns/${id}/items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -167,6 +189,8 @@ export default function CampaignPage() {
           caption: uploadForm.caption,
           scheduledDate: uploadForm.scheduledDate || null,
           driveUrl: uploadForm.driveUrl || null,
+          coverUrl: coverUrl || null,
+          coverDriveUrl: uploadForm.coverDriveUrl || null,
           contentType: uploadForm.contentType,
           groupId,
           order: baseOrder + i,
@@ -179,8 +203,10 @@ export default function CampaignPage() {
     setUploadPercent(0);
     setShowUploadForm(false);
     setSelectedFiles([]);
-    setUploadForm({ title: "", caption: "", scheduledDate: "", driveUrl: "", contentType: "CARROSSEL" });
+    setCoverFile(null);
+    setUploadForm({ title: "", caption: "", scheduledDate: "", driveUrl: "", coverDriveUrl: "", contentType: "CARROSSEL" });
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (coverInputRef.current) coverInputRef.current.value = "";
     fetchCampaign();
   }
 
@@ -635,6 +661,38 @@ export default function CampaignPage() {
                   className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
                 />
               </div>
+
+              {uploadForm.contentType === "REELS" && (
+                <>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1.5">
+                      Capa do Reels <span className="text-gray-600">(opcional)</span>
+                    </label>
+                    <input
+                      ref={coverInputRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+                      className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 file:mr-3 file:py-1 file:px-3 file:bg-white/10 file:text-gray-300 file:rounded file:border-0 file:text-sm cursor-pointer"
+                    />
+                    {coverFile && (
+                      <p className="text-emerald-400 text-xs mt-1">{coverFile.name}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1.5">
+                      Link da capa no Drive <span className="text-gray-600">(opcional)</span>
+                    </label>
+                    <input
+                      type="url"
+                      value={uploadForm.coverDriveUrl}
+                      onChange={(e) => setUploadForm({ ...uploadForm, coverDriveUrl: e.target.value })}
+                      placeholder="https://drive.google.com/..."
+                      className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </>
+              )}
 
               {uploading && (
                 <div className="space-y-1.5">

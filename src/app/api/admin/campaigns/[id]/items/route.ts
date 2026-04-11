@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
 
   const body = await req.json();
-  const { fileUrl, fileType, title, caption, scheduledDate, driveUrl, contentType, order, groupId } = body;
+  const { fileUrl, fileType, title, caption, scheduledDate, driveUrl, coverUrl, coverDriveUrl, contentType, order, groupId } = body;
 
   if (!fileUrl || !fileType || !contentType) {
     return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
@@ -19,6 +19,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       caption,
       scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
       driveUrl: driveUrl || null,
+      coverUrl: coverUrl || null,
+      coverDriveUrl: coverDriveUrl || null,
       contentType,
       groupId: groupId || null,
       order: order ?? 0,
