@@ -54,6 +54,20 @@ interface ClientGroup {
 function PostCard({ post, onMarkPosted }: { post: Post; onMarkPosted: (id: string) => void }) {
   const [loading, setLoading] = useState(false);
   const [isPosted, setIsPosted] = useState(!!post.postedAt);
+  const [driveUrl, setDriveUrl] = useState(post.driveUrl || "");
+  const [editingDrive, setEditingDrive] = useState(false);
+  const [savingDrive, setSavingDrive] = useState(false);
+
+  async function handleSaveDrive() {
+    setSavingDrive(true);
+    await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ driveUrl: driveUrl || null }),
+    });
+    setSavingDrive(false);
+    setEditingDrive(false);
+  }
 
   async function handleMarkPosted() {
     if (isPosted) return;
@@ -104,14 +118,42 @@ function PostCard({ post, onMarkPosted }: { post: Post; onMarkPosted: (id: strin
           </div>
 
           {/* Drive links */}
-          <div className="flex flex-wrap gap-2 mt-1">
-            {post.driveUrl ? (
-              <a href={post.driveUrl} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/20 border border-blue-500/20 px-3 py-1.5 rounded-lg transition-colors">
-                🔗 Arquivo no Drive
-              </a>
+          <div className="flex flex-wrap gap-2 mt-1 items-center">
+            {editingDrive ? (
+              <div className="flex items-center gap-2 w-full">
+                <input
+                  type="url"
+                  value={driveUrl}
+                  onChange={(e) => setDriveUrl(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSaveDrive(); if (e.key === "Escape") setEditingDrive(false); }}
+                  placeholder="Cole o link do Drive..."
+                  autoFocus
+                  className="flex-1 bg-black/40 border border-blue-500/40 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-blue-400 placeholder-gray-600"
+                />
+                <button onClick={handleSaveDrive} disabled={savingDrive} className="text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white px-3 py-1.5 rounded-lg transition-colors">
+                  {savingDrive ? "..." : "Salvar"}
+                </button>
+                <button onClick={() => setEditingDrive(false)} className="text-xs text-gray-500 hover:text-gray-300 px-2 py-1.5 transition-colors">
+                  Cancelar
+                </button>
+              </div>
             ) : (
-              <span className="text-xs text-gray-600 inline-block self-center">Sem link do Drive</span>
+              <>
+                {driveUrl ? (
+                  <a href={driveUrl} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/20 border border-blue-500/20 px-3 py-1.5 rounded-lg transition-colors">
+                    🔗 Arquivo no Drive
+                  </a>
+                ) : (
+                  <span className="text-xs text-gray-600 inline-block self-center">Sem link do Drive</span>
+                )}
+                <button
+                  onClick={() => setEditingDrive(true)}
+                  className="text-xs text-gray-500 hover:text-blue-400 transition-colors underline"
+                >
+                  {driveUrl ? "Editar link" : "+ Adicionar link"}
+                </button>
+              </>
             )}
             {post.contentType === "REELS" && post.coverDriveUrl && (
               <a href={post.coverDriveUrl} target="_blank" rel="noopener noreferrer"
