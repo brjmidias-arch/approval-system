@@ -23,7 +23,7 @@ export default function LoginPage() {
     });
 
     if (result?.error) {
-      setError("E-mail ou senha incorretos.");
+      setError("Usuário ou senha incorretos.");
       setLoading(false);
     } else {
       router.push("/admin");
@@ -43,14 +43,14 @@ export default function LoginPage() {
           className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 space-y-4"
         >
           <div>
-            <label className="block text-sm text-gray-400 mb-1.5">E-mail</label>
+            <label className="block text-sm text-gray-400 mb-1.5">Usuário</label>
             <input
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 transition-colors"
-              placeholder="admin@brjmidias.com.br"
+              placeholder="brjmidias"
             />
           </div>
 
