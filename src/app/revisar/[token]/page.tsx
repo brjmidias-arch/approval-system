@@ -21,6 +21,8 @@ interface ContentItem {
   contentType: ContentType;
   groupId: string | null;
   coverUrl: string | null;
+  driveUrl: string | null;
+  coverDriveUrl: string | null;
   internalReviewItem: InternalReviewItem | null;
 }
 
@@ -416,6 +418,33 @@ export default function InternalReviewPage() {
                 {currentItem.caption && (
                   <div className="bg-black/30 rounded-lg p-3 mb-3">
                     <p className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">{currentItem.caption}</p>
+                  </div>
+                )}
+
+                {(currentItem.driveUrl || currentItem.coverDriveUrl) && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {currentItem.driveUrl && (
+                      <a
+                        href={currentItem.driveUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/20 border border-blue-500/20 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M6.28 3l5.72 9.9L17.72 3H22l-10 17.32L2 3h4.28zm5.72 9.9L6.28 3H2l10 17.32L22 3h-4.28L12 12.9z"/></svg>
+                        Drive — arte
+                      </a>
+                    )}
+                    {currentItem.coverDriveUrl && (
+                      <a
+                        href={currentItem.coverDriveUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/20 border border-blue-500/20 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M6.28 3l5.72 9.9L17.72 3H22l-10 17.32L2 3h4.28zm5.72 9.9L6.28 3H2l10 17.32L22 3h-4.28L12 12.9z"/></svg>
+                        Drive — capa
+                      </a>
+                    )}
                   </div>
                 )}
 
