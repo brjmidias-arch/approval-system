@@ -31,10 +31,19 @@ export default async function ProgramacaoPage() {
       contentType: string;
       fileType: string;
       fileUrl: string;
+      approvedAt: Date | null;
+      postedAt: Date | null;
+      campaignId: string;
     }[] = [];
 
     for (const item of campaign.contentItems) {
       if (item.approvalItem?.status !== "APPROVED") continue;
+
+      const base = {
+        approvedAt: item.approvalItem.reviewedAt,
+        postedAt: item.postedAt,
+        campaignId: campaign.id,
+      };
 
       if (item.contentType === "CARROSSEL" && item.groupId) {
         if (seenGroupIds.has(item.groupId)) continue;
@@ -51,6 +60,7 @@ export default async function ProgramacaoPage() {
           contentType: item.contentType,
           fileType: item.fileType,
           fileUrl: item.fileUrl,
+          ...base,
         });
       } else if (item.contentType !== "CARROSSEL") {
         groups.push({
@@ -65,6 +75,7 @@ export default async function ProgramacaoPage() {
           contentType: item.contentType,
           fileType: item.fileType,
           fileUrl: item.fileUrl,
+          ...base,
         });
       }
     }
@@ -98,10 +109,29 @@ export default async function ProgramacaoPage() {
     });
   }
 
-  const clients = Array.from(clientMap.values()).map((c) => ({
-    ...c,
-    totalPosts: c.campaigns.reduce((acc, camp) => acc + camp.posts.length, 0),
-  }));
+  const now = new Date();
+
+  const clients = Array.from(clientMap.values()).map((c) => {
+    const allPosts = c.campaigns.flatMap((camp) => camp.posts);
+    const pendingPosts = allPosts.filter((p) => !p.postedAt);
+    const totalPosts = allPosts.length;
+    const postedPosts = allPosts.filter((p) => p.postedAt).length;
+
+    // Max days waiting: oldest unscheduled approved post
+    const maxDaysWaiting = pendingPosts.reduce((max, p) => {
+      if (!p.approvedAt) return max;
+      const days = Math.floor((now.getTime() - new Date(p.approvedAt).getTime()) / (1000 * 60 * 60 * 24));
+      return Math.max(max, days);
+    }, 0);
+
+    return {
+      ...c,
+      totalPosts,
+      postedPosts,
+      pendingPosts: pendingPosts.length,
+      maxDaysWaiting,
+    };
+  });
 
   return (
     <div className="space-y-6">

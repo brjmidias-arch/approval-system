@@ -61,6 +61,10 @@ export default async function AdminDashboard() {
     (acc, c) => acc + c.campaigns.filter((cam) => cam.status === "OPEN").length,
     0
   );
+  const internalReviewCampaigns = clients.reduce(
+    (acc, c) => acc + c.campaigns.filter((cam) => cam.status === "INTERNAL_REVIEW").length,
+    0
+  );
   const awaitingAction = clients.reduce(
     (acc, c) =>
       acc + c.campaigns.filter((cam) => {
@@ -101,7 +105,7 @@ export default async function AdminDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-5 gap-4">
         <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4">
           <p className="text-gray-400 text-xs uppercase tracking-wider">Clientes</p>
           <p className="text-3xl font-bold text-white mt-1">{totalClients}</p>
@@ -109,6 +113,10 @@ export default async function AdminDashboard() {
         <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4">
           <p className="text-gray-400 text-xs uppercase tracking-wider">Campanhas</p>
           <p className="text-3xl font-bold text-white mt-1">{totalCampaigns}</p>
+        </div>
+        <div className={`border rounded-xl p-4 ${internalReviewCampaigns > 0 ? "bg-violet-900/20 border-violet-500/30" : "bg-[#1a1a1a] border-white/10"}`}>
+          <p className="text-gray-400 text-xs uppercase tracking-wider">Revisão Interna</p>
+          <p className={`text-3xl font-bold mt-1 ${internalReviewCampaigns > 0 ? "text-violet-400" : "text-white"}`}>{internalReviewCampaigns}</p>
         </div>
         <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4">
           <p className="text-gray-400 text-xs uppercase tracking-wider">Em Aberto</p>
@@ -215,10 +223,15 @@ export default async function AdminDashboard() {
 
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                       campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
+                      : campaign.status === "DRAFT" ? "bg-gray-800 text-gray-400"
+                      : campaign.status === "INTERNAL_REVIEW" ? "bg-violet-900/30 text-violet-400"
                       : isExpired ? "bg-red-900/30 text-red-400"
                       : "bg-emerald-900/30 text-emerald-400"
                     }`}>
-                      {campaign.status === "CLOSED" ? "Fechado" : isExpired ? "Expirado" : "Aberto"}
+                      {campaign.status === "CLOSED" ? "Fechado"
+                      : campaign.status === "DRAFT" ? "Rascunho"
+                      : campaign.status === "INTERNAL_REVIEW" ? "Revisão Interna"
+                      : isExpired ? "Expirado" : "Aberto"}
                     </span>
                   </div>
                 </Link>

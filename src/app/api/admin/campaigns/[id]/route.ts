@@ -9,7 +9,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       client: true,
       contentItems: {
         orderBy: { order: "asc" },
-        include: { approvalItem: true },
+        include: { approvalItem: true, internalReviewItem: true },
       },
     },
   });
