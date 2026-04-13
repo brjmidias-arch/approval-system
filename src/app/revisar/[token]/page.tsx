@@ -215,32 +215,21 @@ export default function InternalReviewPage() {
                 {whatsappMsg}
               </p>
               <button
-                onClick={() => {
+                onClick={async () => {
                   navigator.clipboard.writeText(whatsappMsg);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 3000);
+                  if (!sentToClient) {
+                    setSendingToClient(true);
+                    const res = await fetch(`/api/internal/${campaign.internalToken}/send-client`, { method: "POST" });
+                    if (res.ok) setSentToClient(true);
+                    setSendingToClient(false);
+                  }
                 }}
-                className="w-full py-3 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                disabled={sendingToClient}
+                className="w-full py-3 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-60"
               >
-                {copied ? "✅ Copiado!" : "📋 Copiar mensagem"}
-              </button>
-              <button
-                onClick={async () => {
-                  if (sentToClient) return;
-                  setSendingToClient(true);
-                  const res = await fetch(`/api/internal/${campaign.internalToken}/send-client`, { method: "POST" });
-                  if (res.ok) setSentToClient(true);
-                  else alert("Erro ao mudar status. Tente novamente.");
-                  setSendingToClient(false);
-                }}
-                disabled={sendingToClient || sentToClient}
-                className={`w-full py-3 rounded-xl text-sm font-semibold transition-colors ${
-                  sentToClient
-                    ? "bg-violet-900/40 text-violet-300 border border-violet-500/30 cursor-default"
-                    : "bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-60"
-                }`}
-              >
-                {sentToClient ? "✅ Enviado para o cliente" : sendingToClient ? "Enviando..." : "🚀 Enviar para o cliente"}
+                {sendingToClient ? "Enviando..." : copied ? "✅ Mensagem copiada — enviado para o cliente!" : "📋 Copiar mensagem e enviar para o cliente"}
               </button>
             </div>
           )}
