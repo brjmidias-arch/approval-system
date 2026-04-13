@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 
 type ContentType = "CARROSSEL" | "POST_FEED" | "REELS" | "STORIES";
@@ -29,6 +29,7 @@ interface ParsedPost {
   driveUrl: string;
   coverDriveUrl: string;
   title: string;
+  scheduledDate: string;
 }
 
 function inferContentType(name: string, files: File[]): ContentType {
@@ -99,6 +100,7 @@ function parseFolder(fileList: FileList): ParsedPost[] {
       driveUrl: "",
       coverDriveUrl: "",
       title: name,
+      scheduledDate: "",
     };
   });
 }
@@ -163,6 +165,16 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
     setLightboxUrl(null);
   }
 
+  useEffect(() => {
+    if (!lightboxUrl) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") closeLightbox();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxUrl]);
+
   function handleFolderChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -214,6 +226,7 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
             fileType: result.fileType,
             title: post.title || null,
             caption: post.caption || null,
+            scheduledDate: post.scheduledDate || null,
             driveUrl: post.driveUrl || null,
             coverUrl: fi === 0 ? coverUrl : null,
             coverDriveUrl: fi === 0 ? (post.coverDriveUrl || null) : null,
@@ -370,6 +383,15 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
 
                   {/* Fields */}
                   <div className="px-4 pb-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <label className="text-gray-500 text-xs shrink-0">Data prevista:</label>
+                      <input
+                        type="date"
+                        value={post.scheduledDate}
+                        onChange={(e) => updatePost(post.tempId, "scheduledDate", e.target.value)}
+                        className="bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-emerald-500 placeholder-gray-600 [color-scheme:dark]"
+                      />
+                    </div>
                     <textarea
                       value={post.caption}
                       onChange={(e) => updatePost(post.tempId, "caption", e.target.value)}
