@@ -516,13 +516,14 @@ export default function CampaignPage() {
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                 campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
                 : campaign.status === "DRAFT" ? "bg-gray-800 text-gray-400"
-                : campaign.status === "INTERNAL_REVIEW" ? "bg-violet-900/30 text-violet-400"
+                : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "bg-violet-900/30 text-violet-400"
                 : isExpired ? "bg-red-900/30 text-red-400"
                 : "bg-emerald-900/30 text-emerald-400"
               }`}>
                 {campaign.status === "CLOSED" ? "Fechado"
                 : campaign.status === "DRAFT" ? "Rascunho"
                 : campaign.status === "INTERNAL_REVIEW" ? "Revisão Interna"
+                : campaign.status === "INTERNAL_DONE" ? "Revisão Interna"
                 : isExpired ? "Expirado" : "Aberto"}
               </span>
               {liveStatus && liveStatus.reviewed < liveStatus.total && campaign.status === "OPEN" && (
@@ -549,8 +550,8 @@ export default function CampaignPage() {
               </>
             )}
 
-            {/* INTERNAL_REVIEW: copy internal link + send to client (if all approved) */}
-            {campaign.status === "INTERNAL_REVIEW" && (
+            {/* INTERNAL_REVIEW / INTERNAL_DONE: copy internal link */}
+            {(campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE") && (
               <>
                 <button onClick={() => setShowUploadForm(true)} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
                   + Upload
@@ -613,30 +614,53 @@ export default function CampaignPage() {
       </div>
 
       {/* Internal review banner */}
-      {campaign.status === "INTERNAL_REVIEW" && (
-        <div className="bg-violet-900/20 border border-violet-500/30 rounded-xl px-5 py-4 space-y-3">
+      {(campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE") && (
+        <div className={`border rounded-xl px-5 py-4 space-y-3 ${
+          campaign.status === "INTERNAL_DONE" && (internalAdjustment + internalRejected) > 0
+            ? "bg-amber-900/20 border-amber-500/30"
+            : campaign.status === "INTERNAL_DONE" && allInternalApproved
+            ? "bg-emerald-900/20 border-emerald-500/30"
+            : "bg-violet-900/20 border-violet-500/30"
+        }`}>
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <p className="text-violet-400 font-medium text-sm">Aguardando revisão interna</p>
-              <p className="text-violet-400/70 text-xs mt-0.5">
-                {internalPending > 0
+              <p className={`font-medium text-sm ${
+                campaign.status === "INTERNAL_DONE" && (internalAdjustment + internalRejected) > 0
+                  ? "text-amber-400"
+                  : campaign.status === "INTERNAL_DONE" && allInternalApproved
+                  ? "text-emerald-400"
+                  : "text-violet-400"
+              }`}>
+                {campaign.status === "INTERNAL_REVIEW"
+                  ? "Aguardando revisão interna"
+                  : allInternalApproved
+                  ? "Revisão interna concluída — tudo aprovado"
+                  : "Revisão interna concluída — ajustes necessários"}
+              </p>
+              <p className="text-gray-400/70 text-xs mt-0.5">
+                {campaign.status === "INTERNAL_REVIEW"
                   ? `${internalPending} ${internalPending === 1 ? "post pendente" : "posts pendentes"} de revisão`
                   : allInternalApproved
-                  ? "Todos os posts aprovados internamente — pronto para enviar ao cliente."
-                  : `${internalAdjustment + internalRejected} ${internalAdjustment + internalRejected === 1 ? "post precisa" : "posts precisam"} de correção.`
+                  ? "Todos os posts aprovados. Você já pode enviar para o cliente."
+                  : `${internalAdjustment + internalRejected} ${internalAdjustment + internalRejected === 1 ? "post precisa" : "posts precisam"} de correção antes de enviar ao cliente.`
                 }
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex gap-3 text-xs">
                 <span className="text-emerald-400">{internalApproved} aprovados</span>
-                <span className="text-amber-400">{internalAdjustment} ajustes</span>
-                <span className="text-red-400">{internalRejected} reprovados</span>
-                <span className="text-gray-400">{internalPending} pendentes</span>
+                {internalAdjustment > 0 && <span className="text-amber-400">{internalAdjustment} ajustes</span>}
+                {internalRejected > 0 && <span className="text-red-400">{internalRejected} reprovados</span>}
+                {internalPending > 0 && <span className="text-gray-400">{internalPending} pendentes</span>}
               </div>
-              {allInternalApproved && (
+              {campaign.status === "INTERNAL_DONE" && allInternalApproved && (
                 <button onClick={handleSendClient} className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm px-4 py-2 rounded-lg transition-colors">
                   Enviar para Cliente
+                </button>
+              )}
+              {campaign.status === "INTERNAL_DONE" && !allInternalApproved && (
+                <button onClick={handleSendInternal} className="bg-violet-600 hover:bg-violet-500 text-white font-semibold text-sm px-4 py-2 rounded-lg transition-colors">
+                  Reenviar para Revisão
                 </button>
               )}
             </div>
@@ -1010,14 +1034,33 @@ export default function CampaignPage() {
                           🔗 Ver no Drive
                         </a>
                       )}
+                      {item.internalReviewItem?.comment && (
+                        <div className="mt-1.5 text-xs text-violet-300 bg-violet-900/20 border border-violet-500/20 rounded-lg px-2.5 py-1.5">
+                          <span className="text-violet-400/70">Revisão interna: </span>
+                          {item.internalReviewItem.comment}
+                        </div>
+                      )}
                       {item.approvalItem?.clientComment && (
                         <div className="mt-1.5 text-xs text-gray-400 bg-white/5 rounded-lg px-2.5 py-1.5">
-                          <span className="text-gray-500">Comentário: </span>
+                          <span className="text-gray-500">Comentário do cliente: </span>
                           {item.approvalItem.clientComment}
                         </div>
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                      {item.internalReviewItem && (
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                          item.internalReviewItem.status === "APPROVED" ? "bg-emerald-900/30 text-emerald-400"
+                          : item.internalReviewItem.status === "ADJUSTMENT" ? "bg-amber-900/30 text-amber-400"
+                          : item.internalReviewItem.status === "REJECTED" ? "bg-red-900/30 text-red-400"
+                          : "bg-violet-900/30 text-violet-400"
+                        }`}>
+                          {item.internalReviewItem.status === "APPROVED" ? "✅ Int. Aprovado"
+                          : item.internalReviewItem.status === "ADJUSTMENT" ? "✏️ Int. Ajuste"
+                          : item.internalReviewItem.status === "REJECTED" ? "❌ Int. Reprovado"
+                          : "⏳ Int. Pendente"}
+                        </span>
+                      )}
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${APPROVAL_STATUS_COLORS[statusKey]}`}>
                         {APPROVAL_STATUS_LABELS[statusKey]}
                       </span>
@@ -1076,6 +1119,12 @@ export default function CampaignPage() {
                       Excluir post
                     </button>
                   </div>
+                  {firstItem.internalReviewItem?.comment && (
+                    <div className="mb-2 text-xs text-violet-300 bg-violet-900/20 border border-violet-500/20 rounded-lg px-2.5 py-1.5">
+                      <span className="text-violet-400/70">Revisão interna: </span>
+                      {firstItem.internalReviewItem.comment}
+                    </div>
+                  )}
                   <CarouselCard
                     campaignId={id}
                     slides={slides}

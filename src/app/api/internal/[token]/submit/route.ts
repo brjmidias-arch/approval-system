@@ -18,10 +18,10 @@ export async function POST(_req: NextRequest, { params }: { params: { token: str
   const adjustment = items.filter((i) => i.internalReviewItem?.status === "ADJUSTMENT").length;
   const rejected = items.filter((i) => i.internalReviewItem?.status === "REJECTED").length;
 
-  // Mark campaign as internally reviewed
+  // Mark campaign as internally reviewed (done)
   await prisma.campaign.update({
     where: { id: campaign.id },
-    data: { status: "INTERNAL_REVIEW" },
+    data: { status: "INTERNAL_DONE" },
   });
 
   return NextResponse.json({ approved, adjustment, rejected });

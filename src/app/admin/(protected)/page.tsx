@@ -47,7 +47,7 @@ export default async function AdminDashboard() {
       campaigns: {
         include: {
           approvalItems: true,
-          contentItems: { select: { id: true, groupId: true, contentType: true } },
+          contentItems: { select: { id: true, groupId: true, contentType: true, internalReviewItem: { select: { status: true } } } },
         },
         orderBy: { createdAt: "desc" },
       },
@@ -62,7 +62,7 @@ export default async function AdminDashboard() {
     0
   );
   const internalReviewCampaigns = clients.reduce(
-    (acc, c) => acc + c.campaigns.filter((cam) => cam.status === "INTERNAL_REVIEW").length,
+    (acc, c) => acc + c.campaigns.filter((cam) => cam.status === "INTERNAL_REVIEW" || cam.status === "INTERNAL_DONE").length,
     0
   );
   const awaitingAction = clients.reduce(
@@ -221,16 +221,32 @@ export default async function AdminDashboard() {
                       </div>
                     )}
 
+                    {campaign.status === "INTERNAL_DONE" && (() => {
+                      const internalItems = campaign.contentItems ?? [];
+                      const hasInternalAdjustment = internalItems.some((i: { internalReviewItem?: { status: string } | null }) =>
+                        i.internalReviewItem?.status === "ADJUSTMENT" || i.internalReviewItem?.status === "REJECTED"
+                      );
+                      return hasInternalAdjustment ? (
+                        <span className="flex items-center gap-1 text-xs font-semibold text-amber-400 bg-amber-900/30 border border-amber-500/30 px-2.5 py-1 rounded-full animate-pulse">
+                          ⚠️ Ajuste interno
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs font-semibold text-emerald-400 bg-emerald-900/30 border border-emerald-500/30 px-2.5 py-1 rounded-full">
+                          ✅ Pronto para cliente
+                        </span>
+                      );
+                    })()}
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                       campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
                       : campaign.status === "DRAFT" ? "bg-gray-800 text-gray-400"
-                      : campaign.status === "INTERNAL_REVIEW" ? "bg-violet-900/30 text-violet-400"
+                      : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "bg-violet-900/30 text-violet-400"
                       : isExpired ? "bg-red-900/30 text-red-400"
                       : "bg-emerald-900/30 text-emerald-400"
                     }`}>
                       {campaign.status === "CLOSED" ? "Fechado"
                       : campaign.status === "DRAFT" ? "Rascunho"
                       : campaign.status === "INTERNAL_REVIEW" ? "Revisão Interna"
+                      : campaign.status === "INTERNAL_DONE" ? "Revisão Interna"
                       : isExpired ? "Expirado" : "Aberto"}
                     </span>
                   </div>
