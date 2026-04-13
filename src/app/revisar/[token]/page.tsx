@@ -27,8 +27,10 @@ interface ContentItem {
 interface Campaign {
   id: string;
   name: string;
+  token: string;
   internalToken: string;
   status: string;
+  expiresAt: string;
   client: { name: string };
   contentItems: ContentItem[];
 }
@@ -66,6 +68,7 @@ export default function InternalReviewPage() {
   const [carouselSlide, setCarouselSlide] = useState<Record<string, number>>({});
   const [savingGroup, setSavingGroup] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ approved: number; adjustment: number; rejected: number } | null>(null);
 
@@ -170,25 +173,59 @@ export default function InternalReviewPage() {
     </div>
   );
 
-  if (submitted && submitResult) {
+  if (submitted && submitResult && campaign) {
+    const allApproved = submitResult.adjustment === 0 && submitResult.rejected === 0 && submitResult.approved > 0;
+    const approvalUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/aprovar/${campaign.token}`;
+    const prazo = new Date(campaign.expiresAt).toLocaleDateString("pt-BR");
+    const whatsappMsg = `Olá, ${campaign.client.name}! 👋\n\nSeu conteúdo de *${campaign.name}* está pronto para aprovação.\n\nAcesse o link abaixo, revise cada post e aprove ou solicite ajustes:\n${approvalUrl}\n\n_Prazo de aprovação: ${prazo}_`;
+
     return (
       <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
-        <div className="text-center max-w-sm">
-          <div className="text-5xl mb-4">✅</div>
-          <h1 className="text-xl font-semibold text-white mb-2">Revisão Interna Enviada!</h1>
-          <p className="text-gray-400 text-sm mb-6">O administrador já foi notificado e pode enviar para o cliente.</p>
+        <div className="w-full max-w-sm space-y-4">
+          <div className="text-center">
+            <div className="text-5xl mb-4">{allApproved ? "🚀" : "✅"}</div>
+            <h1 className="text-xl font-semibold text-white mb-2">Revisão Interna Concluída!</h1>
+            <p className="text-gray-400 text-sm">
+              {allApproved ? "Tudo aprovado! Já pode enviar para o cliente." : "Revisão enviada. Aguarde os ajustes."}
+            </p>
+          </div>
+
           <div className="bg-[#1a1a24] border border-white/10 rounded-xl p-4 text-sm space-y-2">
             <div className="flex justify-between text-gray-300">
               <span>Aprovados</span><span className="text-emerald-400 font-medium">{submitResult.approved}</span>
             </div>
-            <div className="flex justify-between text-gray-300">
-              <span>Com ajuste</span><span className="text-amber-400 font-medium">{submitResult.adjustment}</span>
-            </div>
-            <div className="flex justify-between text-gray-300">
-              <span>Reprovados</span><span className="text-red-400 font-medium">{submitResult.rejected}</span>
-            </div>
+            {submitResult.adjustment > 0 && (
+              <div className="flex justify-between text-gray-300">
+                <span>Com ajuste</span><span className="text-amber-400 font-medium">{submitResult.adjustment}</span>
+              </div>
+            )}
+            {submitResult.rejected > 0 && (
+              <div className="flex justify-between text-gray-300">
+                <span>Reprovados</span><span className="text-red-400 font-medium">{submitResult.rejected}</span>
+              </div>
+            )}
           </div>
-          <p className="text-gray-600 text-xs mt-8">BRJ Mídias · Revisão Interna</p>
+
+          {allApproved && (
+            <div className="bg-[#1a1a24] border border-emerald-500/20 rounded-xl p-4 space-y-3">
+              <p className="text-xs text-emerald-400 font-semibold uppercase tracking-wider">Mensagem para o cliente</p>
+              <p className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed bg-black/30 rounded-lg p-3">
+                {whatsappMsg}
+              </p>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(whatsappMsg);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 3000);
+                }}
+                className="w-full py-3 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+              >
+                {copied ? "✅ Copiado!" : "📋 Copiar mensagem"}
+              </button>
+            </div>
+          )}
+
+          <p className="text-center text-gray-600 text-xs">BRJ Mídias · Revisão Interna</p>
         </div>
       </div>
     );
