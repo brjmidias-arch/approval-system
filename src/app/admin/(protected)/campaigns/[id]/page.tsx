@@ -100,7 +100,7 @@ export default function CampaignPage() {
   const isCarousel = uploadForm.contentType === "CARROSSEL";
 
   const fetchCampaign = useCallback(async () => {
-    const res = await fetch(`/api/admin/campaigns/${id}`);
+    const res = await fetch(`/api/admin/campaigns/${id}`, { cache: "no-store" });
     const data = await res.json();
     setCampaign(data);
     setLoading(false);
