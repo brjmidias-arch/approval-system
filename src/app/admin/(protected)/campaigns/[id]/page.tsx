@@ -398,6 +398,17 @@ export default function CampaignPage() {
     }
   }
 
+  async function handleResetInternalItem(itemIds: string[]) {
+    for (const itemId of itemIds) {
+      await fetch(`/api/admin/campaigns/${id}/items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resetInternalReview: true }),
+      });
+    }
+    fetchCampaign();
+  }
+
   async function handleSendInternal() {
     if (campaign!.contentItems.length === 0) {
       alert("Adicione pelo menos um conteúdo antes de enviar para revisão interna.");
@@ -1049,17 +1060,27 @@ export default function CampaignPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                       {item.internalReviewItem && (
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                          item.internalReviewItem.status === "APPROVED" ? "bg-emerald-900/30 text-emerald-400"
-                          : item.internalReviewItem.status === "ADJUSTMENT" ? "bg-amber-900/30 text-amber-400"
-                          : item.internalReviewItem.status === "REJECTED" ? "bg-red-900/30 text-red-400"
-                          : "bg-violet-900/30 text-violet-400"
-                        }`}>
-                          {item.internalReviewItem.status === "APPROVED" ? "✅ Int. Aprovado"
-                          : item.internalReviewItem.status === "ADJUSTMENT" ? "✏️ Int. Ajuste"
-                          : item.internalReviewItem.status === "REJECTED" ? "❌ Int. Reprovado"
-                          : "⏳ Int. Pendente"}
-                        </span>
+                        <>
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                            item.internalReviewItem.status === "APPROVED" ? "bg-emerald-900/30 text-emerald-400"
+                            : item.internalReviewItem.status === "ADJUSTMENT" ? "bg-amber-900/30 text-amber-400"
+                            : item.internalReviewItem.status === "REJECTED" ? "bg-red-900/30 text-red-400"
+                            : "bg-violet-900/30 text-violet-400"
+                          }`}>
+                            {item.internalReviewItem.status === "APPROVED" ? "✅ Int. Aprovado"
+                            : item.internalReviewItem.status === "ADJUSTMENT" ? "✏️ Int. Ajuste"
+                            : item.internalReviewItem.status === "REJECTED" ? "❌ Int. Reprovado"
+                            : "⏳ Int. Pendente"}
+                          </span>
+                          {(item.internalReviewItem.status === "ADJUSTMENT" || item.internalReviewItem.status === "REJECTED") && (
+                            <button
+                              onClick={() => handleResetInternalItem([item.id])}
+                              className="text-xs px-2.5 py-1 bg-violet-900/40 hover:bg-violet-900/60 text-violet-400 border border-violet-500/30 rounded-lg transition-colors"
+                            >
+                              Ajuste feito
+                            </button>
+                          )}
+                        </>
                       )}
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${APPROVAL_STATUS_COLORS[statusKey]}`}>
                         {APPROVAL_STATUS_LABELS[statusKey]}
@@ -1112,17 +1133,27 @@ export default function CampaignPage() {
                         </span>
                       )}
                       {firstItem.internalReviewItem && (
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          firstItem.internalReviewItem.status === "APPROVED" ? "bg-emerald-900/30 text-emerald-400"
-                          : firstItem.internalReviewItem.status === "ADJUSTMENT" ? "bg-amber-900/30 text-amber-400"
-                          : firstItem.internalReviewItem.status === "REJECTED" ? "bg-red-900/30 text-red-400"
-                          : "bg-violet-900/30 text-violet-400"
-                        }`}>
-                          {firstItem.internalReviewItem.status === "APPROVED" ? "✅ Int. Aprovado"
-                          : firstItem.internalReviewItem.status === "ADJUSTMENT" ? "✏️ Int. Ajuste"
-                          : firstItem.internalReviewItem.status === "REJECTED" ? "❌ Int. Reprovado"
-                          : "⏳ Int. Pendente"}
-                        </span>
+                        <>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            firstItem.internalReviewItem.status === "APPROVED" ? "bg-emerald-900/30 text-emerald-400"
+                            : firstItem.internalReviewItem.status === "ADJUSTMENT" ? "bg-amber-900/30 text-amber-400"
+                            : firstItem.internalReviewItem.status === "REJECTED" ? "bg-red-900/30 text-red-400"
+                            : "bg-violet-900/30 text-violet-400"
+                          }`}>
+                            {firstItem.internalReviewItem.status === "APPROVED" ? "✅ Int. Aprovado"
+                            : firstItem.internalReviewItem.status === "ADJUSTMENT" ? "✏️ Int. Ajuste"
+                            : firstItem.internalReviewItem.status === "REJECTED" ? "❌ Int. Reprovado"
+                            : "⏳ Int. Pendente"}
+                          </span>
+                          {(firstItem.internalReviewItem.status === "ADJUSTMENT" || firstItem.internalReviewItem.status === "REJECTED") && (
+                            <button
+                              onClick={() => handleResetInternalItem(slides.map((s) => s.id))}
+                              className="text-xs px-2.5 py-1 bg-violet-900/40 hover:bg-violet-900/60 text-violet-400 border border-violet-500/30 rounded-lg transition-colors"
+                            >
+                              Ajuste feito
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                     <button

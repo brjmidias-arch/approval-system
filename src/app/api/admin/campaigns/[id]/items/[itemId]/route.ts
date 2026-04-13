@@ -7,7 +7,7 @@ export async function PATCH(
 ) {
 
   const body = await req.json();
-  const { title, caption, scheduledDate, fileUrl, fileType, driveUrl, resetApproval, postedAt } = body;
+  const { title, caption, scheduledDate, fileUrl, fileType, driveUrl, resetApproval, resetInternalReview, postedAt } = body;
 
   const item = await prisma.contentItem.update({
     where: { id: params.itemId },
@@ -28,6 +28,13 @@ export async function PATCH(
     await prisma.approvalItem.updateMany({
       where: { contentItemId: params.itemId },
       data: { status: "PENDING", clientComment: null, reviewedAt: null },
+    });
+  }
+
+  if (resetInternalReview) {
+    await prisma.internalReviewItem.updateMany({
+      where: { contentItemId: params.itemId },
+      data: { status: "PENDING", comment: null, reviewedAt: null },
     });
   }
 
