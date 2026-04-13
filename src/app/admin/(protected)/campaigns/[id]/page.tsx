@@ -427,14 +427,6 @@ export default function CampaignPage() {
   const approvalUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/aprovar/${campaign.token}`;
   const internalReviewUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/revisar/${campaign.internalToken}`;
 
-  // Internal review stats
-  const internalTotal = campaign.contentItems.length;
-  const internalApproved = campaign.contentItems.filter((i) => i.internalReviewItem?.status === "APPROVED").length;
-  const internalAdjustment = campaign.contentItems.filter((i) => i.internalReviewItem?.status === "ADJUSTMENT").length;
-  const internalRejected = campaign.contentItems.filter((i) => i.internalReviewItem?.status === "REJECTED").length;
-  const internalPending = internalTotal - internalApproved - internalAdjustment - internalRejected;
-  const allInternalApproved = internalTotal > 0 && internalApproved === internalTotal;
-
   // Group carousel items by groupId
   type GroupedItem =
     | { type: "single"; item: ContentItem }
@@ -469,6 +461,18 @@ export default function CampaignPage() {
     return rep?.status === "REJECTED";
   }).length;
   const pending = total - approved - adjustment - rejected;
+
+  // Internal stats counted by post/group (carousel = 1 post)
+  const internalTotal = grouped.length;
+  const getInternalStatus = (g: GroupedItem) => {
+    const firstItem = g.type === "single" ? g.item : g.items[0];
+    return firstItem.internalReviewItem?.status || "PENDING";
+  };
+  const internalApproved = grouped.filter((g) => getInternalStatus(g) === "APPROVED").length;
+  const internalAdjustment = grouped.filter((g) => getInternalStatus(g) === "ADJUSTMENT").length;
+  const internalRejected = grouped.filter((g) => getInternalStatus(g) === "REJECTED").length;
+  const internalPending = internalTotal - internalApproved - internalAdjustment - internalRejected;
+  const allInternalApproved = internalTotal > 0 && internalApproved === internalTotal;
 
   return (
     <div className="space-y-6">
@@ -616,10 +620,10 @@ export default function CampaignPage() {
               <p className="text-violet-400 font-medium text-sm">Aguardando revisão interna</p>
               <p className="text-violet-400/70 text-xs mt-0.5">
                 {internalPending > 0
-                  ? `${internalPending} ${internalPending === 1 ? "item pendente" : "itens pendentes"} de revisão`
+                  ? `${internalPending} ${internalPending === 1 ? "post pendente" : "posts pendentes"} de revisão`
                   : allInternalApproved
-                  ? "Todos os itens aprovados internamente — pronto para enviar ao cliente."
-                  : `${internalAdjustment + internalRejected} ${internalAdjustment + internalRejected === 1 ? "item precisa" : "itens precisam"} de correção.`
+                  ? "Todos os posts aprovados internamente — pronto para enviar ao cliente."
+                  : `${internalAdjustment + internalRejected} ${internalAdjustment + internalRejected === 1 ? "post precisa" : "posts precisam"} de correção.`
                 }
               </p>
             </div>
