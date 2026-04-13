@@ -1099,7 +1099,7 @@ export default function CampaignPage() {
               return (
                 <div key={`carousel-${gi}`} className="px-5 py-4">
                   <div className="flex items-center justify-between gap-2 mb-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {firstItem.title && (
                         <span className="text-white text-sm font-medium">{firstItem.title}</span>
                       )}
@@ -1109,6 +1109,19 @@ export default function CampaignPage() {
                       {firstItem.scheduledDate && (
                         <span className="text-xs text-gray-500">
                           {new Date(firstItem.scheduledDate).toLocaleDateString("pt-BR")}
+                        </span>
+                      )}
+                      {firstItem.internalReviewItem && (
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          firstItem.internalReviewItem.status === "APPROVED" ? "bg-emerald-900/30 text-emerald-400"
+                          : firstItem.internalReviewItem.status === "ADJUSTMENT" ? "bg-amber-900/30 text-amber-400"
+                          : firstItem.internalReviewItem.status === "REJECTED" ? "bg-red-900/30 text-red-400"
+                          : "bg-violet-900/30 text-violet-400"
+                        }`}>
+                          {firstItem.internalReviewItem.status === "APPROVED" ? "✅ Int. Aprovado"
+                          : firstItem.internalReviewItem.status === "ADJUSTMENT" ? "✏️ Int. Ajuste"
+                          : firstItem.internalReviewItem.status === "REJECTED" ? "❌ Int. Reprovado"
+                          : "⏳ Int. Pendente"}
                         </span>
                       )}
                     </div>
