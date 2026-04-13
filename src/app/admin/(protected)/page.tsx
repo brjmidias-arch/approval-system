@@ -79,16 +79,29 @@ export default async function AdminDashboard() {
     client.campaigns.map((campaign) => ({ campaign, client }))
   );
 
-  // Sort by urgency: open campaigns with most days without approval first
+  // Sort by urgency — highest priority first
   const sortedCampaigns = [...allCampaigns].sort((a, b) => {
-    function score(cam: typeof a.campaign) {
+    function urgency(cam: typeof a.campaign) {
       const counts = getStatusCounts(cam);
-      const waiting = cam.status === "OPEN" && counts.pending > 0;
-      return waiting
-        ? Math.floor((Date.now() - new Date(cam.createdAt).getTime()) / (1000 * 60 * 60 * 24))
-        : -1;
+      const internalItems = cam.contentItems ?? [];
+      const hasInternalAdjustment = internalItems.some(
+        (i: { internalReviewItem?: { status: string } | null }) =>
+          i.internalReviewItem?.status === "ADJUSTMENT" || i.internalReviewItem?.status === "REJECTED"
+      );
+      const hasClientAdjustment = counts.adjustment > 0 || counts.rejected > 0;
+      const isFullyApproved = counts.total > 0 && counts.approved === counts.total;
+      const daysSince = Math.floor((Date.now() - new Date(cam.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+
+      if (cam.status === "INTERNAL_DONE" && hasInternalAdjustment) return 5000 + daysSince;
+      if (cam.status === "CLOSED" && hasClientAdjustment) return 4000 + daysSince;
+      if (cam.status === "CLOSED" && isFullyApproved) return 3000 + daysSince;
+      if (cam.status === "CLOSED") return 2000 + daysSince;
+      if (cam.status === "OPEN" && counts.pending > 0) return 1000 + daysSince;
+      if (cam.status === "INTERNAL_REVIEW" || cam.status === "INTERNAL_DONE") return 500 + daysSince;
+      if (cam.status === "DRAFT") return 100 + daysSince;
+      return daysSince;
     }
-    return score(b.campaign) - score(a.campaign);
+    return urgency(b.campaign) - urgency(a.campaign);
   });
 
   return (
@@ -163,20 +176,34 @@ export default async function AdminDashboard() {
                 rowBg = "bg-blue-900/10";
               }
 
+              // Determine left border color based on urgency
+              const internalItemsRow = campaign.contentItems ?? [];
+              const hasInternalAdjustmentRow = internalItemsRow.some(
+                (i: { internalReviewItem?: { status: string } | null }) =>
+                  i.internalReviewItem?.status === "ADJUSTMENT" || i.internalReviewItem?.status === "REJECTED"
+              );
+              let borderColor = "border-l-white/5";
+              if (campaign.status === "INTERNAL_DONE" && hasInternalAdjustmentRow) borderColor = "border-l-amber-500";
+              else if (clientFinished && hasAdjustment) borderColor = "border-l-amber-500";
+              else if (clientFinished && isFullyApproved) borderColor = "border-l-emerald-500";
+              else if (clientFinished) borderColor = "border-l-blue-500";
+              else if (waitingClient) borderColor = "border-l-white/20";
+              else if (campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE") borderColor = "border-l-violet-500";
+
               return (
                 <Link
                   key={campaign.id}
                   href={`/admin/campaigns/${campaign.id}`}
-                  className={`px-5 py-3.5 flex items-center gap-4 hover:bg-white/[0.03] transition-colors block ${rowBg}`}
+                  className={`pl-4 pr-5 py-3.5 flex items-center gap-4 hover:bg-white/[0.03] transition-colors block border-l-2 ${borderColor} ${rowBg}`}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm font-medium truncate">{campaign.name}</p>
-                    <p className="text-gray-500 text-xs mt-0.5">
-                      <span className="text-gray-400">{client.name}</span>
-                      {" · "}{counts.total} {counts.total === 1 ? "post" : "posts"} · prazo:{" "}
-                      {new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}
+                    <p className="text-white text-sm font-bold truncate">{client.name}</p>
+                    <p className="text-gray-400 text-xs mt-0.5 truncate">
+                      {campaign.name}
+                      <span className="text-gray-600"> · </span>
+                      {counts.total} {counts.total === 1 ? "post" : "posts"}
                       {waitingClient && (
-                        <span className={`ml-2 font-medium ${daysSinceCreated >= 3 ? "text-red-400" : "text-amber-400"}`}>
+                        <span className={`ml-1.5 font-medium ${daysSinceCreated >= 3 ? "text-red-400" : "text-amber-400"}`}>
                           · {daysSinceCreated === 0 ? "enviado hoje" : daysSinceCreated === 1 ? "há 1 dia" : `há ${daysSinceCreated} dias`} sem aprovação
                         </span>
                       )}
@@ -219,12 +246,13 @@ export default async function AdminDashboard() {
                       </div>
                     )}
 
-                    {campaign.status === "INTERNAL_DONE" && (() => {
-                      const internalItems = campaign.contentItems ?? [];
-                      const hasInternalAdjustment = internalItems.some((i: { internalReviewItem?: { status: string } | null }) =>
-                        i.internalReviewItem?.status === "ADJUSTMENT" || i.internalReviewItem?.status === "REJECTED"
-                      );
-                      return hasInternalAdjustment ? (
+                    {campaign.status === "INTERNAL_REVIEW" && (
+                      <span className="flex items-center gap-1 text-xs font-semibold text-violet-400 bg-violet-900/30 border border-violet-500/30 px-2.5 py-1 rounded-full">
+                        🔍 Em revisão interna
+                      </span>
+                    )}
+                    {campaign.status === "INTERNAL_DONE" && (
+                      hasInternalAdjustmentRow ? (
                         <span className="flex items-center gap-1 text-xs font-semibold text-amber-400 bg-amber-900/30 border border-amber-500/30 px-2.5 py-1 rounded-full animate-pulse">
                           ⚠️ Ajuste interno
                         </span>
@@ -232,8 +260,8 @@ export default async function AdminDashboard() {
                         <span className="flex items-center gap-1 text-xs font-semibold text-emerald-400 bg-emerald-900/30 border border-emerald-500/30 px-2.5 py-1 rounded-full">
                           ✅ Pronto para cliente
                         </span>
-                      );
-                    })()}
+                      )
+                    )}
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                       campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
                       : campaign.status === "DRAFT" ? "bg-gray-800 text-gray-400"
