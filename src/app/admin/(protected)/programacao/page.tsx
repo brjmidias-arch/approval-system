@@ -131,7 +131,7 @@ export default async function ProgramacaoPage() {
       pendingPosts: pendingPosts.length,
       maxDaysWaiting,
     };
-  });
+  }).sort((a, b) => b.maxDaysWaiting - a.maxDaysWaiting);
 
   return (
     <div className="space-y-6">

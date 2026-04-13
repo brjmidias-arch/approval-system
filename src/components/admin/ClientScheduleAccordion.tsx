@@ -159,8 +159,11 @@ function PostCard({ post, onMarkPosted }: { post: Post; onMarkPosted: (id: strin
 }
 
 export default function ClientScheduleAccordion({ clients }: { clients: ClientGroup[] }) {
+  // Auto-open the most urgent client (first after sort, if has pending posts)
   const [openClientId, setOpenClientId] = useState<string | null>(
-    clients.length === 1 ? clients[0].clientId : null
+    clients.length === 1 ? clients[0].clientId
+    : clients[0]?.pendingPosts > 0 ? clients[0].clientId
+    : null
   );
   const [postedIds, setPostedIds] = useState<Set<string>>(new Set());
 
@@ -186,36 +189,51 @@ export default function ClientScheduleAccordion({ clients }: { clients: ClientGr
           client.campaigns.flatMap(c => c.posts).some(p => p.id === id && !p.postedAt)
         ).length;
         const days = client.maxDaysWaiting;
+        const urgencyBorder = pendingCount > 0
+          ? days >= 7 ? "border-l-red-500"
+          : days >= 3 ? "border-l-amber-500"
+          : days >= 1 ? "border-l-yellow-600"
+          : "border-l-emerald-500/40"
+          : "border-l-white/10";
+        const urgencyBg = pendingCount > 0
+          ? days >= 7 ? "bg-red-900/10"
+          : days >= 3 ? "bg-amber-900/10"
+          : "bg-[#1a1a1a]"
+          : "bg-[#1a1a1a]";
 
         return (
-          <div key={client.clientId} className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden">
+          <div key={client.clientId} className={`border border-white/10 border-l-2 ${urgencyBorder} ${urgencyBg} rounded-xl overflow-hidden`}>
             {/* Client header */}
             <button
               onClick={() => setOpenClientId(isOpen ? null : client.clientId)}
               className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition-colors text-left"
             >
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full transition-colors ${isOpen ? "bg-emerald-400" : "bg-white/20"}`} />
-                <div>
-                  <p className="text-white font-medium">{client.clientName}</p>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="min-w-0">
+                  <p className="text-white font-semibold">{client.clientName}</p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <p className="text-gray-500 text-xs">
                       {client.totalPosts} {client.totalPosts === 1 ? "post aprovado" : "posts aprovados"}
                       {client.postedPosts > 0 && ` · ${client.postedPosts} agendados`}
                     </p>
-                    {client.pendingPosts > 0 && days > 0 && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        days >= 7 ? "bg-red-900/30 text-red-400"
-                        : days >= 3 ? "bg-amber-900/30 text-amber-400"
-                        : "bg-white/5 text-gray-400"
+                    {pendingCount > 0 && days > 0 && (
+                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
+                        days >= 7 ? "bg-red-900/40 text-red-400 border border-red-500/30 animate-pulse"
+                        : days >= 3 ? "bg-amber-900/40 text-amber-400 border border-amber-500/30"
+                        : "bg-yellow-900/20 text-yellow-500 border border-yellow-600/20"
                       }`}>
-                        {client.pendingPosts} sem agendar há {days} {days === 1 ? "dia" : "dias"}
+                        ⏰ {pendingCount} {pendingCount === 1 ? "post" : "posts"} sem agendar há {days} {days === 1 ? "dia" : "dias"}
+                      </span>
+                    )}
+                    {pendingCount > 0 && days === 0 && (
+                      <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-emerald-900/20 text-emerald-400 border border-emerald-500/20">
+                        {pendingCount} {pendingCount === 1 ? "post aprovado hoje" : "posts aprovados hoje"}
                       </span>
                     )}
                   </div>
                 </div>
               </div>
-              <span className={`text-gray-400 text-lg transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}>
+              <span className={`text-gray-400 text-lg transition-transform duration-200 shrink-0 ${isOpen ? "rotate-180" : ""}`}>
                 ›
               </span>
             </button>
