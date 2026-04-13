@@ -148,7 +148,20 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
   const [posts, setPosts] = useState<ParsedPost[]>([]);
   const [progress, setProgress] = useState({ current: 0, total: 0, label: "" });
   const [uploadedCount, setUploadedCount] = useState(0);
+  const [lightboxFile, setLightboxFile] = useState<File | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+
+  function openLightbox(file: File) {
+    setLightboxFile(file);
+    setLightboxUrl(URL.createObjectURL(file));
+  }
+
+  function closeLightbox() {
+    if (lightboxUrl) URL.revokeObjectURL(lightboxUrl);
+    setLightboxFile(null);
+    setLightboxUrl(null);
+  }
 
   function handleFolderChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
@@ -163,6 +176,10 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
     setPosts((prev) =>
       prev.map((p) => (p.tempId === tempId ? { ...p, [field]: value } : p))
     );
+  }
+
+  function removePost(tempId: string) {
+    setPosts((prev) => prev.filter((p) => p.tempId !== tempId));
   }
 
   async function handleUpload() {
@@ -213,19 +230,48 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
     onDone();
   }
 
-  // Thumbnail preview for a file
+  // Thumbnail preview for a file — clickable to open lightbox
   function FileThumbnail({ file, className }: { file: File; className?: string }) {
     const [url] = useState(() => URL.createObjectURL(file));
-    return file.type.startsWith("image/") ? (
-      <img src={url} alt="" className={className ?? "w-12 h-12 object-cover rounded"} />
+    const isImage = file.type.startsWith("image/");
+    return isImage ? (
+      <button
+        type="button"
+        onClick={() => openLightbox(file)}
+        className="shrink-0 focus:outline-none group relative"
+        title="Ver imagem"
+      >
+        <img src={url} alt="" className={`${className ?? "w-10 h-10"} object-cover rounded cursor-zoom-in group-hover:brightness-75 transition-all`} />
+      </button>
     ) : (
-      <div className={`flex items-center justify-center bg-black/40 rounded text-xl ${className ?? "w-12 h-12"}`}>
+      <div className={`flex items-center justify-center bg-black/40 rounded text-xl shrink-0 ${className ?? "w-10 h-10"}`}>
         🎬
       </div>
     );
   }
 
   return (
+    <>
+    {/* Lightbox */}
+    {lightboxUrl && lightboxFile && (
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 cursor-zoom-out"
+        onClick={closeLightbox}
+      >
+        <button
+          className="absolute top-4 right-4 text-white/60 hover:text-white text-3xl leading-none"
+          onClick={closeLightbox}
+        >×</button>
+        <img
+          src={lightboxUrl}
+          alt=""
+          className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        />
+        <p className="absolute bottom-4 text-gray-500 text-xs">{lightboxFile.name}</p>
+      </div>
+    )}
+
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 overflow-y-auto py-8 px-4">
       <div className="bg-[#111] border border-white/10 rounded-2xl w-full max-w-2xl">
         {/* Header */}
@@ -233,7 +279,7 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
           <div>
             <h2 className="text-white font-semibold text-base">Upload de Pasta</h2>
             {step === "review" && (
-              <p className="text-gray-500 text-xs mt-0.5">{posts.length} {posts.length === 1 ? "post identificado" : "posts identificados"}</p>
+              <p className="text-gray-500 text-xs mt-0.5">{posts.length} {posts.length === 1 ? "post" : "posts"} · clique na imagem para ampliar · × para remover</p>
             )}
           </div>
           {step !== "uploading" && (
@@ -277,15 +323,15 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
               {posts.map((post) => (
                 <div key={post.tempId} className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden">
                   {/* Post header */}
-                  <div className="flex items-center gap-3 px-4 pt-3 pb-2">
+                  <div className="flex items-start gap-3 px-4 pt-3 pb-2">
                     {/* Thumbnails */}
-                    <div className="flex gap-1 shrink-0">
-                      {post.mainFiles.slice(0, 4).map((f, i) => (
+                    <div className="flex gap-1 shrink-0 flex-wrap max-w-[11rem]">
+                      {post.mainFiles.slice(0, 6).map((f, i) => (
                         <FileThumbnail key={i} file={f} className="w-10 h-10 object-cover rounded" />
                       ))}
-                      {post.mainFiles.length > 4 && (
+                      {post.mainFiles.length > 6 && (
                         <div className="w-10 h-10 rounded bg-white/5 flex items-center justify-center text-xs text-gray-400">
-                          +{post.mainFiles.length - 4}
+                          +{post.mainFiles.length - 6}
                         </div>
                       )}
                     </div>
@@ -297,7 +343,7 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
                         placeholder="Título do post"
                         className="w-full bg-transparent text-white text-sm font-medium focus:outline-none placeholder-gray-600 truncate"
                       />
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <select
                           value={post.contentType}
                           onChange={(e) => updatePost(post.tempId, "contentType", e.target.value as ContentType)}
@@ -311,6 +357,15 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
                         {post.coverFile && <span className="text-xs text-gray-500">+ capa</span>}
                       </div>
                     </div>
+                    {/* Remove button */}
+                    <button
+                      type="button"
+                      onClick={() => removePost(post.tempId)}
+                      className="shrink-0 text-gray-600 hover:text-red-400 transition-colors text-lg leading-none mt-0.5"
+                      title="Remover este post"
+                    >
+                      ×
+                    </button>
                   </div>
 
                   {/* Fields */}
@@ -352,7 +407,8 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
               </button>
               <button
                 onClick={handleUpload}
-                className="flex-1 py-2.5 rounded-lg text-sm bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition-colors"
+                disabled={posts.length === 0}
+                className="flex-1 py-2.5 rounded-lg text-sm bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium transition-colors"
               >
                 Fazer upload ({posts.length} {posts.length === 1 ? "post" : "posts"})
               </button>
@@ -396,5 +452,6 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
         )}
       </div>
     </div>
+    </>
   );
 }
