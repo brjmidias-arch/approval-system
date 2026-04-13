@@ -15,6 +15,7 @@ interface ContentItem {
   scheduledDate: string | null;
   contentType: ContentType;
   groupId: string | null;
+  coverUrl: string | null;
   approvalItem: { status: Status; clientComment: string | null } | null;
 }
 
@@ -389,6 +390,21 @@ export default function ApprovalPage() {
                     </div>
                   )}
                 </div>
+
+              {/* Capa do Reels */}
+              {currentItem.contentType === "REELS" && currentItem.coverUrl && (
+                <div className="border-t border-white/10">
+                  <div className="px-4 pt-3 pb-1">
+                    <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Capa do Reels</span>
+                  </div>
+                  <div className="relative bg-black">
+                    <img src={currentItem.coverUrl} alt="Capa do Reels" className="w-full max-h-[400px] object-contain" />
+                    <div className="absolute inset-0 flex items-end justify-end p-3 pointer-events-none">
+                      <span className="text-white/30 text-xs font-medium tracking-wider select-none">PRÉVIA · BRJ Mídias</span>
+                    </div>
+                  </div>
+                </div>
+              )}
               )}
 
               {/* Dots */}
