@@ -26,37 +26,52 @@ model Client {
 }
 
 model Campaign {
-  id            String          @id @default(cuid())
-  clientId      String
-  client        Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  name          String
-  month         Int
-  year          Int
-  token         String          @unique @default(uuid())
-  expiresAt     DateTime
-  status        String          @default("OPEN")
-  createdAt     DateTime        @default(now())
-  contentItems  ContentItem[]
-  approvalItems ApprovalItem[]
+  id                  String               @id @default(cuid())
+  clientId            String
+  client              Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name                String
+  month               Int
+  year                Int
+  token               String               @unique @default(uuid())
+  internalToken       String               @unique @default(dbgenerated("gen_random_uuid()"))
+  expiresAt           DateTime
+  status              String               @default("DRAFT")
+  createdAt           DateTime             @default(now())
+  contentItems        ContentItem[]
+  approvalItems       ApprovalItem[]
+  internalReviewItems InternalReviewItem[]
 }
 
 model ContentItem {
-  id            String        @id @default(cuid())
+  id                 String              @id @default(cuid())
+  campaignId         String
+  campaign           Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  fileUrl            String
+  fileType           String
+  title              String?
+  caption            String?
+  scheduledDate      DateTime?
+  contentType        String
+  groupId            String?
+  driveUrl           String?
+  coverUrl           String?
+  coverDriveUrl      String?
+  order              Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  approvalItem       ApprovalItem?
+  internalReviewItem InternalReviewItem?
+}
+
+model InternalReviewItem {
+  id            String      @id @default(cuid())
+  contentItemId String      @unique
+  contentItem   ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
   campaignId    String
-  campaign      Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  fileUrl       String
-  fileType      String
-  title         String?
-  caption       String?
-  scheduledDate DateTime?
-  contentType   String
-  groupId       String?
-  driveUrl      String?
-  coverUrl      String?
-  coverDriveUrl String?
-  order         Int           @default(0)
-  createdAt     DateTime      @default(now())
-  approvalItem  ApprovalItem?
+  campaign      Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  status        String      @default("PENDING")
+  comment       String?
+  reviewedAt    DateTime?
+  createdAt     DateTime    @default(now())
 }
 
 model ApprovalItem {

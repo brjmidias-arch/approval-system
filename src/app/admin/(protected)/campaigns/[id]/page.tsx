@@ -15,6 +15,11 @@ interface ApprovalItem {
   reviewedAt: string | null;
 }
 
+interface InternalReviewItem {
+  status: string;
+  comment: string | null;
+}
+
 interface ContentItem {
   id: string;
   fileUrl: string;
@@ -29,6 +34,7 @@ interface ContentItem {
   coverDriveUrl: string | null;
   order: number;
   approvalItem: ApprovalItem | null;
+  internalReviewItem: InternalReviewItem | null;
 }
 
 interface Campaign {
@@ -37,6 +43,7 @@ interface Campaign {
   month: number;
   year: number;
   token: string;
+  internalToken: string;
   expiresAt: string;
   status: string;
   client: { id: string; name: string; email: string };
@@ -391,11 +398,42 @@ export default function CampaignPage() {
     }
   }
 
+  async function handleSendInternal() {
+    if (campaign!.contentItems.length === 0) {
+      alert("Adicione pelo menos um conteúdo antes de enviar para revisão interna.");
+      return;
+    }
+    await fetch(`/api/admin/campaigns/${id}/send-internal`, { method: "POST" });
+    fetchCampaign();
+  }
+
+  async function handleSendClient() {
+    if (!confirm("Enviar para o cliente? Isso tornará a campanha visível para aprovação.")) return;
+    await fetch(`/api/admin/campaigns/${id}/send-client`, { method: "POST" });
+    fetchCampaign();
+  }
+
+  function copyInternalLink() {
+    const url = `${window.location.origin}/revisar/${campaign!.internalToken}`;
+    navigator.clipboard.writeText(url);
+    setCopyFeedback(true);
+    setTimeout(() => setCopyFeedback(false), 2000);
+  }
+
   if (loading) return <div className="text-gray-400 p-8">Carregando...</div>;
   if (!campaign) return <div className="text-red-400 p-8">Campanha não encontrada.</div>;
 
   const isExpired = new Date() > new Date(campaign.expiresAt) && campaign.status === "OPEN";
   const approvalUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/aprovar/${campaign.token}`;
+  const internalReviewUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/revisar/${campaign.internalToken}`;
+
+  // Internal review stats
+  const internalTotal = campaign.contentItems.length;
+  const internalApproved = campaign.contentItems.filter((i) => i.internalReviewItem?.status === "APPROVED").length;
+  const internalAdjustment = campaign.contentItems.filter((i) => i.internalReviewItem?.status === "ADJUSTMENT").length;
+  const internalRejected = campaign.contentItems.filter((i) => i.internalReviewItem?.status === "REJECTED").length;
+  const internalPending = internalTotal - internalApproved - internalAdjustment - internalRejected;
+  const allInternalApproved = internalTotal > 0 && internalApproved === internalTotal;
 
   // Group carousel items by groupId
   type GroupedItem =
@@ -473,10 +511,15 @@ export default function CampaignPage() {
               )}
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                 campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
+                : campaign.status === "DRAFT" ? "bg-gray-800 text-gray-400"
+                : campaign.status === "INTERNAL_REVIEW" ? "bg-violet-900/30 text-violet-400"
                 : isExpired ? "bg-red-900/30 text-red-400"
                 : "bg-emerald-900/30 text-emerald-400"
               }`}>
-                {campaign.status === "CLOSED" ? "Fechado" : isExpired ? "Expirado" : "Aberto"}
+                {campaign.status === "CLOSED" ? "Fechado"
+                : campaign.status === "DRAFT" ? "Rascunho"
+                : campaign.status === "INTERNAL_REVIEW" ? "Revisão Interna"
+                : isExpired ? "Expirado" : "Aberto"}
               </span>
               {liveStatus && liveStatus.reviewed < liveStatus.total && campaign.status === "OPEN" && (
                 <span className="flex items-center gap-1.5 text-xs text-amber-400">
@@ -490,25 +533,60 @@ export default function CampaignPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-            <button onClick={copyLink} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
-              {copyFeedback ? "Copiado!" : "Copiar Link"}
-            </button>
-            <button onClick={handleResend} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
-              Reenviar E-mail
-            </button>
-            <button onClick={handleToggleStatus} className={`text-sm px-3 py-2 rounded-lg transition-colors ${
-              campaign.status === "OPEN" ? "bg-red-900/20 hover:bg-red-900/30 text-red-400" : "bg-emerald-900/20 hover:bg-emerald-900/30 text-emerald-400"
-            }`}>
-              {campaign.status === "OPEN" ? "Fechar Campanha" : "Reabrir Campanha"}
-            </button>
-            <button onClick={() => setShowUploadForm(true)} className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
-              + Upload
-            </button>
-            <button onClick={handleResetApprovals} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg transition-colors">
-              Resetar Aprovações
-            </button>
+            {/* DRAFT: upload + send to internal review */}
+            {campaign.status === "DRAFT" && (
+              <>
+                <button onClick={() => setShowUploadForm(true)} className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
+                  + Upload
+                </button>
+                <button onClick={handleSendInternal} className="text-sm px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-colors">
+                  Enviar para Revisão Interna
+                </button>
+              </>
+            )}
+
+            {/* INTERNAL_REVIEW: copy internal link + send to client (if all approved) */}
+            {campaign.status === "INTERNAL_REVIEW" && (
+              <>
+                <button onClick={() => setShowUploadForm(true)} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
+                  + Upload
+                </button>
+                <button onClick={copyInternalLink} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
+                  {copyFeedback ? "Copiado!" : "Copiar Link Interno"}
+                </button>
+                {allInternalApproved && (
+                  <button onClick={handleSendClient} className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
+                    Enviar para Cliente
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* OPEN / CLOSED: original buttons */}
+            {(campaign.status === "OPEN" || campaign.status === "CLOSED") && (
+              <>
+                <button onClick={copyLink} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
+                  {copyFeedback ? "Copiado!" : "Copiar Link"}
+                </button>
+                <button onClick={handleResend} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
+                  Reenviar E-mail
+                </button>
+                <button onClick={handleToggleStatus} className={`text-sm px-3 py-2 rounded-lg transition-colors ${
+                  campaign.status === "OPEN" ? "bg-red-900/20 hover:bg-red-900/30 text-red-400" : "bg-emerald-900/20 hover:bg-emerald-900/30 text-emerald-400"
+                }`}>
+                  {campaign.status === "OPEN" ? "Fechar Campanha" : "Reabrir Campanha"}
+                </button>
+                <button onClick={() => setShowUploadForm(true)} className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
+                  + Upload
+                </button>
+                <button onClick={handleResetApprovals} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg transition-colors">
+                  Resetar Aprovações
+                </button>
+              </>
+            )}
+
             <button onClick={handleDeleteCampaign} className="text-sm px-3 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded-lg transition-colors">
-              Excluir Campanha
+              Excluir
             </button>
           </div>
         </div>
@@ -530,6 +608,45 @@ export default function CampaignPage() {
         ))}
       </div>
 
+      {/* Internal review banner */}
+      {campaign.status === "INTERNAL_REVIEW" && (
+        <div className="bg-violet-900/20 border border-violet-500/30 rounded-xl px-5 py-4 space-y-3">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-violet-400 font-medium text-sm">Aguardando revisão interna</p>
+              <p className="text-violet-400/70 text-xs mt-0.5">
+                {internalPending > 0
+                  ? `${internalPending} ${internalPending === 1 ? "item pendente" : "itens pendentes"} de revisão`
+                  : allInternalApproved
+                  ? "Todos os itens aprovados internamente — pronto para enviar ao cliente."
+                  : `${internalAdjustment + internalRejected} ${internalAdjustment + internalRejected === 1 ? "item precisa" : "itens precisam"} de correção.`
+                }
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex gap-3 text-xs">
+                <span className="text-emerald-400">{internalApproved} aprovados</span>
+                <span className="text-amber-400">{internalAdjustment} ajustes</span>
+                <span className="text-red-400">{internalRejected} reprovados</span>
+                <span className="text-gray-400">{internalPending} pendentes</span>
+              </div>
+              {allInternalApproved && (
+                <button onClick={handleSendClient} className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm px-4 py-2 rounded-lg transition-colors">
+                  Enviar para Cliente
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-3 bg-black/20 rounded-lg px-3 py-2">
+            <span className="text-gray-400 text-xs shrink-0">Link interno:</span>
+            <input readOnly value={internalReviewUrl} className="flex-1 bg-transparent text-xs text-gray-300 focus:outline-none" />
+            <button onClick={copyInternalLink} className="text-xs px-2.5 py-1 bg-white/5 hover:bg-white/10 text-gray-300 rounded transition-colors shrink-0">
+              {copyFeedback ? "Copiado!" : "Copiar"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Reopen banner — shown when campaign is CLOSED and has adjustments pending */}
       {campaign.status === "CLOSED" && (adjustment > 0 || rejected > 0) && (
         <div className="bg-amber-900/20 border border-amber-500/30 rounded-xl px-5 py-4 flex items-center justify-between gap-4">
@@ -548,14 +665,16 @@ export default function CampaignPage() {
         </div>
       )}
 
-      {/* Approval URL */}
-      <div className="bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">
-        <span className="text-gray-400 text-sm shrink-0">Link do cliente:</span>
-        <input readOnly value={approvalUrl} className="flex-1 bg-transparent text-sm text-gray-300 focus:outline-none" />
-        <button onClick={copyLink} className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors shrink-0">
-          {copyFeedback ? "Copiado!" : "Copiar"}
-        </button>
-      </div>
+      {/* Approval URL — only shown when sent to client */}
+      {(campaign.status === "OPEN" || campaign.status === "CLOSED") && (
+        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 flex items-center gap-3">
+          <span className="text-gray-400 text-sm shrink-0">Link do cliente:</span>
+          <input readOnly value={approvalUrl} className="flex-1 bg-transparent text-sm text-gray-300 focus:outline-none" />
+          <button onClick={copyLink} className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors shrink-0">
+            {copyFeedback ? "Copiado!" : "Copiar"}
+          </button>
+        </div>
+      )}
 
       {/* Upload Modal */}
       {showUploadForm && (

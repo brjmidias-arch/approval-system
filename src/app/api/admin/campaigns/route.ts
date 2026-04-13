@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
       month: Number(month),
       year: Number(year),
       expiresAt: expires,
+      status: "DRAFT",
     },
   });
 
