@@ -363,48 +363,50 @@ export default function ApprovalPage() {
                 </div>
               ) : (
                 // Single item
-                <div className="relative bg-black">
-                  {currentItem.fileType === "IMAGE" && (
-                    <div className="relative">
-                      <img src={currentItem.fileUrl} alt="" className="w-full max-h-[500px] object-contain" />
-                      <div className="absolute inset-0 flex items-end justify-end p-3 pointer-events-none">
-                        <span className="text-white/30 text-xs font-medium tracking-wider select-none">PRÉVIA · BRJ Mídias</span>
+                <>
+                  <div className="relative bg-black">
+                    {currentItem.fileType === "IMAGE" && (
+                      <div className="relative">
+                        <img src={currentItem.fileUrl} alt="" className="w-full max-h-[500px] object-contain" />
+                        <div className="absolute inset-0 flex items-end justify-end p-3 pointer-events-none">
+                          <span className="text-white/30 text-xs font-medium tracking-wider select-none">PRÉVIA · BRJ Mídias</span>
+                        </div>
+                      </div>
+                    )}
+                    {currentItem.fileType === "VIDEO" && (
+                      <div className="relative">
+                        <video src={currentItem.fileUrl} controls className="w-full max-h-[500px]" id={`video-single-${currentItem.id}`} />
+                        <button
+                          onClick={() => { const v = document.getElementById(`video-single-${currentItem.id}`) as HTMLVideoElement & { webkitEnterFullscreen?: () => void }; v?.requestFullscreen?.() ?? v?.webkitEnterFullscreen?.(); }}
+                          className="absolute bottom-12 right-2 bg-black/60 hover:bg-black/80 text-white text-xs px-2.5 py-1.5 rounded-lg transition-colors"
+                        >
+                          ⛶ Tela cheia
+                        </button>
+                      </div>
+                    )}
+                    {currentItem.fileType === "PDF" && (
+                      <div className="flex items-center justify-center h-32 gap-3">
+                        <span className="text-3xl">📄</span>
+                        <a href={currentItem.fileUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-400 text-sm">Abrir PDF →</a>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Capa do Reels */}
+                  {currentItem.contentType === "REELS" && currentItem.coverUrl && (
+                    <div className="border-t border-white/10">
+                      <div className="px-4 pt-3 pb-1">
+                        <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Capa do Reels</span>
+                      </div>
+                      <div className="relative bg-black">
+                        <img src={currentItem.coverUrl} alt="Capa do Reels" className="w-full max-h-[400px] object-contain" />
+                        <div className="absolute inset-0 flex items-end justify-end p-3 pointer-events-none">
+                          <span className="text-white/30 text-xs font-medium tracking-wider select-none">PRÉVIA · BRJ Mídias</span>
+                        </div>
                       </div>
                     </div>
                   )}
-                  {currentItem.fileType === "VIDEO" && (
-                    <div className="relative">
-                      <video src={currentItem.fileUrl} controls className="w-full max-h-[500px]" id={`video-single-${currentItem.id}`} />
-                      <button
-                        onClick={() => { const v = document.getElementById(`video-single-${currentItem.id}`) as HTMLVideoElement & { webkitEnterFullscreen?: () => void }; v?.requestFullscreen?.() ?? v?.webkitEnterFullscreen?.(); }}
-                        className="absolute bottom-12 right-2 bg-black/60 hover:bg-black/80 text-white text-xs px-2.5 py-1.5 rounded-lg transition-colors"
-                      >
-                        ⛶ Tela cheia
-                      </button>
-                    </div>
-                  )}
-                  {currentItem.fileType === "PDF" && (
-                    <div className="flex items-center justify-center h-32 gap-3">
-                      <span className="text-3xl">📄</span>
-                      <a href={currentItem.fileUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-400 text-sm">Abrir PDF →</a>
-                    </div>
-                  )}
-                </div>
-
-              {/* Capa do Reels */}
-              {currentItem.contentType === "REELS" && currentItem.coverUrl && (
-                <div className="border-t border-white/10">
-                  <div className="px-4 pt-3 pb-1">
-                    <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Capa do Reels</span>
-                  </div>
-                  <div className="relative bg-black">
-                    <img src={currentItem.coverUrl} alt="Capa do Reels" className="w-full max-h-[400px] object-contain" />
-                    <div className="absolute inset-0 flex items-end justify-end p-3 pointer-events-none">
-                      <span className="text-white/30 text-xs font-medium tracking-wider select-none">PRÉVIA · BRJ Mídias</span>
-                    </div>
-                  </div>
-                </div>
-              )}
+                </>
               )}
 
               {/* Dots */}
