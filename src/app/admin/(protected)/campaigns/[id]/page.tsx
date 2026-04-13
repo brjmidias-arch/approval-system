@@ -80,6 +80,8 @@ export default function CampaignPage() {
   const [markingDoneItemId, setMarkingDoneItemId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
+  const [editingDeadline, setEditingDeadline] = useState(false);
+  const [deadlineValue, setDeadlineValue] = useState("");
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
@@ -324,6 +326,17 @@ export default function CampaignPage() {
     fetchCampaign();
   }
 
+  async function handleSaveDeadline() {
+    if (!deadlineValue) return;
+    await fetch(`/api/admin/campaigns/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expiresAt: deadlineValue }),
+    });
+    setEditingDeadline(false);
+    fetchCampaign();
+  }
+
   async function handleDeleteCampaign() {
     if (!confirm(`Excluir a campanha "${campaign!.name}" e todos os conteúdos? Esta ação não pode ser desfeita.`)) return;
     await fetch(`/api/admin/campaigns/${id}`, { method: "DELETE" });
@@ -434,7 +447,6 @@ export default function CampaignPage() {
   if (loading) return <div className="text-gray-400 p-8">Carregando...</div>;
   if (!campaign) return <div className="text-red-400 p-8">Campanha não encontrada.</div>;
 
-  const isExpired = new Date() > new Date(campaign.expiresAt) && campaign.status === "OPEN";
   const approvalUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/aprovar/${campaign.token}`;
   const internalReviewUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/revisar/${campaign.internalToken}`;
 
@@ -528,14 +540,12 @@ export default function CampaignPage() {
                 campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
                 : campaign.status === "DRAFT" ? "bg-gray-800 text-gray-400"
                 : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "bg-violet-900/30 text-violet-400"
-                : isExpired ? "bg-red-900/30 text-red-400"
                 : "bg-emerald-900/30 text-emerald-400"
               }`}>
                 {campaign.status === "CLOSED" ? "Fechado"
                 : campaign.status === "DRAFT" ? "Rascunho"
-                : campaign.status === "INTERNAL_REVIEW" ? "Revisão Interna"
-                : campaign.status === "INTERNAL_DONE" ? "Revisão Interna"
-                : isExpired ? "Expirado" : "Aberto"}
+                : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "Revisão Interna"
+                : "Aberto"}
               </span>
               {liveStatus && liveStatus.reviewed < liveStatus.total && campaign.status === "OPEN" && (
                 <span className="flex items-center gap-1.5 text-xs text-amber-400">
@@ -544,9 +554,36 @@ export default function CampaignPage() {
                 </span>
               )}
             </div>
-            <p className="text-gray-400 text-sm mt-0.5">
-              {campaign.client.name} · Expira {new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}
-            </p>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span className="text-gray-400 text-sm">{campaign.client.name}</span>
+              <span className="text-gray-600 text-sm">·</span>
+              {editingDeadline ? (
+                <>
+                  <input
+                    type="date"
+                    autoFocus
+                    value={deadlineValue}
+                    onChange={(e) => setDeadlineValue(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSaveDeadline(); if (e.key === "Escape") setEditingDeadline(false); }}
+                    className="bg-[#0f0f0f] border border-emerald-500 rounded px-2 py-0.5 text-white text-sm focus:outline-none"
+                  />
+                  <button onClick={handleSaveDeadline} className="text-emerald-400 hover:text-emerald-300 text-xs">Salvar</button>
+                  <button onClick={() => setEditingDeadline(false)} className="text-gray-500 hover:text-gray-300 text-xs">Cancelar</button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    const d = new Date(campaign.expiresAt);
+                    setDeadlineValue(d.toISOString().slice(0, 10));
+                    setEditingDeadline(true);
+                  }}
+                  className="text-gray-400 text-sm hover:text-white transition-colors group flex items-center gap-1"
+                >
+                  Prazo: {new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}
+                  <span className="text-gray-600 group-hover:text-gray-400 text-xs">✏️</span>
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
             {/* DRAFT: upload + send to internal review */}

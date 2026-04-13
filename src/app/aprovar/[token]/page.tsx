@@ -59,7 +59,7 @@ export default function ApprovalPage() {
   const { token } = useParams<{ token: string }>();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [error, setError] = useState<"expired" | "closed" | "not_found" | null>(null);
+  const [error, setError] = useState<"closed" | "not_found" | null>(null);
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState<Record<string, LocalReview>>({});
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
@@ -71,7 +71,6 @@ export default function ApprovalPage() {
 
   const fetchCampaign = useCallback(async () => {
     const res = await fetch(`/api/approval/${token}`);
-    if (res.status === 410) { setError("expired"); setLoading(false); return; }
     if (res.status === 404) { setError("not_found"); setLoading(false); return; }
     const data: Campaign = await res.json();
     if (data.status === "CLOSED") { setError("closed"); setLoading(false); return; }
@@ -168,7 +167,6 @@ export default function ApprovalPage() {
 
   if (error) {
     const msgs = {
-      expired: { icon: "🔒", title: "Link Expirado", desc: "O prazo para aprovação deste conteúdo já passou. Entre em contato com a agência." },
       closed: { icon: "✅", title: "Revisão Concluída", desc: "Esta campanha já foi finalizada. Obrigado!" },
       not_found: { icon: "🔒", title: "Link Inválido", desc: "Este link de aprovação não existe ou foi removido." },
     };

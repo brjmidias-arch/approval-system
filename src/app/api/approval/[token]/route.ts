@@ -17,10 +17,6 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     return NextResponse.json({ error: "Link não encontrado" }, { status: 404 });
   }
 
-  if (new Date() > new Date(campaign.expiresAt) && campaign.status === "OPEN") {
-    return NextResponse.json({ error: "expired" }, { status: 410 });
-  }
-
   return NextResponse.json(campaign);
 }
 
@@ -33,10 +29,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
 
   if (campaign.status === "CLOSED") {
     return NextResponse.json({ error: "Campanha encerrada" }, { status: 403 });
-  }
-
-  if (new Date() > new Date(campaign.expiresAt)) {
-    return NextResponse.json({ error: "Link expirado" }, { status: 410 });
   }
 
   const body = await req.json();

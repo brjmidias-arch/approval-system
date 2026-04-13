@@ -40,7 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           Ou acesse: <a href="${approvalUrl}">${approvalUrl}</a>
         </p>
         <p style="color:#666;font-size:14px;">
-          Este link expira em ${new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}.
+          Prazo de aprovação: ${new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}.
         </p>
         <hr/>
         <p style="color:#999;font-size:12px;">BRJ Mídias — brjmidias.com.br</p>

@@ -218,7 +218,6 @@ export default function ClientDetailPage() {
               const adjustment = campaign.approvalItems.filter((a) => a.status === "ADJUSTMENT").length;
               const rejected = campaign.approvalItems.filter((a) => a.status === "REJECTED").length;
               const pending = total - approved - adjustment - rejected;
-              const isExpired = new Date() > new Date(campaign.expiresAt) && campaign.status === "OPEN";
               const progress = total > 0 ? Math.round(((total - pending) / total) * 100) : 0;
 
               return (
@@ -236,16 +235,21 @@ export default function ClientDetailPage() {
                           className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                             campaign.status === "CLOSED"
                               ? "bg-gray-800 text-gray-400"
-                              : isExpired
-                              ? "bg-red-900/30 text-red-400"
+                              : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE"
+                              ? "bg-violet-900/30 text-violet-400"
+                              : campaign.status === "DRAFT"
+                              ? "bg-gray-800 text-gray-400"
                               : "bg-emerald-900/30 text-emerald-400"
                           }`}
                         >
-                          {campaign.status === "CLOSED" ? "Fechado" : isExpired ? "Expirado" : "Aberto"}
+                          {campaign.status === "CLOSED" ? "Fechado"
+                            : campaign.status === "DRAFT" ? "Rascunho"
+                            : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "Revisão Interna"
+                            : "Aberto"}
                         </span>
                       </div>
                       <p className="text-gray-500 text-xs mt-0.5">
-                        {MONTHS[campaign.month - 1]} {campaign.year} · Expira{" "}
+                        {MONTHS[campaign.month - 1]} {campaign.year} · Prazo:{" "}
                         {new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}
                       </p>
 

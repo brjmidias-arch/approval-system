@@ -83,8 +83,7 @@ export default async function AdminDashboard() {
   const sortedCampaigns = [...allCampaigns].sort((a, b) => {
     function score(cam: typeof a.campaign) {
       const counts = getStatusCounts(cam);
-      const isExpired = new Date() > new Date(cam.expiresAt) && cam.status === "OPEN";
-      const waiting = cam.status === "OPEN" && counts.pending > 0 && !isExpired;
+      const waiting = cam.status === "OPEN" && counts.pending > 0;
       return waiting
         ? Math.floor((Date.now() - new Date(cam.createdAt).getTime()) / (1000 * 60 * 60 * 24))
         : -1;
@@ -141,14 +140,13 @@ export default async function AdminDashboard() {
           <div className="divide-y divide-white/5">
             {sortedCampaigns.map(({ campaign, client }) => {
               const counts = getStatusCounts(campaign);
-              const isExpired = new Date() > new Date(campaign.expiresAt) && campaign.status === "OPEN";
               const daysSinceCreated = Math.floor(
                 (Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24)
               );
               const hasAdjustment = counts.adjustment > 0 || counts.rejected > 0;
               const isFullyApproved = counts.total > 0 && counts.approved === counts.total;
               const clientFinished = campaign.status === "CLOSED" && counts.total > 0;
-              const waitingClient = campaign.status === "OPEN" && counts.pending > 0 && !isExpired;
+              const waitingClient = campaign.status === "OPEN" && counts.pending > 0;
 
               type BadgeType = "adjustment" | "approved" | "finished" | null;
               let badgeType: BadgeType = null;
@@ -175,7 +173,7 @@ export default async function AdminDashboard() {
                     <p className="text-white text-sm font-medium truncate">{campaign.name}</p>
                     <p className="text-gray-500 text-xs mt-0.5">
                       <span className="text-gray-400">{client.name}</span>
-                      {" · "}{counts.total} {counts.total === 1 ? "post" : "posts"} · expira{" "}
+                      {" · "}{counts.total} {counts.total === 1 ? "post" : "posts"} · prazo:{" "}
                       {new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}
                       {waitingClient && (
                         <span className={`ml-2 font-medium ${daysSinceCreated >= 3 ? "text-red-400" : "text-amber-400"}`}>
@@ -240,14 +238,12 @@ export default async function AdminDashboard() {
                       campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
                       : campaign.status === "DRAFT" ? "bg-gray-800 text-gray-400"
                       : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "bg-violet-900/30 text-violet-400"
-                      : isExpired ? "bg-red-900/30 text-red-400"
                       : "bg-emerald-900/30 text-emerald-400"
                     }`}>
                       {campaign.status === "CLOSED" ? "Fechado"
                       : campaign.status === "DRAFT" ? "Rascunho"
-                      : campaign.status === "INTERNAL_REVIEW" ? "Revisão Interna"
-                      : campaign.status === "INTERNAL_DONE" ? "Revisão Interna"
-                      : isExpired ? "Expirado" : "Aberto"}
+                      : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "Revisão Interna"
+                      : "Aberto"}
                     </span>
                   </div>
                 </Link>
