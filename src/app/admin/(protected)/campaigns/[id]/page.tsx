@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import { CONTENT_TYPE_LABELS, APPROVAL_STATUS_LABELS, APPROVAL_STATUS_COLORS } from "@/types";
 import type { ContentType, ApprovalStatus } from "@/types";
 import CarouselCard from "@/components/admin/CarouselCard";
+import FolderUploadModal from "@/components/admin/FolderUploadModal";
 
 interface ApprovalItem {
   id: string;
@@ -82,6 +83,7 @@ export default function CampaignPage() {
   const [nameValue, setNameValue] = useState("");
   const [editingDeadline, setEditingDeadline] = useState(false);
   const [deadlineValue, setDeadlineValue] = useState("");
+  const [showFolderUpload, setShowFolderUpload] = useState(false);
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
@@ -589,6 +591,9 @@ export default function CampaignPage() {
             {/* DRAFT: upload + send to internal review */}
             {campaign.status === "DRAFT" && (
               <>
+                <button onClick={() => setShowFolderUpload(true)} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
+                  📁 Upload Pasta
+                </button>
                 <button onClick={() => setShowUploadForm(true)} className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
                   + Upload
                 </button>
@@ -601,6 +606,9 @@ export default function CampaignPage() {
             {/* INTERNAL_REVIEW / INTERNAL_DONE: copy internal link */}
             {(campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE") && (
               <>
+                <button onClick={() => setShowFolderUpload(true)} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
+                  📁 Upload Pasta
+                </button>
                 <button onClick={() => setShowUploadForm(true)} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
                   + Upload
                 </button>
@@ -628,6 +636,9 @@ export default function CampaignPage() {
                   campaign.status === "OPEN" ? "bg-red-900/20 hover:bg-red-900/30 text-red-400" : "bg-emerald-900/20 hover:bg-emerald-900/30 text-emerald-400"
                 }`}>
                   {campaign.status === "OPEN" ? "Fechar Campanha" : "Reabrir Campanha"}
+                </button>
+                <button onClick={() => setShowFolderUpload(true)} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
+                  📁 Upload Pasta
                 </button>
                 <button onClick={() => setShowUploadForm(true)} className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
                   + Upload
@@ -750,6 +761,16 @@ export default function CampaignPage() {
             {copyFeedback ? "Copiado!" : "Copiar"}
           </button>
         </div>
+      )}
+
+      {/* Folder Upload Modal */}
+      {showFolderUpload && (
+        <FolderUploadModal
+          campaignId={id}
+          existingItemCount={campaign.contentItems.length}
+          onDone={() => { fetchCampaign(); }}
+          onClose={() => setShowFolderUpload(false)}
+        />
       )}
 
       {/* Upload Modal */}
