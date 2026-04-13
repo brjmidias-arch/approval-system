@@ -176,12 +176,18 @@ export default async function AdminDashboard() {
                 rowBg = "bg-blue-900/10";
               }
 
-              // Determine left border color based on urgency
+              // Internal review adjustment check
               const internalItemsRow = campaign.contentItems ?? [];
               const hasInternalAdjustmentRow = internalItemsRow.some(
                 (i: { internalReviewItem?: { status: string } | null }) =>
                   i.internalReviewItem?.status === "ADJUSTMENT" || i.internalReviewItem?.status === "REJECTED"
               );
+
+              // Row background + border based on urgency
+              if (campaign.status === "INTERNAL_DONE" && hasInternalAdjustmentRow) {
+                rowBg = "bg-amber-900/10";
+              }
+
               let borderColor = "border-l-white/5";
               if (campaign.status === "INTERNAL_DONE" && hasInternalAdjustmentRow) borderColor = "border-l-amber-500";
               else if (clientFinished && hasAdjustment) borderColor = "border-l-amber-500";
