@@ -263,6 +263,16 @@ export default function InternalReviewPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+        {/* Preload all images eagerly so carousel slides are instant */}
+        <div className="hidden" aria-hidden="true">
+          {groups.flatMap((g) => (g.type === "single" ? [g.item] : g.items))
+            .filter((i) => i.fileType === "IMAGE")
+            .map((i) => <img key={i.id} src={i.fileUrl} alt="" />)}
+          {groups.flatMap((g) => (g.type === "single" ? [g.item] : g.items))
+            .filter((i) => i.coverUrl)
+            .map((i) => <img key={`cover-${i.id}`} src={i.coverUrl!} alt="" />)}
+        </div>
+
         {alreadyApprovedGroups.length > 0 && needsReviewGroups.length > 0 ? (
           <p className="text-gray-400 text-sm">
             Fizemos os ajustes solicitados. Revise os itens abaixo e aprove ou solicite novos ajustes.
@@ -303,6 +313,12 @@ export default function InternalReviewPage() {
               {/* Media */}
               {isCarousel && items.length > 1 ? (
                 <div className="relative bg-black select-none">
+                  {/* Preload all slides */}
+                  <div className="hidden" aria-hidden="true">
+                    {items.filter(i => i.fileType === "IMAGE").map(i => (
+                      <img key={i.id} src={i.fileUrl} alt="" />
+                    ))}
+                  </div>
                   <div className="overflow-hidden"
                     onTouchStart={(e) => {
                       (e.currentTarget as HTMLDivElement).dataset.startX = String(e.touches[0].clientX);
@@ -316,11 +332,11 @@ export default function InternalReviewPage() {
                     }}
                   >
                     <div className="flex transition-transform duration-300 ease-out" style={{ transform: `translateX(-${currentSlide * 100}%)` }}>
-                      {items.map((item) => (
+                      {items.map((item, idx) => (
                         <div key={item.id} className="w-full shrink-0">
                           {item.fileType === "IMAGE"
-                            ? <img src={item.fileUrl} alt="" className="w-full max-h-[500px] object-contain" />
-                            : <video src={item.fileUrl} controls className="w-full max-h-[500px]" />
+                            ? <img src={item.fileUrl} alt="" loading="eager" className="w-full max-h-[500px] object-contain" />
+                            : <video src={item.fileUrl} controls preload={idx === 0 ? "auto" : "none"} className="w-full max-h-[500px]" />
                           }
                         </div>
                       ))}
