@@ -539,12 +539,14 @@ export default function CampaignPage() {
                 </div>
               )}
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
+                campaign.status === "PUBLISHED" ? "bg-teal-900/30 text-teal-400"
+                : campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
                 : campaign.status === "DRAFT" ? "bg-gray-800 text-gray-400"
                 : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "bg-violet-900/30 text-violet-400"
                 : "bg-emerald-900/30 text-emerald-400"
               }`}>
-                {campaign.status === "CLOSED" ? "Fechado"
+                {campaign.status === "PUBLISHED" ? "Publicado"
+                : campaign.status === "CLOSED" ? "Fechado"
                 : campaign.status === "DRAFT" ? "Rascunho"
                 : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "Revisão Interna"
                 : "Aberto"}
@@ -646,7 +648,38 @@ export default function CampaignPage() {
                 <button onClick={handleResetApprovals} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg transition-colors">
                   Resetar Aprovações
                 </button>
+                <button
+                  onClick={async () => {
+                    if (!confirm("Marcar campanha como Publicada? Ela será movida para Concluídas no dashboard.")) return;
+                    await fetch(`/api/admin/campaigns/${id}`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ status: "PUBLISHED" }),
+                    });
+                    fetchCampaign();
+                  }}
+                  className="text-sm px-3 py-2 bg-teal-900/20 hover:bg-teal-900/30 text-teal-400 rounded-lg transition-colors"
+                >
+                  Marcar como Publicada
+                </button>
               </>
+            )}
+
+            {/* PUBLISHED */}
+            {campaign.status === "PUBLISHED" && (
+              <button
+                onClick={async () => {
+                  await fetch(`/api/admin/campaigns/${id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: "CLOSED" }),
+                  });
+                  fetchCampaign();
+                }}
+                className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg transition-colors"
+              >
+                Reabrir
+              </button>
             )}
 
             <button onClick={handleDeleteCampaign} className="text-sm px-3 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded-lg transition-colors">
