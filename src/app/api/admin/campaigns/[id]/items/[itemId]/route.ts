@@ -38,6 +38,21 @@ export async function PATCH(
     });
   }
 
+  // Auto-publish campaign when all approved items are posted
+  if (postedAt !== undefined && postedAt) {
+    const campaignItems = await prisma.contentItem.findMany({
+      where: { campaignId: params.id },
+      include: { approvalItem: true },
+    });
+    const approvedItems = campaignItems.filter((i) => i.approvalItem?.status === "APPROVED");
+    if (approvedItems.length > 0 && approvedItems.every((i) => i.postedAt)) {
+      await prisma.campaign.update({
+        where: { id: params.id },
+        data: { status: "PUBLISHED" },
+      });
+    }
+  }
+
   return NextResponse.json(item);
 }
 

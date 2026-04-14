@@ -41,7 +41,8 @@ function getStatusCounts(campaign: {
   return { total, approved, adjustment, rejected, pending, clientFinished, allReviewed };
 }
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({ searchParams }: { searchParams: { tab?: string } }) {
+  const tab = searchParams.tab === "concluidas" ? "concluidas" : "ativas";
   const clients = await prisma.client.findMany({
     include: {
       campaigns: {
@@ -104,6 +105,10 @@ export default async function AdminDashboard() {
     return urgency(b.campaign) - urgency(a.campaign);
   });
 
+  const activeCampaigns = sortedCampaigns.filter(({ campaign }) => campaign.status !== "PUBLISHED");
+  const publishedCampaigns = sortedCampaigns.filter(({ campaign }) => campaign.status === "PUBLISHED");
+  const displayCampaigns = tab === "concluidas" ? publishedCampaigns : activeCampaigns;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -140,18 +145,40 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-1 bg-white/5 rounded-lg p-1 w-fit">
+        <Link
+          href="/admin"
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "ativas" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"}`}
+        >
+          Ativas {activeCampaigns.length > 0 && <span className="ml-1 text-xs opacity-60">{activeCampaigns.length}</span>}
+        </Link>
+        <Link
+          href="/admin?tab=concluidas"
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "concluidas" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"}`}
+        >
+          Concluídas {publishedCampaigns.length > 0 && <span className="ml-1 text-xs opacity-60">{publishedCampaigns.length}</span>}
+        </Link>
+      </div>
+
       {/* Campaigns sorted by urgency */}
       <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden">
-        {sortedCampaigns.length === 0 ? (
+        {displayCampaigns.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-gray-400">Nenhuma campanha ainda.</p>
-            <Link href="/admin/clients" className="inline-block mt-3 text-emerald-400 hover:text-emerald-300 text-sm">
-              Cadastrar primeiro cliente →
-            </Link>
+            {tab === "concluidas" ? (
+              <p className="text-gray-400">Nenhuma campanha concluída ainda.</p>
+            ) : (
+              <>
+                <p className="text-gray-400">Nenhuma campanha ativa.</p>
+                <Link href="/admin/clients" className="inline-block mt-3 text-emerald-400 hover:text-emerald-300 text-sm">
+                  Cadastrar primeiro cliente →
+                </Link>
+              </>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-white/5">
-            {sortedCampaigns.map(({ campaign, client }) => {
+            {displayCampaigns.map(({ campaign, client }) => {
               const counts = getStatusCounts(campaign);
               const daysSinceCreated = Math.floor(
                 (Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24)
@@ -269,12 +296,14 @@ export default async function AdminDashboard() {
                       )
                     )}
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
+                      campaign.status === "PUBLISHED" ? "bg-teal-900/30 text-teal-400"
+                      : campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
                       : campaign.status === "DRAFT" ? "bg-gray-800 text-gray-400"
                       : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "bg-violet-900/30 text-violet-400"
                       : "bg-emerald-900/30 text-emerald-400"
                     }`}>
-                      {campaign.status === "CLOSED" ? "Fechado"
+                      {campaign.status === "PUBLISHED" ? "Publicado"
+                      : campaign.status === "CLOSED" ? "Fechado"
                       : campaign.status === "DRAFT" ? "Rascunho"
                       : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "Revisão Interna"
                       : "Aberto"}

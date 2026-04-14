@@ -1,9 +1,11 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
+import Link from "next/link";
 import ClientScheduleAccordion from "@/components/admin/ClientScheduleAccordion";
 
-export default async function ProgramacaoPage() {
+export default async function ProgramacaoPage({ searchParams }: { searchParams: { tab?: string } }) {
+  const tab = searchParams.tab === "concluidos" ? "concluidos" : "pendentes";
   const campaigns = await prisma.campaign.findMany({
     include: {
       client: true,
@@ -133,18 +135,38 @@ export default async function ProgramacaoPage() {
     };
   }).sort((a, b) => b.maxDaysWaiting - a.maxDaysWaiting);
 
+  const pendingClients = clients.filter((c) => c.pendingPosts > 0);
+  const doneClients = clients.filter((c) => c.pendingPosts === 0);
+  const displayClients = tab === "concluidos" ? doneClients : pendingClients;
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-white">Programação</h1>
         <p className="text-gray-400 text-sm mt-0.5">
-          {clients.length > 0
-            ? `${clients.length} ${clients.length === 1 ? "cliente" : "clientes"} com posts aprovados`
-            : "Posts aprovados prontos para agendar"}
+          {pendingClients.length > 0
+            ? `${pendingClients.length} ${pendingClients.length === 1 ? "cliente" : "clientes"} com posts para agendar`
+            : "Nenhum post pendente de agendamento"}
         </p>
       </div>
 
-      <ClientScheduleAccordion clients={clients} />
+      {/* Tabs */}
+      <div className="flex gap-1 bg-white/5 rounded-lg p-1 w-fit">
+        <Link
+          href="/admin/programacao"
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "pendentes" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"}`}
+        >
+          Pendentes {pendingClients.length > 0 && <span className="ml-1 text-xs opacity-60">{pendingClients.length}</span>}
+        </Link>
+        <Link
+          href="/admin/programacao?tab=concluidos"
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "concluidos" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"}`}
+        >
+          Concluídos {doneClients.length > 0 && <span className="ml-1 text-xs opacity-60">{doneClients.length}</span>}
+        </Link>
+      </div>
+
+      <ClientScheduleAccordion clients={displayClients} />
     </div>
   );
 }
