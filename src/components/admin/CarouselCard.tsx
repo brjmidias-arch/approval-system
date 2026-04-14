@@ -66,6 +66,7 @@ interface Props {
   title: string | null;
   caption: string | null;
   scheduledDate: string | null;
+  driveUrl: string | null;
   clientComment: string | null;
   onDelete: (id: string) => void;
   onEdit: () => void;
@@ -249,6 +250,7 @@ export default function CarouselCard({
   title,
   caption,
   scheduledDate,
+  driveUrl,
   clientComment,
   onDelete,
   onEdit,
@@ -352,6 +354,16 @@ export default function CarouselCard({
       </DndContext>
 
       {caption && <p className="text-sm text-gray-400 mt-2 line-clamp-2">{caption}</p>}
+      {driveUrl && (
+        <a
+          href={driveUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 mt-2 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/20 border border-blue-500/20 px-3 py-1.5 rounded-lg transition-colors"
+        >
+          🔗 Abrir no Drive
+        </a>
+      )}
       {clientComment && (
         <div className="mt-2 text-xs text-amber-400 bg-amber-900/20 rounded-lg px-2.5 py-1.5">
           <span className="text-amber-500/70">Comentário do cliente: </span>

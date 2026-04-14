@@ -1266,6 +1266,7 @@ export default function CampaignPage() {
                     title={firstItem.title}
                     caption={firstItem.caption}
                     scheduledDate={firstItem.scheduledDate}
+                    driveUrl={firstItem.driveUrl}
                     clientComment={slides[0].approvalItem?.clientComment || null}
                     onDelete={handleDeleteItem}
                     onEdit={() => openEditGroup(slides)}
