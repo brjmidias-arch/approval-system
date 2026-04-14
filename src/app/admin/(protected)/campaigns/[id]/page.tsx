@@ -97,7 +97,7 @@ export default function CampaignPage() {
 
   // Edit modal
   const [editingGroup, setEditingGroup] = useState<{ groupId: string | null; firstItemId: string; items: ContentItem[] } | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "" });
+  const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "", driveUrl: "" });
   const [addingSlides, setAddingSlides] = useState(false);
   const [newSlides, setNewSlides] = useState<File[]>([]);
 
@@ -228,6 +228,7 @@ export default function CampaignPage() {
       title: first.title || "",
       caption: first.caption || "",
       scheduledDate: first.scheduledDate ? first.scheduledDate.split("T")[0] : "",
+      driveUrl: first.driveUrl || "",
     });
     setNewSlides([]);
   }
@@ -245,6 +246,7 @@ export default function CampaignPage() {
           title: editForm.title || null,
           caption: editForm.caption || null,
           scheduledDate: editForm.scheduledDate || null,
+          driveUrl: editForm.driveUrl || null,
         }),
       });
     }
@@ -1027,6 +1029,16 @@ export default function CampaignPage() {
                   value={editForm.scheduledDate}
                   onChange={(e) => setEditForm({ ...editForm, scheduledDate: e.target.value })}
                   className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Link do Drive</label>
+                <input
+                  type="url"
+                  value={editForm.driveUrl}
+                  onChange={(e) => setEditForm({ ...editForm, driveUrl: e.target.value })}
+                  placeholder="https://drive.google.com/..."
+                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 placeholder-gray-600"
                 />
               </div>
 
