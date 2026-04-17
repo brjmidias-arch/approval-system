@@ -57,27 +57,8 @@ export default function CampaignPage() {
   const { id } = useParams<{ id: string }>();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showUploadForm, setShowUploadForm] = useState(false);
-  const [uploadForm, setUploadForm] = useState({
-    title: "",
-    caption: "",
-    scheduledDate: "",
-    driveUrl: "",
-    coverDriveUrl: "",
-    contentType: "CARROSSEL" as ContentType,
-  });
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const coverInputRef = useRef<HTMLInputElement>(null);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState("");
-  const [uploadPercent, setUploadPercent] = useState(0);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [liveStatus, setLiveStatus] = useState<{ reviewed: number; total: number } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const addFilesRef = useRef<HTMLInputElement>(null);
-  const replaceItemRef = useRef<HTMLInputElement>(null);
-  const [replacingItemId, setReplacingItemId] = useState<string | null>(null);
   const [markingDoneItemId, setMarkingDoneItemId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
@@ -99,9 +80,8 @@ export default function CampaignPage() {
   const [editingGroup, setEditingGroup] = useState<{ groupId: string | null; firstItemId: string; items: ContentItem[] } | null>(null);
   const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "", driveUrl: "" });
   const [addingSlides, setAddingSlides] = useState(false);
-  const [newSlides, setNewSlides] = useState<File[]>([]);
+  const [newSlideLinks, setNewSlideLinks] = useState("");
 
-  const isCarousel = uploadForm.contentType === "CARROSSEL";
 
   const fetchCampaign = useCallback(async () => {
     const res = await fetch(`/api/admin/campaigns/${id}`, { cache: "no-store" });
@@ -123,103 +103,6 @@ export default function CampaignPage() {
     return () => clearInterval(interval);
   }, [id]);
 
-  function uploadWithProgress(signedUrl: string, file: File, onProgress: (pct: number) => void): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("PUT", signedUrl);
-      xhr.setRequestHeader("Content-Type", file.type);
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-      };
-      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Status ${xhr.status}`)));
-      xhr.onerror = () => reject(new Error("Falha na conexão"));
-      xhr.send(file);
-    });
-  }
-
-  async function handleUpload(e: React.FormEvent) {
-    e.preventDefault();
-    if (selectedFiles.length === 0) return;
-    setUploading(true);
-    setUploadPercent(0);
-
-    const baseOrder = (campaign?.contentItems.length || 0) + 1;
-    const groupId = uploadForm.contentType === "CARROSSEL" ? uuidv4() : null;
-
-    for (let i = 0; i < selectedFiles.length; i++) {
-      const file = selectedFiles[i];
-      setUploadProgress(`Arquivo ${i + 1} de ${selectedFiles.length}: ${file.name}`);
-      setUploadPercent(0);
-
-      // Step 1: get signed URL
-      const signRes = await fetch("/api/upload-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentType: file.type, fileName: file.name }),
-      });
-
-      if (!signRes.ok) {
-        alert(`Erro ao preparar upload de "${file.name}".`);
-        continue;
-      }
-
-      const { signedUrl, publicUrl, fileType } = await signRes.json();
-
-      // Step 2: upload with progress tracking
-      try {
-        await uploadWithProgress(signedUrl, file, (pct) => setUploadPercent(pct));
-      } catch {
-        alert(`Erro ao enviar "${file.name}". Verifique sua conexão e tente novamente.`);
-        continue;
-      }
-
-      // Upload cover image if Reels and cover file selected (only on first file)
-      let coverUrl: string | null = null;
-      if (uploadForm.contentType === "REELS" && coverFile && i === 0) {
-        const covSignRes = await fetch("/api/upload-url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contentType: coverFile.type, fileName: coverFile.name }),
-        });
-        if (covSignRes.ok) {
-          const { signedUrl: covSignedUrl, publicUrl: covPublicUrl } = await covSignRes.json();
-          try {
-            await uploadWithProgress(covSignedUrl, coverFile, () => {});
-            coverUrl = covPublicUrl;
-          } catch { /* ignore cover upload error */ }
-        }
-      }
-
-      await fetch(`/api/admin/campaigns/${id}/items`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileUrl: publicUrl,
-          fileType,
-          title: uploadForm.title || null,
-          caption: uploadForm.caption,
-          scheduledDate: uploadForm.scheduledDate || null,
-          driveUrl: uploadForm.driveUrl || null,
-          coverUrl: coverUrl || null,
-          coverDriveUrl: uploadForm.coverDriveUrl || null,
-          contentType: uploadForm.contentType,
-          groupId,
-          order: baseOrder + i,
-        }),
-      });
-    }
-
-    setUploading(false);
-    setUploadProgress("");
-    setUploadPercent(0);
-    setShowUploadForm(false);
-    setSelectedFiles([]);
-    setCoverFile(null);
-    setUploadForm({ title: "", caption: "", scheduledDate: "", driveUrl: "", coverDriveUrl: "", contentType: "CARROSSEL" });
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (coverInputRef.current) coverInputRef.current.value = "";
-    fetchCampaign();
-  }
 
   function openEditGroup(items: ContentItem[]) {
     const first = items[0];
@@ -230,7 +113,7 @@ export default function CampaignPage() {
       scheduledDate: first.scheduledDate ? first.scheduledDate.split("T")[0] : "",
       driveUrl: first.driveUrl || "",
     });
-    setNewSlides([]);
+    setNewSlideLinks("");
   }
 
   async function handleEditSave() {
@@ -251,34 +134,25 @@ export default function CampaignPage() {
       });
     }
 
-    // Upload new slides if any
-    if (newSlides.length > 0) {
+    // Add new slides from Drive links
+    if (newSlideLinks.trim()) {
+      const links = newSlideLinks.split("\n").map((l) => l.trim()).filter(Boolean);
       const baseOrder = editingGroup.items[editingGroup.items.length - 1].order + 1;
-      for (let i = 0; i < newSlides.length; i++) {
-        const file = newSlides[i];
-        const signRes = await fetch("/api/upload-url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contentType: file.type, fileName: file.name }),
-        });
-        if (!signRes.ok) continue;
-        const { signedUrl, publicUrl, fileType } = await signRes.json();
-        const uploadRes = await fetch(signedUrl, {
-          method: "PUT",
-          headers: { "Content-Type": file.type },
-          body: file,
-        });
-        if (!uploadRes.ok) continue;
-        const url = publicUrl;
+      for (let i = 0; i < links.length; i++) {
+        const url = links[i];
+        const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+        if (!m) continue;
+        const fileId = m[1];
         await fetch(`/api/admin/campaigns/${id}/items`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            fileUrl: url,
-            fileType,
+            fileUrl: `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`,
+            fileType: "IMAGE",
             title: editForm.title || null,
             caption: editForm.caption || null,
             scheduledDate: editForm.scheduledDate || null,
+            driveUrl: url,
             contentType: "CARROSSEL",
             groupId: editingGroup.groupId,
             order: baseOrder + i,
@@ -289,7 +163,7 @@ export default function CampaignPage() {
 
     setAddingSlides(false);
     setEditingGroup(null);
-    setNewSlides([]);
+    setNewSlideLinks("");
     fetchCampaign();
   }
 
@@ -357,31 +231,6 @@ export default function CampaignPage() {
     fetchCampaign();
   }
 
-  async function handleReplaceItem(itemId: string, file: File) {
-    setReplacingItemId(itemId);
-    try {
-      const signRes = await fetch("/api/upload-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentType: file.type, fileName: file.name }),
-      });
-      if (!signRes.ok) throw new Error();
-      const { signedUrl, publicUrl, fileType } = await signRes.json();
-      const uploadRes = await fetch(signedUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-      if (!uploadRes.ok) throw new Error();
-      await fetch(`/api/admin/campaigns/${id}/items/${itemId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileUrl: publicUrl, fileType }),
-      });
-      fetchCampaign();
-    } catch {
-      alert("Erro ao substituir arquivo. Tente novamente.");
-    } finally {
-      setReplacingItemId(null);
-      if (replaceItemRef.current) replaceItemRef.current.value = "";
-    }
-  }
 
   async function handleMarkItemDone(itemId: string) {
     setMarkingDoneItemId(itemId);
@@ -595,11 +444,8 @@ export default function CampaignPage() {
             {/* DRAFT: upload + send to internal review */}
             {campaign.status === "DRAFT" && (
               <>
-                <button onClick={() => setShowFolderUpload(true)} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
-                  📁 Upload Pasta
-                </button>
-                <button onClick={() => setShowUploadForm(true)} className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
-                  + Upload
+                <button onClick={() => setShowFolderUpload(true)} className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
+                  + Adicionar conteúdo
                 </button>
                 <button onClick={handleSendInternal} className="text-sm px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-colors">
                   Enviar para Revisão Interna
@@ -611,10 +457,7 @@ export default function CampaignPage() {
             {(campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE") && (
               <>
                 <button onClick={() => setShowFolderUpload(true)} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
-                  📁 Upload Pasta
-                </button>
-                <button onClick={() => setShowUploadForm(true)} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
-                  + Upload
+                  + Adicionar conteúdo
                 </button>
                 <button onClick={copyInternalLink} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
                   {copyFeedback ? "Copiado!" : "Copiar Link Interno"}
@@ -642,10 +485,7 @@ export default function CampaignPage() {
                   {campaign.status === "OPEN" ? "Fechar Campanha" : "Reabrir Campanha"}
                 </button>
                 <button onClick={() => setShowFolderUpload(true)} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
-                  📁 Upload Pasta
-                </button>
-                <button onClick={() => setShowUploadForm(true)} className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
-                  + Upload
+                  + Adicionar conteúdo
                 </button>
                 <button onClick={handleResetApprovals} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg transition-colors">
                   Resetar Aprovações
@@ -808,179 +648,6 @@ export default function CampaignPage() {
         />
       )}
 
-      {/* Upload Modal */}
-      {showUploadForm && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h2 className="text-white font-medium mb-4">Upload de Conteúdo</h2>
-            <form onSubmit={handleUpload} className="space-y-4">
-
-              <div>
-                <label className="block text-sm text-gray-400 mb-1.5">
-                  Nome do post <span className="text-gray-600">(para identificação interna)</span>
-                </label>
-                <input
-                  type="text"
-                  value={uploadForm.title}
-                  onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
-                  placeholder="Ex: Post motivacional semana 1"
-                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-400 mb-1.5">Tipo de conteúdo</label>
-                <select
-                  value={uploadForm.contentType}
-                  onChange={(e) => {
-                    setUploadForm({ ...uploadForm, contentType: e.target.value as ContentType });
-                    setSelectedFiles([]);
-                    if (fileInputRef.current) fileInputRef.current.value = "";
-                  }}
-                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
-                >
-                  {CONTENT_TYPES.map((ct) => (
-                    <option key={ct} value={ct}>{CONTENT_TYPE_LABELS[ct]}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-400 mb-1.5">
-                  {isCarousel ? "Slides do carrossel (selecione todos de uma vez)" : "Arquivo"}
-                </label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/webp,video/mp4,application/pdf"
-                  multiple={isCarousel}
-                  onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))}
-                  required
-                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 file:mr-3 file:py-1 file:px-3 file:bg-white/10 file:text-gray-300 file:rounded file:border-0 file:text-sm cursor-pointer"
-                />
-                {isCarousel && (
-                  <p className="text-amber-400/80 text-xs mt-1">
-                    Para carrossel: segure Ctrl (ou Cmd) para selecionar múltiplas imagens de uma vez
-                  </p>
-                )}
-                {selectedFiles.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {selectedFiles.map((f, idx) => (
-                      <span key={idx} className="text-xs bg-white/5 text-gray-300 px-2 py-1 rounded">
-                        {f.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <p className="text-gray-500 text-xs mt-1">JPG, PNG, WebP, MP4 ou PDF — máx. 100MB cada</p>
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-400 mb-1.5">
-                  Legenda sugerida <span className="text-gray-600">(opcional)</span>
-                </label>
-                <textarea
-                  value={uploadForm.caption}
-                  onChange={(e) => setUploadForm({ ...uploadForm, caption: e.target.value })}
-                  rows={3}
-                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 resize-none"
-                  placeholder="Texto que será publicado junto com o conteúdo..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-400 mb-1.5">
-                  Data prevista de publicação <span className="text-gray-600">(opcional)</span>
-                </label>
-                <input
-                  type="date"
-                  value={uploadForm.scheduledDate}
-                  onChange={(e) => setUploadForm({ ...uploadForm, scheduledDate: e.target.value })}
-                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-400 mb-1.5">
-                  Link do Drive <span className="text-gray-600">(opcional)</span>
-                </label>
-                <input
-                  type="url"
-                  value={uploadForm.driveUrl}
-                  onChange={(e) => setUploadForm({ ...uploadForm, driveUrl: e.target.value })}
-                  placeholder="https://drive.google.com/..."
-                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              {uploadForm.contentType === "REELS" && (
-                <>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1.5">
-                      Capa do Reels <span className="text-gray-600">(opcional)</span>
-                    </label>
-                    <input
-                      ref={coverInputRef}
-                      type="file"
-                      accept="image/jpeg,image/jpg,image/png,image/webp"
-                      onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
-                      className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 file:mr-3 file:py-1 file:px-3 file:bg-white/10 file:text-gray-300 file:rounded file:border-0 file:text-sm cursor-pointer"
-                    />
-                    {coverFile && (
-                      <p className="text-emerald-400 text-xs mt-1">{coverFile.name}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1.5">
-                      Link da capa no Drive <span className="text-gray-600">(opcional)</span>
-                    </label>
-                    <input
-                      type="url"
-                      value={uploadForm.coverDriveUrl}
-                      onChange={(e) => setUploadForm({ ...uploadForm, coverDriveUrl: e.target.value })}
-                      placeholder="https://drive.google.com/..."
-                      className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </>
-              )}
-
-              {uploading && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-400 truncate max-w-[80%]">{uploadProgress}</span>
-                    <span className="text-emerald-400 font-medium">{uploadPercent}%</span>
-                  </div>
-                  <div className="w-full bg-white/5 rounded-full h-2">
-                    <div
-                      className="bg-emerald-500 h-2 rounded-full transition-all duration-200"
-                      style={{ width: `${uploadPercent}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-1">
-                <button
-                  type="button"
-                  onClick={() => { setShowUploadForm(false); setSelectedFiles([]); }}
-                  disabled={uploading}
-                  className="flex-1 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-gray-300 py-2.5 rounded-lg text-sm transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={uploading || selectedFiles.length === 0}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm transition-colors font-medium"
-                >
-                  {uploading ? "Enviando..." : `Enviar${selectedFiles.length > 1 ? ` (${selectedFiles.length} arquivos)` : ""}`}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Lightbox */}
       {lightboxUrl && (
@@ -1045,25 +712,21 @@ export default function CampaignPage() {
               {editingGroup.groupId && (
                 <div>
                   <label className="block text-sm text-gray-400 mb-1.5">
-                    Adicionar slides ao carrossel <span className="text-gray-600">(opcional)</span>
+                    Adicionar slides ao carrossel <span className="text-gray-600">(opcional — links do Drive, um por linha)</span>
                   </label>
-                  <input
-                    ref={addFilesRef}
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp,video/mp4"
-                    multiple
-                    onChange={(e) => setNewSlides(Array.from(e.target.files || []))}
-                    className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 file:mr-3 file:py-1 file:px-3 file:bg-white/10 file:text-gray-300 file:rounded file:border-0 file:text-sm cursor-pointer"
+                  <textarea
+                    value={newSlideLinks}
+                    onChange={(e) => setNewSlideLinks(e.target.value)}
+                    rows={3}
+                    placeholder={"https://drive.google.com/file/d/ID1/view\nhttps://drive.google.com/file/d/ID2/view"}
+                    className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 resize-none placeholder-gray-600"
                   />
-                  {newSlides.length > 0 && (
-                    <p className="text-emerald-400 text-xs mt-1">{newSlides.length} slide(s) serão adicionados</p>
-                  )}
                 </div>
               )}
 
               <div className="flex gap-3 pt-1">
                 <button
-                  onClick={() => { setEditingGroup(null); setNewSlides([]); }}
+                  onClick={() => { setEditingGroup(null); setNewSlideLinks(""); }}
                   className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 py-2.5 rounded-lg text-sm transition-colors"
                 >
                   Cancelar
@@ -1081,17 +744,6 @@ export default function CampaignPage() {
         </div>
       )}
 
-      {/* Hidden file input for replacing single post */}
-      <input
-        ref={replaceItemRef}
-        type="file"
-        accept="image/jpeg,image/jpg,image/png,image/webp,video/mp4,application/pdf"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file && replacingItemId) handleReplaceItem(replacingItemId, file);
-        }}
-      />
 
       {/* Content Items */}
       <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden">
@@ -1102,8 +754,8 @@ export default function CampaignPage() {
         {total === 0 ? (
           <div className="p-8 text-center">
             <p className="text-gray-400 text-sm">Nenhum conteúdo adicionado ainda.</p>
-            <button onClick={() => setShowUploadForm(true)} className="mt-3 text-emerald-400 hover:text-emerald-300 text-sm transition-colors">
-              Fazer primeiro upload →
+            <button onClick={() => setShowFolderUpload(true)} className="mt-3 text-emerald-400 hover:text-emerald-300 text-sm transition-colors">
+              Adicionar conteúdo via Drive →
             </button>
           </div>
         ) : (
@@ -1189,22 +841,13 @@ export default function CampaignPage() {
                         {APPROVAL_STATUS_LABELS[statusKey]}
                       </span>
                       {(statusKey === "ADJUSTMENT" || statusKey === "REJECTED") && (
-                        <>
-                          <button
-                            onClick={() => { setReplacingItemId(item.id); replaceItemRef.current?.click(); }}
-                            disabled={replacingItemId === item.id}
-                            className="text-xs px-2.5 py-1 bg-amber-900/40 hover:bg-amber-900/60 text-amber-400 border border-amber-500/30 rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            {replacingItemId === item.id ? "Enviando..." : "Substituir"}
-                          </button>
-                          <button
-                            onClick={() => handleMarkItemDone(item.id)}
-                            disabled={markingDoneItemId === item.id}
-                            className="text-xs px-2.5 py-1 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/30 rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            {markingDoneItemId === item.id ? "..." : "Ajuste feito"}
-                          </button>
-                        </>
+                        <button
+                          onClick={() => handleMarkItemDone(item.id)}
+                          disabled={markingDoneItemId === item.id}
+                          className="text-xs px-2.5 py-1 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/30 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {markingDoneItemId === item.id ? "..." : "Ajuste feito"}
+                        </button>
                       )}
                       <button onClick={() => openEditGroup([item])} className="text-gray-400 hover:text-white text-sm transition-colors">
                         Editar
