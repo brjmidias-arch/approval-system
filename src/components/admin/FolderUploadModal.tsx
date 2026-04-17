@@ -34,6 +34,8 @@ interface ParsedPost {
   slides: DriveFile[];
   folderUrl: string | null;
   sourceUrl: string;
+  coverFileId?: string;
+  coverDriveUrl?: string;
 }
 
 function extractDriveId(url: string): string | null {
@@ -64,6 +66,28 @@ function driveFileViewUrl(fileId: string): string {
 function mimeToFileType(mimeType: string): string {
   if (mimeType.startsWith("video/")) return "VIDEO";
   return "IMAGE";
+}
+
+function detectCoverAndType(files: DriveFile[]): {
+  slides: DriveFile[];
+  coverFileId?: string;
+  contentType: ContentType;
+} {
+  const videos = files.filter((f) => f.mimeType.startsWith("video/"));
+  const images = files.filter((f) => !f.mimeType.startsWith("video/"));
+
+  if (videos.length > 0) {
+    return {
+      slides: videos,
+      coverFileId: images[0]?.id,
+      contentType: "REELS",
+    };
+  }
+
+  return {
+    slides: files,
+    contentType: files.length > 1 ? "CARROSSEL" : "POST_FEED",
+  };
 }
 
 type Step = "input" | "loading" | "review" | "saving" | "done";
@@ -111,15 +135,17 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
         // Pasta com subpastas → cada subpasta = um carrossel
         if (data.groups?.length) {
           for (const group of data.groups) {
+            const detected = detectCoverAndType(group.files);
             parsed.push({
               tempId: uuidv4(),
               title: group.folderName,
-              contentType: "CARROSSEL",
+              contentType: detected.contentType,
               caption: "",
               scheduledDate: "",
-              slides: group.files,
+              slides: detected.slides,
               folderUrl: line,
               sourceUrl: line,
+              coverFileId: detected.coverFileId,
             });
           }
           // Arquivos soltos na raiz = posts individuais
@@ -136,16 +162,18 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
             });
           }
         } else if (data.files?.length) {
-          // Pasta sem subpastas → um carrossel com todos os arquivos
+          // Pasta sem subpastas → detecta vídeo/imagem
+          const detected = detectCoverAndType(data.files);
           parsed.push({
             tempId: uuidv4(),
             title: "",
-            contentType: "CARROSSEL",
+            contentType: detected.contentType,
             caption: "",
             scheduledDate: "",
-            slides: data.files,
+            slides: detected.slides,
             folderUrl: line,
             sourceUrl: line,
+            coverFileId: detected.coverFileId,
           });
         } else {
           setError("Nenhuma imagem encontrada na pasta.");
@@ -176,8 +204,19 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
     setStep("review");
   }
 
-  function updatePost(tempId: string, field: keyof ParsedPost, value: string | ContentType) {
+  function updatePost(tempId: string, field: keyof ParsedPost, value: string | ContentType | undefined) {
     setPosts((prev) => prev.map((p) => (p.tempId === tempId ? { ...p, [field]: value } : p)));
+  }
+
+  function handleCoverLinkChange(tempId: string, rawUrl: string) {
+    const id = extractDriveId(rawUrl);
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.tempId === tempId
+          ? { ...p, coverDriveUrl: rawUrl || undefined, coverFileId: id || undefined }
+          : p
+      )
+    );
   }
 
   function removePost(tempId: string) {
@@ -198,6 +237,9 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
           ? post.folderUrl
           : driveFileViewUrl(slide.id);
 
+        const coverUrl = post.coverFileId ? driveThumbUrl(post.coverFileId) : null;
+        const coverDriveUrl = post.coverDriveUrl || (post.coverFileId ? driveFileViewUrl(post.coverFileId) : null);
+
         await fetch(`/api/admin/campaigns/${campaignId}/items`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -211,6 +253,8 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
             contentType: post.contentType,
             groupId,
             order: baseOrder++,
+            coverUrl: i === 0 ? coverUrl : null,
+            coverDriveUrl: i === 0 ? coverDriveUrl : null,
           }),
         });
       }
@@ -354,6 +398,34 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
                       rows={2}
                       className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500 resize-none placeholder-gray-600"
                     />
+                    {(post.contentType === "REELS" || post.slides.some((s) => s.mimeType.startsWith("video/"))) && (
+                      <div className="flex items-start gap-3 pt-1">
+                        <div className="shrink-0">
+                          {post.coverFileId ? (
+                            <img
+                              src={driveThumbUrl(post.coverFileId)}
+                              alt="Capa"
+                              className="w-12 h-12 object-cover rounded-lg bg-black/40"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center text-lg">🖼</div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <label className="text-gray-500 text-xs block mb-1">
+                            Capa do vídeo {post.coverFileId ? <span className="text-emerald-400">(detectada)</span> : <span className="text-amber-400">(não detectada)</span>}
+                          </label>
+                          <input
+                            type="text"
+                            value={post.coverDriveUrl ?? (post.coverFileId ? driveFileViewUrl(post.coverFileId) : "")}
+                            onChange={(e) => handleCoverLinkChange(post.tempId, e.target.value)}
+                            placeholder="Link do arquivo de capa no Drive (opcional)"
+                            className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-emerald-500 placeholder-gray-600"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
