@@ -102,21 +102,56 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
           body: JSON.stringify({ folderId: id }),
         });
         const data = await res.json();
-        if (data.error || !data.files?.length) {
+        if (data.error) {
           setError(`Não foi possível buscar arquivos da pasta. Verifique se está compartilhada publicamente.`);
           setStep("input");
           return;
         }
-        parsed.push({
-          tempId: uuidv4(),
-          title: "",
-          contentType: "CARROSSEL",
-          caption: "",
-          scheduledDate: "",
-          slides: data.files,
-          folderUrl: line,
-          sourceUrl: line,
-        });
+
+        // Pasta com subpastas → cada subpasta = um carrossel
+        if (data.groups?.length) {
+          for (const group of data.groups) {
+            parsed.push({
+              tempId: uuidv4(),
+              title: group.folderName,
+              contentType: "CARROSSEL",
+              caption: "",
+              scheduledDate: "",
+              slides: group.files,
+              folderUrl: line,
+              sourceUrl: line,
+            });
+          }
+          // Arquivos soltos na raiz = posts individuais
+          for (const file of data.looseFiles || []) {
+            parsed.push({
+              tempId: uuidv4(),
+              title: file.name.replace(/\.[^.]+$/, ""),
+              contentType: "POST_FEED",
+              caption: "",
+              scheduledDate: "",
+              slides: [file],
+              folderUrl: null,
+              sourceUrl: driveFileViewUrl(file.id),
+            });
+          }
+        } else if (data.files?.length) {
+          // Pasta sem subpastas → um carrossel com todos os arquivos
+          parsed.push({
+            tempId: uuidv4(),
+            title: "",
+            contentType: "CARROSSEL",
+            caption: "",
+            scheduledDate: "",
+            slides: data.files,
+            folderUrl: line,
+            sourceUrl: line,
+          });
+        } else {
+          setError("Nenhuma imagem encontrada na pasta.");
+          setStep("input");
+          return;
+        }
       } else {
         parsed.push({
           tempId: uuidv4(),
