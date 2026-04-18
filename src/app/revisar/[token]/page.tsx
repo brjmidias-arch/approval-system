@@ -347,7 +347,7 @@ export default function InternalReviewPage() {
                         <div key={item.id} className="w-full shrink-0">
                           {item.fileType === "IMAGE"
                             ? <img src={item.fileUrl} alt="" loading="eager" className="w-full max-h-[500px] object-contain" />
-                            : <video src={item.fileUrl} controls preload={idx === 0 ? "auto" : "none"} className="w-full max-h-[500px]" />
+                            : <iframe src={item.fileUrl} className="w-full" style={{ aspectRatio: "9/16", maxHeight: 500 }} allow="autoplay" allowFullScreen />
                           }
                         </div>
                       ))}
@@ -364,11 +364,7 @@ export default function InternalReviewPage() {
                     )}
                     {currentItem.fileType === "VIDEO" && (
                       <div className="relative">
-                        <video src={currentItem.fileUrl} controls className="w-full max-h-[500px]" id={`vid-${currentItem.id}`} />
-                        <button
-                          onClick={() => { const v = document.getElementById(`vid-${currentItem.id}`) as HTMLVideoElement & { webkitEnterFullscreen?: () => void }; v?.requestFullscreen?.() ?? v?.webkitEnterFullscreen?.(); }}
-                          className="absolute bottom-12 right-2 bg-black/60 hover:bg-black/80 text-white text-xs px-2.5 py-1.5 rounded-lg transition-colors"
-                        >⛶ Tela cheia</button>
+                        <iframe src={currentItem.fileUrl} className="w-full" style={{ aspectRatio: "9/16", maxHeight: 500 }} allow="autoplay" allowFullScreen />
                       </div>
                     )}
                     {currentItem.fileType === "PDF" && (

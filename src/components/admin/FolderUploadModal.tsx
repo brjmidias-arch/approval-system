@@ -63,6 +63,10 @@ function driveFileViewUrl(fileId: string): string {
   return `https://drive.google.com/file/d/${fileId}/view`;
 }
 
+function drivePreviewUrl(fileId: string): string {
+  return `https://drive.google.com/file/d/${fileId}/preview`;
+}
+
 function mimeToFileType(mimeType: string): string {
   if (mimeType.startsWith("video/")) return "VIDEO";
   return "IMAGE";
@@ -232,7 +236,7 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
 
       for (let i = 0; i < post.slides.length; i++) {
         const slide = post.slides[i];
-        const fileUrl = driveThumbUrl(slide.id);
+        const fileUrl = slide.mimeType.startsWith("video/") ? drivePreviewUrl(slide.id) : driveThumbUrl(slide.id);
         const driveUrl = post.folderUrl && i === 0
           ? post.folderUrl
           : driveFileViewUrl(slide.id);
