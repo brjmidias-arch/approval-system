@@ -333,16 +333,18 @@ export default function ApprovalPage() {
                               </div>
                             </>
                           ) : (
-                            <div className="relative bg-black flex flex-col items-center justify-center" style={{ aspectRatio: "9/16", maxHeight: 500 }}>
-                              {item.coverUrl
-                                ? <img src={item.coverUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />
-                                : null}
-                              <a href={item.driveUrl ?? item.fileUrl} target="_blank" rel="noopener noreferrer" className="relative z-10 flex flex-col items-center gap-3">
-                                <div className="w-16 h-16 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors backdrop-blur-sm">
-                                  <span className="text-white text-3xl ml-1">▶</span>
-                                </div>
-                                <span className="text-white/80 text-sm font-medium">Assistir vídeo no Drive</span>
-                              </a>
+                            <div className="flex justify-center bg-black w-full">
+                              <div className="relative flex flex-col items-center justify-center overflow-hidden" style={{ aspectRatio: "9/16", maxHeight: 500, width: "calc(500px * 9 / 16)" }}>
+                                {item.coverUrl
+                                  ? <img src={item.coverUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />
+                                  : null}
+                                <a href={item.driveUrl ?? item.fileUrl} target="_blank" rel="noopener noreferrer" className="relative z-10 flex flex-col items-center gap-3">
+                                  <div className="w-16 h-16 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors backdrop-blur-sm">
+                                    <span className="text-white text-3xl ml-1">▶</span>
+                                  </div>
+                                  <span className="text-white/80 text-sm font-medium">Assistir vídeo no Drive</span>
+                                </a>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -375,16 +377,18 @@ export default function ApprovalPage() {
                       </div>
                     )}
                     {currentItem.fileType === "VIDEO" && (
-                      <div className="relative bg-black flex flex-col items-center justify-center" style={{ aspectRatio: "9/16", maxHeight: 500 }}>
-                        {currentItem.coverUrl
-                          ? <img src={currentItem.coverUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />
-                          : null}
-                        <a href={currentItem.driveUrl ?? currentItem.fileUrl} target="_blank" rel="noopener noreferrer" className="relative z-10 flex flex-col items-center gap-3">
-                          <div className="w-16 h-16 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors backdrop-blur-sm">
-                            <span className="text-white text-3xl ml-1">▶</span>
-                          </div>
-                          <span className="text-white/80 text-sm font-medium">Assistir vídeo no Drive</span>
-                        </a>
+                      <div className="flex justify-center bg-black w-full">
+                        <div className="relative flex flex-col items-center justify-center overflow-hidden" style={{ aspectRatio: "9/16", maxHeight: 500, width: "calc(500px * 9 / 16)" }}>
+                          {currentItem.coverUrl
+                            ? <img src={currentItem.coverUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />
+                            : null}
+                          <a href={currentItem.driveUrl ?? currentItem.fileUrl} target="_blank" rel="noopener noreferrer" className="relative z-10 flex flex-col items-center gap-3">
+                            <div className="w-16 h-16 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors backdrop-blur-sm">
+                              <span className="text-white text-3xl ml-1">▶</span>
+                            </div>
+                            <span className="text-white/80 text-sm font-medium">Assistir vídeo no Drive</span>
+                          </a>
+                        </div>
                       </div>
                     )}
                     {currentItem.fileType === "PDF" && (
