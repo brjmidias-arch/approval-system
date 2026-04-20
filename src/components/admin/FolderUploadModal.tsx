@@ -397,10 +397,18 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
                     </div>
                     <textarea
                       value={post.caption}
-                      onChange={(e) => updatePost(post.tempId, "caption", e.target.value)}
+                      onChange={(e) => {
+                        updatePost(post.tempId, "caption", e.target.value);
+                        e.target.style.height = "auto";
+                        e.target.style.height = e.target.scrollHeight + "px";
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.height = "auto";
+                        e.target.style.height = e.target.scrollHeight + "px";
+                      }}
                       placeholder="Legenda (opcional)"
-                      rows={2}
-                      className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500 resize-none placeholder-gray-600"
+                      rows={4}
+                      className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500 resize-none placeholder-gray-600 overflow-hidden"
                     />
                     {(post.contentType === "REELS" || post.slides.some((s) => s.mimeType.startsWith("video/"))) && (
                       <div className="flex items-start gap-3 pt-1">
