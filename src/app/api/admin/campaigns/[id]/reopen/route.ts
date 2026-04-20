@@ -20,10 +20,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     data: { status: "PENDING", clientComment: null, reviewedAt: null },
   });
 
-  // Reopen the campaign
+  // Reopen the campaign with a fresh 1-day deadline
+  const oneDayFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await prisma.campaign.update({
     where: { id: params.id },
-    data: { status: "OPEN" },
+    data: { status: "OPEN", expiresAt: oneDayFromNow },
   });
 
   // Send email notification to client if they have an email

@@ -23,13 +23,15 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const body = await req.json();
   const { name, month, year, expiresAt, status } = body;
 
+  const oneDayFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
   const campaign = await prisma.campaign.update({
     where: { id: params.id },
     data: {
       ...(name && { name }),
       ...(month && { month: Number(month) }),
       ...(year && { year: Number(year) }),
-      ...(expiresAt && { expiresAt: new Date(expiresAt) }),
+      ...(status === "OPEN" ? { expiresAt: oneDayFromNow } : expiresAt ? { expiresAt: new Date(expiresAt) } : {}),
       ...(status && { status }),
     },
   });

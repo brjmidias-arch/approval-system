@@ -62,8 +62,7 @@ export default function CampaignPage() {
   const [markingDoneItemId, setMarkingDoneItemId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
-  const [editingDeadline, setEditingDeadline] = useState(false);
-  const [deadlineValue, setDeadlineValue] = useState("");
+
   const [showFolderUpload, setShowFolderUpload] = useState(false);
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -204,16 +203,7 @@ export default function CampaignPage() {
     fetchCampaign();
   }
 
-  async function handleSaveDeadline() {
-    if (!deadlineValue) return;
-    await fetch(`/api/admin/campaigns/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ expiresAt: deadlineValue }),
-    });
-    setEditingDeadline(false);
-    fetchCampaign();
-  }
+
 
   async function handleDeleteCampaign() {
     if (!confirm(`Excluir a campanha "${campaign!.name}" e todos os conteúdos? Esta ação não pode ser desfeita.`)) return;
@@ -412,32 +402,9 @@ export default function CampaignPage() {
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <span className="text-gray-400 text-sm">{campaign.client.name}</span>
               <span className="text-gray-600 text-sm">·</span>
-              {editingDeadline ? (
-                <>
-                  <input
-                    type="date"
-                    autoFocus
-                    value={deadlineValue}
-                    onChange={(e) => setDeadlineValue(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleSaveDeadline(); if (e.key === "Escape") setEditingDeadline(false); }}
-                    className="bg-[#0f0f0f] border border-emerald-500 rounded px-2 py-0.5 text-white text-sm focus:outline-none"
-                  />
-                  <button onClick={handleSaveDeadline} className="text-emerald-400 hover:text-emerald-300 text-xs">Salvar</button>
-                  <button onClick={() => setEditingDeadline(false)} className="text-gray-500 hover:text-gray-300 text-xs">Cancelar</button>
-                </>
-              ) : (
-                <button
-                  onClick={() => {
-                    const d = new Date(campaign.expiresAt);
-                    setDeadlineValue(d.toISOString().slice(0, 10));
-                    setEditingDeadline(true);
-                  }}
-                  className="text-gray-400 text-sm hover:text-white transition-colors group flex items-center gap-1"
-                >
-                  Prazo: {new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}
-                  <span className="text-gray-600 group-hover:text-gray-400 text-xs">✏️</span>
-                </button>
-              )}
+              <span className="text-gray-400 text-sm">
+                Prazo: {new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
