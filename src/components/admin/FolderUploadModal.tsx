@@ -237,7 +237,7 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
       for (let i = 0; i < post.slides.length; i++) {
         const slide = post.slides[i];
         const fileUrl = slide.mimeType.startsWith("video/") ? drivePreviewUrl(slide.id) : driveThumbUrl(slide.id);
-        const driveUrl = post.folderUrl && i === 0
+        const driveUrl = (post.folderUrl && i === 0 && slide.mimeType.startsWith("image/"))
           ? post.folderUrl
           : driveFileViewUrl(slide.id);
 
