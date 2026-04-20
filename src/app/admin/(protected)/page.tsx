@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import ChargeButton from "@/components/admin/ChargeButton";
 
 function getStatusCounts(campaign: {
   status: string;
@@ -55,6 +56,8 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     },
     orderBy: { createdAt: "desc" },
   });
+
+
 
   const totalClients = clients.length;
   const totalCampaigns = clients.reduce((acc, c) => acc + c.campaigns.length, 0);
@@ -183,6 +186,9 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
               const daysSinceCreated = Math.floor(
                 (Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24)
               );
+              const daysSinceOpen = Math.floor(
+                (Date.now() - new Date(campaign.expiresAt).getTime() + 24 * 60 * 60 * 1000) / (1000 * 60 * 60 * 24)
+              );
               const hasAdjustment = counts.adjustment > 0 || counts.rejected > 0;
               const isFullyApproved = counts.total > 0 && counts.approved === counts.total;
               const clientFinished = campaign.status === "CLOSED" && counts.total > 0;
@@ -260,7 +266,11 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                       </span>
                     )}
                     {waitingClient && (
-                      <span className="text-xs text-gray-500">Aguardando cliente</span>
+                      <ChargeButton
+                        campaignId={campaign.id}
+                        lastChargedAt={(campaign as { lastChargedAt?: Date | null }).lastChargedAt?.toISOString() ?? null}
+                        daysSinceOpen={Math.max(0, daysSinceOpen)}
+                      />
                     )}
 
                     {!clientFinished && (

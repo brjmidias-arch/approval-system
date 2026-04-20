@@ -36,6 +36,7 @@ model Campaign {
   internalToken       String               @unique @default(dbgenerated("gen_random_uuid()"))
   expiresAt           DateTime
   status              String               @default("DRAFT")
+  lastChargedAt       DateTime?
   createdAt           DateTime             @default(now())
   contentItems        ContentItem[]
   approvalItems       ApprovalItem[]
