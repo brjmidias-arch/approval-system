@@ -29,9 +29,13 @@ export default function ChargeButton({ campaignId, lastChargedAt, daysSinceOpen 
     router.refresh();
   }
 
+  // Sent today and never charged → just show "Aguardando cliente"
+  if (daysSinceOpen === 0 && neverCharged) {
+    return <span className="text-xs text-gray-500">Aguardando cliente</span>;
+  }
+
   return (
     <div className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
-      {/* Aviso: não cobrado há X dias */}
       {neverCharged && daysSinceOpen >= 1 && (
         <span className="text-xs text-red-400 font-medium">
           ⚠ não cobrado · sem aprovação há {daysSinceOpen} {daysSinceOpen === 1 ? "dia" : "dias"}
@@ -46,7 +50,6 @@ export default function ChargeButton({ campaignId, lastChargedAt, daysSinceOpen 
         <span className="text-xs text-gray-500">cobrado hoje</span>
       )}
 
-      {/* Botão */}
       {!chargedToday && (
         <button
           onClick={handleCharge}
