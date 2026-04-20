@@ -87,20 +87,16 @@ export default function CampaignPage() {
     const data = await res.json();
     setCampaign(data);
     setLoading(false);
+    const items: { status: string }[] = data.approvalItems ?? [];
+    setLiveStatus({ reviewed: items.filter((i) => i.status !== "PENDING").length, total: items.length });
   }, [id]);
 
   useEffect(() => { fetchCampaign(); }, [fetchCampaign]);
 
   useEffect(() => {
-    const interval = setInterval(async () => {
-      const res = await fetch(`/api/admin/campaigns/${id}/status`);
-      if (res.ok) {
-        const data = await res.json();
-        setLiveStatus({ reviewed: data.reviewed, total: data.total });
-      }
-    }, 30000);
+    const interval = setInterval(() => fetchCampaign(), 30000);
     return () => clearInterval(interval);
-  }, [id]);
+  }, [fetchCampaign]);
 
 
   function openEditGroup(items: ContentItem[]) {

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import ChargeButton from "@/components/admin/ChargeButton";
+import AutoRefresh from "@/components/admin/AutoRefresh";
 
 function getStatusCounts(campaign: {
   status: string;
@@ -114,6 +115,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
 
   return (
     <div className="space-y-6">
+      <AutoRefresh intervalMs={30000} />
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-white">Dashboard</h1>
         <Link
