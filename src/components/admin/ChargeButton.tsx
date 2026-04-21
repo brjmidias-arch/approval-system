@@ -13,12 +13,17 @@ export default function ChargeButton({ campaignId, lastChargedAt, daysSinceOpen 
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
+  const now = new Date();
+  const todaySixAM = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 6, 0, 0);
+
+  // Charged "this cycle" means after today's 6am reset
+  const chargedThisCycle = lastChargedAt ? new Date(lastChargedAt) >= todaySixAM : false;
+
   const daysSinceCharged = lastChargedAt
     ? Math.floor((Date.now() - new Date(lastChargedAt).getTime()) / (1000 * 60 * 60 * 24))
     : null;
 
   const neverCharged = lastChargedAt === null;
-  const chargedToday = daysSinceCharged === 0;
 
   async function handleCharge(e: React.MouseEvent) {
     e.preventDefault();
@@ -29,7 +34,6 @@ export default function ChargeButton({ campaignId, lastChargedAt, daysSinceOpen 
     router.refresh();
   }
 
-  // Sent today and never charged → just show "Aguardando cliente"
   if (daysSinceOpen === 0 && neverCharged) {
     return <span className="text-xs text-gray-500">Aguardando cliente</span>;
   }
@@ -41,16 +45,16 @@ export default function ChargeButton({ campaignId, lastChargedAt, daysSinceOpen 
           ⚠ não cobrado · sem aprovação há {daysSinceOpen} {daysSinceOpen === 1 ? "dia" : "dias"}
         </span>
       )}
-      {!neverCharged && !chargedToday && (
+      {!neverCharged && !chargedThisCycle && (
         <span className="text-xs text-amber-400">
           cobrado há {daysSinceCharged} {daysSinceCharged === 1 ? "dia" : "dias"} · sem aprovação há {daysSinceOpen} {daysSinceOpen === 1 ? "dia" : "dias"}
         </span>
       )}
-      {chargedToday && (
+      {chargedThisCycle && (
         <span className="text-xs text-gray-500">cobrado hoje</span>
       )}
 
-      {!chargedToday && (
+      {!chargedThisCycle && (
         <button
           onClick={handleCharge}
           disabled={loading}
