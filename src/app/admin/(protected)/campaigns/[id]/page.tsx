@@ -94,7 +94,7 @@ export default function CampaignPage() {
   useEffect(() => { fetchCampaign(); }, [fetchCampaign]);
 
   useEffect(() => {
-    const interval = setInterval(() => fetchCampaign(), 30000);
+    const interval = setInterval(() => fetchCampaign(), 60000);
     return () => clearInterval(interval);
   }, [fetchCampaign]);
 

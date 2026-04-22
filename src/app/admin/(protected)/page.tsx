@@ -115,7 +115,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
 
   return (
     <div className="space-y-6">
-      <AutoRefresh intervalMs={30000} />
+      <AutoRefresh intervalMs={60000} />
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-white">Dashboard</h1>
         <Link
