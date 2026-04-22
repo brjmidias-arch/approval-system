@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import CopyButton from "./CopyButton";
+import PlannerCalendar from "./PlannerCalendar";
 
 const CONTENT_TYPE_LABELS: Record<string, string> = {
   CARROSSEL: "Carrossel",
@@ -201,17 +202,34 @@ function PostCard({ post, onMarkPosted }: { post: Post; onMarkPosted: (id: strin
 }
 
 export default function ClientScheduleAccordion({ clients }: { clients: ClientGroup[] }) {
-  // Auto-open the most urgent client (first after sort, if has pending posts)
   const [openClientId, setOpenClientId] = useState<string | null>(
     clients.length === 1 ? clients[0].clientId
     : clients[0]?.pendingPosts > 0 ? clients[0].clientId
     : null
   );
   const [postedIds, setPostedIds] = useState<Set<string>>(new Set());
+  const [plannerClientId, setPlannerClientId] = useState<string | null>(null);
 
   function handleMarkPosted(postId: string) {
     setPostedIds((prev) => new Set(prev).add(postId));
   }
+
+  const plannerClient = clients.find((c) => c.clientId === plannerClientId);
+  const plannerPosts = plannerClient
+    ? plannerClient.campaigns.flatMap((camp) =>
+        camp.posts.map((p) => ({
+          id: p.id,
+          title: p.title,
+          contentType: p.contentType,
+          fileUrl: p.fileUrl,
+          coverUrl: p.coverUrl,
+          scheduledDate: p.scheduledDate ? new Date(p.scheduledDate).toISOString() : null,
+          clientName: plannerClient.clientName,
+          campaignName: camp.name,
+          campaignId: p.campaignId,
+        }))
+      )
+    : [];
 
   if (clients.length === 0) {
     return (
@@ -224,6 +242,25 @@ export default function ClientScheduleAccordion({ clients }: { clients: ClientGr
   }
 
   return (
+    <>
+    {/* Planner modal */}
+    {plannerClient && (
+      <div className="fixed inset-0 z-50 bg-black/80 flex flex-col">
+        <div className="flex items-center justify-between px-6 py-3 bg-[#111] border-b border-white/10 shrink-0">
+          <div>
+            <h2 className="text-white font-semibold">Planner — {plannerClient.clientName}</h2>
+            <p className="text-gray-500 text-xs mt-0.5">Arraste os posts para definir as datas de publicação</p>
+          </div>
+          <button
+            onClick={() => setPlannerClientId(null)}
+            className="text-gray-400 hover:text-white text-2xl leading-none transition-colors"
+          >×</button>
+        </div>
+        <div className="flex-1 overflow-hidden p-4">
+          <PlannerCalendar initialPosts={plannerPosts} />
+        </div>
+      </div>
+    )}
     <div className="space-y-3">
       {clients.map((client) => {
         const isOpen = openClientId === client.clientId;
@@ -275,9 +312,15 @@ export default function ClientScheduleAccordion({ clients }: { clients: ClientGr
                   </div>
                 </div>
               </div>
-              <span className={`text-gray-400 text-lg transition-transform duration-200 shrink-0 ${isOpen ? "rotate-180" : ""}`}>
-                ›
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setPlannerClientId(client.clientId); }}
+                  className="text-xs px-2.5 py-1.5 rounded-lg bg-violet-900/30 hover:bg-violet-900/50 text-violet-400 border border-violet-500/30 transition-colors"
+                >
+                  📅 Planner
+                </button>
+                <span className={`text-gray-400 text-lg transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}>›</span>
+              </div>
             </button>
 
             {/* Expanded content */}
@@ -308,5 +351,6 @@ export default function ClientScheduleAccordion({ clients }: { clients: ClientGr
         );
       })}
     </div>
+    </>
   );
 }
