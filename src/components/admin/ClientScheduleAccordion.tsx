@@ -257,7 +257,7 @@ export default function ClientScheduleAccordion({ clients }: { clients: ClientGr
           >×</button>
         </div>
         <div className="flex-1 overflow-hidden p-4">
-          <PlannerCalendar initialPosts={plannerPosts} />
+          <PlannerCalendar initialPosts={plannerPosts} clientId={plannerClient.clientId} />
         </div>
       </div>
     )}
