@@ -77,7 +77,7 @@ export default function CampaignPage() {
 
   // Edit modal
   const [editingGroup, setEditingGroup] = useState<{ groupId: string | null; firstItemId: string; items: ContentItem[] } | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "", driveUrl: "" });
+  const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "", driveUrl: "", coverDriveUrl: "" });
   const [addingSlides, setAddingSlides] = useState(false);
   const [newSlideLinks, setNewSlideLinks] = useState("");
 
@@ -107,6 +107,7 @@ export default function CampaignPage() {
       caption: first.caption || "",
       scheduledDate: first.scheduledDate ? first.scheduledDate.split("T")[0] : "",
       driveUrl: first.driveUrl || "",
+      coverDriveUrl: first.coverDriveUrl || "",
     });
     setNewSlideLinks("");
   }
@@ -114,6 +115,13 @@ export default function CampaignPage() {
   async function handleEditSave() {
     if (!editingGroup) return;
     setAddingSlides(true);
+
+    // Derive coverUrl from coverDriveUrl
+    let coverUrl: string | null = null;
+    if (editForm.coverDriveUrl.trim()) {
+      const m = editForm.coverDriveUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (m) coverUrl = `https://drive.google.com/thumbnail?id=${m[1]}&sz=w800`;
+    }
 
     // Update title/caption/date for all items in group
     for (const item of editingGroup.items) {
@@ -125,6 +133,10 @@ export default function CampaignPage() {
           caption: editForm.caption || null,
           scheduledDate: editForm.scheduledDate || null,
           driveUrl: editForm.driveUrl || null,
+          ...(editForm.coverDriveUrl.trim() !== "" && {
+            coverUrl,
+            coverDriveUrl: editForm.coverDriveUrl.trim() || null,
+          }),
         }),
       });
     }
@@ -671,6 +683,25 @@ export default function CampaignPage() {
                   className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 placeholder-gray-600"
                 />
               </div>
+
+              {(editingGroup.items[0].fileType === "VIDEO" || editingGroup.items[0].contentType === "REELS") && (
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">
+                    Capa do vídeo
+                    <span className="text-gray-600 ml-1">(link do Drive)</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={editForm.coverDriveUrl}
+                    onChange={(e) => setEditForm({ ...editForm, coverDriveUrl: e.target.value })}
+                    placeholder="https://drive.google.com/file/d/..."
+                    className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 placeholder-gray-600"
+                  />
+                  {editForm.coverDriveUrl.trim() && !editForm.coverDriveUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) && (
+                    <p className="text-xs text-red-400 mt-1">Link do Drive não reconhecido</p>
+                  )}
+                </div>
+              )}
 
               {editingGroup.groupId && (
                 <div>
