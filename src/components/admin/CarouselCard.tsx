@@ -44,8 +44,10 @@ interface Props {
 function SortableSlide({
   slide,
   index,
+  campaignId,
   onDelete,
   onPreview,
+  onReplaced,
 }: {
   slide: SlideItem;
   index: number;
@@ -54,6 +56,12 @@ function SortableSlide({
   onPreview: (index: number) => void;
   onReplaced: (id: string, fileUrl: string, fileType: string) => void;
 }) {
+  const [replacing, setReplacing] = useState(false);
+  const [driveInput, setDriveInput] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const isSupabase = slide.fileUrl.includes("supabase");
+
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: slide.id });
 
@@ -63,10 +71,32 @@ function SortableSlide({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  function extractDriveId(url: string): string | null {
+    const patterns = [/\/file\/d\/([a-zA-Z0-9_-]+)/, /id=([a-zA-Z0-9_-]+)/];
+    for (const p of patterns) { const m = url.match(p); if (m) return m[1]; }
+    return null;
+  }
+
+  async function handleReplace() {
+    const fileId = extractDriveId(driveInput);
+    if (!fileId) return alert("Link do Drive não reconhecido.");
+    setSaving(true);
+    const newFileUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`;
+    const newDriveUrl = `https://drive.google.com/file/d/${fileId}/view`;
+    await fetch(`/api/admin/campaigns/${campaignId}/items/${slide.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileUrl: newFileUrl, fileType: "IMAGE", driveUrl: newDriveUrl }),
+    });
+    onReplaced(slide.id, newFileUrl, "IMAGE");
+    setSaving(false);
+    setReplacing(false);
+    setDriveInput("");
+  }
+
   return (
     <div ref={setNodeRef} style={style} className="shrink-0 w-24">
       <div className="w-24 h-24 rounded-lg overflow-hidden bg-black/40 relative">
-        {/* Drag handle */}
         <div
           className="absolute top-0 left-0 right-0 h-7 cursor-grab active:cursor-grabbing z-10 flex items-center justify-center bg-gradient-to-b from-black/50 to-transparent"
           {...attributes}
@@ -75,7 +105,6 @@ function SortableSlide({
           <span className="text-white/60 text-xs select-none">⠿ arrastar</span>
         </div>
 
-        {/* Imagem clicável para preview */}
         {slide.fileType === "IMAGE" ? (
           <img
             src={slide.fileUrl}
@@ -90,18 +119,57 @@ function SortableSlide({
         <span className="absolute bottom-1 left-1 text-xs bg-black/60 text-white px-1 rounded pointer-events-none">
           {index + 1}
         </span>
+
+        {isSupabase && (
+          <div className="absolute bottom-1 right-1">
+            <span className="text-xs bg-orange-500/80 text-white px-1 rounded">S</span>
+          </div>
+        )}
       </div>
+
       <div className="flex items-center justify-between mt-1">
         <span className={`text-xs px-1.5 py-0.5 rounded-full ${APPROVAL_STATUS_COLORS[(slide.approvalItem?.status || "PENDING") as ApprovalStatus]}`}>
           {APPROVAL_STATUS_LABELS[(slide.approvalItem?.status || "PENDING") as ApprovalStatus]}
         </span>
-        <button
-          onClick={() => onDelete(slide.id)}
-          className="text-red-500 hover:text-red-400 text-xs"
-        >
-          ✕
-        </button>
+        <button onClick={() => onDelete(slide.id)} className="text-red-500 hover:text-red-400 text-xs">✕</button>
       </div>
+
+      {isSupabase && !replacing && (
+        <button
+          onClick={() => setReplacing(true)}
+          className="mt-1 w-full text-xs px-1.5 py-1 bg-orange-900/30 hover:bg-orange-900/50 text-orange-400 border border-orange-500/30 rounded-lg transition-colors"
+        >
+          → Drive
+        </button>
+      )}
+
+      {replacing && (
+        <div className="mt-1 space-y-1">
+          <input
+            autoFocus
+            type="text"
+            value={driveInput}
+            onChange={(e) => setDriveInput(e.target.value)}
+            placeholder="Link Drive"
+            className="w-full bg-black/60 border border-white/20 rounded px-1.5 py-1 text-white text-xs focus:outline-none focus:border-orange-400"
+          />
+          <div className="flex gap-1">
+            <button
+              onClick={handleReplace}
+              disabled={saving || !driveInput.trim()}
+              className="flex-1 text-xs py-0.5 bg-orange-600 hover:bg-orange-500 text-white rounded disabled:opacity-40"
+            >
+              {saving ? "..." : "OK"}
+            </button>
+            <button
+              onClick={() => { setReplacing(false); setDriveInput(""); }}
+              className="flex-1 text-xs py-0.5 bg-white/10 text-gray-400 rounded"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
