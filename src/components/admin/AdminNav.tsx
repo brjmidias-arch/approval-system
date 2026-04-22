@@ -10,6 +10,7 @@ export default function AdminNav() {
     { href: "/admin", label: "Dashboard" },
     { href: "/admin/clients", label: "Clientes" },
     { href: "/admin/programacao", label: "Programação" },
+    { href: "/admin/planner", label: "Planner" },
   ];
 
   return (
