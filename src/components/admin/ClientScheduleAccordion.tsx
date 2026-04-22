@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import CopyButton from "./CopyButton";
 import PlannerCalendar from "./PlannerCalendar";
@@ -210,6 +210,14 @@ export default function ClientScheduleAccordion({ clients: initialClients }: { c
   );
   const [postedIds, setPostedIds] = useState<Set<string>>(new Set());
   const [plannerClientId, setPlannerClientId] = useState<string | null>(null);
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPlannerClientId(null);
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
 
   function handleDateChange(postId: string, dateKey: string | null) {
     setClients((prev) => prev.map((client) => ({
