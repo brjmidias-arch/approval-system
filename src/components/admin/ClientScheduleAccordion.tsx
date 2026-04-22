@@ -211,14 +211,17 @@ export default function ClientScheduleAccordion({ clients: initialClients }: { c
   const [postedIds, setPostedIds] = useState<Set<string>>(new Set());
   const [plannerClientId, setPlannerClientId] = useState<string | null>(null);
 
-  function handleDateChange(postId: string, dateKey: string) {
+  function handleDateChange(postId: string, dateKey: string | null) {
     setClients((prev) => prev.map((client) => ({
       ...client,
       campaigns: client.campaigns.map((campaign) => ({
         ...campaign,
-        posts: campaign.posts.map((post) =>
-          post.id === postId ? { ...post, scheduledDate: new Date(dateKey) } : post
-        ),
+        posts: campaign.posts.map((post) => {
+          if (post.id !== postId) return post;
+          if (!dateKey) return { ...post, scheduledDate: null };
+          const [y, m, d] = dateKey.split("-").map(Number);
+          return { ...post, scheduledDate: new Date(y, m - 1, d, 12, 0, 0) };
+        }),
       })),
     })));
   }

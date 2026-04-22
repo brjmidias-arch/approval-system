@@ -79,6 +79,25 @@ function ManualNote({ label, onRemove }: { label: string; onRemove: () => void }
   );
 }
 
+function UnscheduledDropzone({ children, count }: { children: React.ReactNode; count: number }) {
+  const { setNodeRef, isOver } = useDroppable({ id: "unscheduled" });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`bg-[#111] border rounded-xl p-3 flex-1 overflow-hidden flex flex-col transition-colors ${
+        isOver ? "border-white/40 bg-white/5" : "border-white/10"
+      }`}
+    >
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+        Sem data ({count})
+      </p>
+      <div className="overflow-y-auto space-y-1.5 flex-1">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function DroppableDay({ dateKey, isToday, isPast, children, onAddNote }: {
   dateKey: string; isToday: boolean; isPast: boolean;
   children: React.ReactNode; onAddNote: () => void;
@@ -105,7 +124,7 @@ interface NoteMap { [dateKey: string]: string[] }
 export default function PlannerCalendar({ initialPosts, clientId, onDateChange }: {
   initialPosts: Post[];
   clientId?: string;
-  onDateChange?: (postId: string, dateKey: string) => void;
+  onDateChange?: (postId: string, dateKey: string | null) => void;
 }) {
   const [posts, setPosts] = useState(initialPosts);
   const [activePost, setActivePost] = useState<Post | null>(null);
@@ -188,16 +207,34 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
     const { active, over } = e;
     if (!over) return;
     const postId = active.id as string;
-    const dateKey = over.id as string;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return;
+    const overId = over.id as string;
     const post = posts.find((p) => p.id === postId);
-    if (!post || post.scheduledDate?.slice(0, 10) === dateKey) return;
-    setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, scheduledDate: dateKey + "T12:00:00.000Z" } : p));
-    onDateChange?.(postId, dateKey);
+    if (!post) return;
+
+    // Drop on unscheduled sidebar → remove date
+    if (overId === "unscheduled") {
+      if (!post.scheduledDate) return;
+      setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, scheduledDate: null } : p));
+      onDateChange?.(postId, null);
+      await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduledDate: null }),
+      });
+      return;
+    }
+
+    // Drop on a calendar day
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(overId)) return;
+    if (post.scheduledDate?.slice(0, 10) === overId) return;
+    const [y, m, d] = overId.split("-").map(Number);
+    const localDate = new Date(y, m - 1, d, 12, 0, 0);
+    setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, scheduledDate: localDate.toISOString() } : p));
+    onDateChange?.(postId, overId);
     await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scheduledDate: dateKey }),
+      body: JSON.stringify({ scheduledDate: overId }),
     });
   }
 
@@ -207,17 +244,12 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
 
         {/* Sidebar */}
         <div className="w-52 shrink-0 flex flex-col gap-2">
-          <div className="bg-[#111] border border-white/10 rounded-xl p-3 flex-1 overflow-hidden flex flex-col">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-              Sem data ({unscheduledPosts.length})
-            </p>
-            <div className="overflow-y-auto space-y-1.5 flex-1">
-              {unscheduledPosts.length === 0 && (
-                <p className="text-xs text-gray-600 text-center mt-4">Todos os posts têm data</p>
-              )}
-              {unscheduledPosts.map((post) => <DraggablePost key={post.id} post={post} />)}
-            </div>
-          </div>
+          <UnscheduledDropzone count={unscheduledPosts.length}>
+            {unscheduledPosts.length === 0 && (
+              <p className="text-xs text-gray-600 text-center mt-4">Todos os posts têm data</p>
+            )}
+            {unscheduledPosts.map((post) => <DraggablePost key={post.id} post={post} />)}
+          </UnscheduledDropzone>
           <div className="bg-[#111] border border-white/10 rounded-xl p-3 text-xs text-gray-400 space-y-1.5">
             <p className="font-semibold text-gray-300">Legenda</p>
             {Object.entries(CONTENT_TYPE_LABELS).map(([k, v]) => (
