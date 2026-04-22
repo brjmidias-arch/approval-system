@@ -8,7 +8,13 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
       client: true,
       contentItems: {
         orderBy: { order: "asc" },
-        include: { approvalItem: true },
+        include: { approvalItem: true, internalReviewItem: true },
+        where: {
+          OR: [
+            { internalReviewItem: { is: null } },
+            { internalReviewItem: { is: { status: "APPROVED" } } },
+          ],
+        },
       },
     },
   });
