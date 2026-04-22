@@ -217,6 +217,10 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                 (i: { internalReviewItem?: { status: string } | null }) =>
                   i.internalReviewItem?.status === "ADJUSTMENT" || i.internalReviewItem?.status === "REJECTED"
               );
+              const pendingInternalCount = internalItemsRow.filter(
+                (i: { internalReviewItem?: { status: string } | null }) =>
+                  i.internalReviewItem?.status === "PENDING"
+              ).length;
 
               // Row background + border based on urgency
               if (campaign.status === "INTERNAL_DONE" && hasInternalAdjustmentRow) {
@@ -265,6 +269,11 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                     {badgeType === "finished" && (
                       <span className="flex items-center gap-1 text-xs font-semibold text-blue-400 bg-blue-900/30 border border-blue-500/30 px-2.5 py-1 rounded-full">
                         📋 Cliente finalizou revisão
+                      </span>
+                    )}
+                    {pendingInternalCount > 0 && (
+                      <span className="flex items-center gap-1 text-xs font-semibold text-violet-400 bg-violet-900/30 border border-violet-500/30 px-2.5 py-1 rounded-full animate-pulse">
+                        🔍 {pendingInternalCount} revisão interna
                       </span>
                     )}
                     {waitingClient && (
