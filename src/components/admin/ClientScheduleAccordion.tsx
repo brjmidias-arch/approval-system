@@ -201,14 +201,27 @@ function PostCard({ post, onMarkPosted }: { post: Post; onMarkPosted: (id: strin
   );
 }
 
-export default function ClientScheduleAccordion({ clients }: { clients: ClientGroup[] }) {
+export default function ClientScheduleAccordion({ clients: initialClients }: { clients: ClientGroup[] }) {
+  const [clients, setClients] = useState(initialClients);
   const [openClientId, setOpenClientId] = useState<string | null>(
-    clients.length === 1 ? clients[0].clientId
-    : clients[0]?.pendingPosts > 0 ? clients[0].clientId
+    initialClients.length === 1 ? initialClients[0].clientId
+    : initialClients[0]?.pendingPosts > 0 ? initialClients[0].clientId
     : null
   );
   const [postedIds, setPostedIds] = useState<Set<string>>(new Set());
   const [plannerClientId, setPlannerClientId] = useState<string | null>(null);
+
+  function handleDateChange(postId: string, dateKey: string) {
+    setClients((prev) => prev.map((client) => ({
+      ...client,
+      campaigns: client.campaigns.map((campaign) => ({
+        ...campaign,
+        posts: campaign.posts.map((post) =>
+          post.id === postId ? { ...post, scheduledDate: new Date(dateKey) } : post
+        ),
+      })),
+    })));
+  }
 
   function handleMarkPosted(postId: string) {
     setPostedIds((prev) => new Set(prev).add(postId));
@@ -257,7 +270,7 @@ export default function ClientScheduleAccordion({ clients }: { clients: ClientGr
           >×</button>
         </div>
         <div className="flex-1 overflow-hidden p-4">
-          <PlannerCalendar initialPosts={plannerPosts} clientId={plannerClient.clientId} />
+          <PlannerCalendar initialPosts={plannerPosts} clientId={plannerClient.clientId} onDateChange={handleDateChange} />
         </div>
       </div>
     )}

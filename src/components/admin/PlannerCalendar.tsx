@@ -102,7 +102,11 @@ function DroppableDay({ dateKey, isToday, isPast, children, onAddNote }: {
 
 interface NoteMap { [dateKey: string]: string[] }
 
-export default function PlannerCalendar({ initialPosts, clientId }: { initialPosts: Post[]; clientId?: string }) {
+export default function PlannerCalendar({ initialPosts, clientId, onDateChange }: {
+  initialPosts: Post[];
+  clientId?: string;
+  onDateChange?: (postId: string, dateKey: string) => void;
+}) {
   const [posts, setPosts] = useState(initialPosts);
   const [activePost, setActivePost] = useState<Post | null>(null);
   const [notes, setNotes] = useState<NoteMap>({});
@@ -189,6 +193,7 @@ export default function PlannerCalendar({ initialPosts, clientId }: { initialPos
     const post = posts.find((p) => p.id === postId);
     if (!post || post.scheduledDate?.slice(0, 10) === dateKey) return;
     setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, scheduledDate: dateKey + "T12:00:00.000Z" } : p));
+    onDateChange?.(postId, dateKey);
     await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
