@@ -50,7 +50,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
       campaigns: {
         include: {
           approvalItems: true,
-          contentItems: { select: { id: true, groupId: true, contentType: true, internalReviewItem: { select: { status: true } } } },
+          contentItems: { select: { id: true, groupId: true, contentType: true, scheduledDate: true, postedAt: true, internalReviewItem: { select: { status: true } } } },
         },
         orderBy: { createdAt: "desc" },
       },
@@ -211,6 +211,26 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                 rowBg = "bg-blue-900/10";
               }
 
+              // Unscheduled approved posts
+              const seenGroupIdsUnsched = new Set<string>();
+              const unscheduledApproved = (campaign.contentItems ?? []).filter((item) => {
+                if (item.postedAt) return false;
+                if (item.scheduledDate) return false;
+                if (item.contentType === "CARROSSEL" && item.groupId) {
+                  if (seenGroupIdsUnsched.has(item.groupId)) return false;
+                  seenGroupIdsUnsched.add(item.groupId);
+                }
+                const approval = campaign.approvalItems.find((a) => a.contentItemId === item.id);
+                return approval?.status === "APPROVED";
+              });
+              const unscheduledCount = unscheduledApproved.length;
+              const maxDaysUnscheduled = unscheduledApproved.reduce((max, item) => {
+                const approval = campaign.approvalItems.find((a) => a.contentItemId === item.id);
+                if (!approval?.reviewedAt) return max;
+                const days = Math.floor((Date.now() - new Date(approval.reviewedAt).getTime()) / (1000 * 60 * 60 * 24));
+                return Math.max(max, days);
+              }, 0);
+
               // Internal review adjustment check
               const internalItemsRow = campaign.contentItems ?? [];
               const hasInternalAdjustmentRow = internalItemsRow.some(
@@ -274,6 +294,15 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                     {pendingInternalCount > 0 && (
                       <span className="flex items-center gap-1 text-xs font-semibold text-violet-400 bg-violet-900/30 border border-violet-500/30 px-2.5 py-1 rounded-full animate-pulse">
                         🔍 {pendingInternalCount} revisão interna
+                      </span>
+                    )}
+                    {unscheduledCount > 0 && (
+                      <span className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                        maxDaysUnscheduled >= 7 ? "text-red-400 bg-red-900/30 border-red-500/30" :
+                        maxDaysUnscheduled >= 3 ? "text-amber-400 bg-amber-900/40 border-amber-500/30" :
+                        "text-yellow-500 bg-yellow-900/20 border-yellow-600/20"
+                      }`}>
+                        ⏰ {unscheduledCount} {unscheduledCount === 1 ? "post" : "posts"} sem agendar há {maxDaysUnscheduled} {maxDaysUnscheduled === 1 ? "dia" : "dias"}
                       </span>
                     )}
                     {waitingClient && (
