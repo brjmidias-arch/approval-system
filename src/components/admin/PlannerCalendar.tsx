@@ -38,7 +38,7 @@ const MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","A
 function PostPreviewModal({ post, onClose }: { post: Post; onClose: () => void }) {
   const s = TYPE_STYLE[post.contentType] ?? DEFAULT_STYLE;
   const isVideo = post.fileType === "VIDEO";
-  const thumb = post.coverUrl || (post.fileUrl.includes("thumbnail") ? post.fileUrl : null);
+  const thumb = post.coverUrl || (post.fileType === "IMAGE" ? post.fileUrl : (post.fileUrl.includes("thumbnail") ? post.fileUrl : null));
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -112,7 +112,7 @@ function PostPreviewModal({ post, onClose }: { post: Post; onClose: () => void }
 
 function PostCard({ post, compact = false }: { post: Post; compact?: boolean }) {
   const s = TYPE_STYLE[post.contentType] ?? DEFAULT_STYLE;
-  const thumb = post.coverUrl || (post.fileUrl.includes("thumbnail") ? post.fileUrl : null);
+  const thumb = post.coverUrl || (post.fileType === "IMAGE" ? post.fileUrl : (post.fileUrl.includes("thumbnail") ? post.fileUrl : null));
 
   if (compact) {
     return (
