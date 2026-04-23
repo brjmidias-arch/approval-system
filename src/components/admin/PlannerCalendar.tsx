@@ -11,7 +11,9 @@ interface Post {
   title: string | null;
   contentType: string;
   fileUrl: string;
+  fileType: string;
   coverUrl: string | null;
+  caption: string | null;
   scheduledDate: string | null;
   clientName: string;
   campaignName: string;
@@ -32,6 +34,81 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+function PostPreviewModal({ post, onClose }: { post: Post; onClose: () => void }) {
+  const s = TYPE_STYLE[post.contentType] ?? DEFAULT_STYLE;
+  const isVideo = post.fileType === "VIDEO";
+  const thumb = post.coverUrl || (post.fileUrl.includes("thumbnail") ? post.fileUrl : null);
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4" onClick={onClose}>
+      <div
+        className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${s.bg} ${s.text}`}>
+              {CONTENT_TYPE_LABELS[post.contentType] ?? post.contentType}
+            </span>
+            <span className="text-white text-sm font-medium truncate">
+              {post.title || post.campaignName}
+            </span>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-white text-xl leading-none transition-colors ml-2 shrink-0">×</button>
+        </div>
+
+        {/* Media */}
+        {isVideo ? (
+          <div className="relative bg-black flex items-center justify-center" style={{ minHeight: 200 }}>
+            {thumb
+              ? <img src={thumb} alt="" className="w-full max-h-72 object-contain opacity-60" />
+              : <div className="py-12 text-5xl">🎬</div>
+            }
+            <a
+              href={post.fileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute inset-0 flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-14 h-14 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm flex items-center justify-center transition-colors">
+                <span className="text-white text-2xl ml-1">▶</span>
+              </div>
+            </a>
+          </div>
+        ) : thumb ? (
+          <img src={thumb} alt="" className="w-full max-h-72 object-contain bg-black" />
+        ) : (
+          <div className="py-12 text-center text-5xl bg-black/40">🖼️</div>
+        )}
+
+        {/* Info */}
+        <div className="px-4 py-3 space-y-2">
+          <p className="text-xs text-gray-500">{post.clientName} · {post.campaignName}</p>
+          {post.scheduledDate && (
+            <p className="text-xs text-emerald-400">
+              📅 {new Date(post.scheduledDate).toLocaleDateString("pt-BR")}
+            </p>
+          )}
+          {post.caption && (
+            <div className="border-t border-white/10 pt-2">
+              <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Legenda</p>
+              <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto">{post.caption}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function PostCard({ post, compact = false }: { post: Post; compact?: boolean }) {
   const s = TYPE_STYLE[post.contentType] ?? DEFAULT_STYLE;
@@ -60,11 +137,16 @@ function PostCard({ post, compact = false }: { post: Post; compact?: boolean }) 
   );
 }
 
-function DraggablePost({ post, compact }: { post: Post; compact?: boolean }) {
+function DraggablePost({ post, compact, onPreview }: { post: Post; compact?: boolean; onPreview: (post: Post) => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: post.id });
   return (
-    <div ref={setNodeRef} {...listeners} {...attributes}
-      style={{ opacity: isDragging ? 0.3 : 1, cursor: "grab", touchAction: "none" }}>
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      style={{ opacity: isDragging ? 0.3 : 1, cursor: "grab", touchAction: "none" }}
+      onClick={(e) => { e.stopPropagation(); onPreview(post); }}
+    >
       <PostCard post={post} compact={compact} />
     </div>
   );
@@ -128,6 +210,7 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
 }) {
   const [posts, setPosts] = useState(initialPosts);
   const [activePost, setActivePost] = useState<Post | null>(null);
+  const [previewPost, setPreviewPost] = useState<Post | null>(null);
   const [notes, setNotes] = useState<NoteMap>({});
   const [addingNoteDate, setAddingNoteDate] = useState<string | null>(null);
   const [noteInput, setNoteInput] = useState("");
@@ -211,7 +294,6 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
     const post = posts.find((p) => p.id === postId);
     if (!post) return;
 
-    // Drop on unscheduled sidebar → remove date
     if (overId === "unscheduled") {
       if (!post.scheduledDate) return;
       setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, scheduledDate: null } : p));
@@ -224,7 +306,6 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
       return;
     }
 
-    // Drop on a calendar day
     if (!/^\d{4}-\d{2}-\d{2}$/.test(overId)) return;
     if (post.scheduledDate?.slice(0, 10) === overId) return;
     const [y, m, d] = overId.split("-").map(Number);
@@ -239,108 +320,114 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
   }
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex gap-4 h-full">
+    <>
+      {previewPost && <PostPreviewModal post={previewPost} onClose={() => setPreviewPost(null)} />}
 
-        {/* Sidebar */}
-        <div className="w-52 shrink-0 flex flex-col gap-2">
-          <UnscheduledDropzone count={unscheduledPosts.length}>
-            {unscheduledPosts.length === 0 && (
-              <p className="text-xs text-gray-600 text-center mt-4">Todos os posts têm data</p>
-            )}
-            {unscheduledPosts.map((post) => <DraggablePost key={post.id} post={post} />)}
-          </UnscheduledDropzone>
-          <div className="bg-[#111] border border-white/10 rounded-xl p-3 text-xs text-gray-400 space-y-1.5">
-            <p className="font-semibold text-gray-300">Legenda</p>
-            {Object.entries(CONTENT_TYPE_LABELS).map(([k, v]) => (
-              <div key={k} className="flex items-center gap-1.5">
-                <div className={`w-2.5 h-2.5 rounded-sm ${TYPE_STYLE[k]?.bg}`} />
-                <span>{v}</span>
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <div className="flex gap-4 h-full">
+
+          {/* Sidebar */}
+          <div className="w-52 shrink-0 flex flex-col gap-2">
+            <UnscheduledDropzone count={unscheduledPosts.length}>
+              {unscheduledPosts.length === 0 && (
+                <p className="text-xs text-gray-600 text-center mt-4">Todos os posts têm data</p>
+              )}
+              {unscheduledPosts.map((post) => (
+                <DraggablePost key={post.id} post={post} onPreview={setPreviewPost} />
+              ))}
+            </UnscheduledDropzone>
+            <div className="bg-[#111] border border-white/10 rounded-xl p-3 text-xs text-gray-400 space-y-1.5">
+              <p className="font-semibold text-gray-300">Legenda</p>
+              {Object.entries(CONTENT_TYPE_LABELS).map(([k, v]) => (
+                <div key={k} className="flex items-center gap-1.5">
+                  <div className={`w-2.5 h-2.5 rounded-sm ${TYPE_STYLE[k]?.bg}`} />
+                  <span>{v}</span>
+                </div>
+              ))}
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-sm bg-zinc-700" />
+                <span>Manual</span>
               </div>
-            ))}
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-sm bg-zinc-700" />
-              <span>Manual</span>
+            </div>
+          </div>
+
+          {/* Calendar */}
+          <div className="flex-1 flex flex-col gap-2 min-w-0">
+            <div className="flex items-center justify-end gap-2">
+              <button onClick={prevMonth} className="w-7 h-7 rounded bg-white/5 hover:bg-white/10 text-white text-lg flex items-center justify-center transition-colors">‹</button>
+              <span className="text-white font-semibold text-sm w-36 text-center">{MONTHS[viewMonth]} {viewYear}</span>
+              <button onClick={nextMonth} className="w-7 h-7 rounded bg-white/5 hover:bg-white/10 text-white text-lg flex items-center justify-center transition-colors">›</button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {WEEKDAYS.map((d) => (
+                <div key={d} className="text-center text-xs text-gray-500 font-medium py-0.5">{d}</div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 flex-1 overflow-y-auto content-start">
+              {calendarDays.map((dateKey, i) => {
+                if (!dateKey) return <div key={`e-${i}`} />;
+                const dayNum = Number(dateKey.slice(8));
+                const dayPosts = getPostsForDate(dateKey);
+                const dayNotes = notes[dateKey] ?? [];
+                const isToday = dateKey === todayKey;
+                const isPast = dateKey < todayKey;
+                const total = dayPosts.length + dayNotes.length;
+
+                return (
+                  <DroppableDay key={dateKey} dateKey={dateKey} isToday={isToday} isPast={isPast}
+                    onAddNote={() => { setAddingNoteDate(dateKey); setNoteInput(""); }}>
+                    <div className={`text-xs font-bold mb-1 px-0.5 ${isToday ? "text-emerald-400" : isPast ? "text-gray-600" : "text-gray-300"}`}>
+                      {dayNum}
+                    </div>
+
+                    {addingNoteDate === dateKey ? (
+                      <div className="space-y-0.5">
+                        <input
+                          autoFocus
+                          value={noteInput}
+                          onChange={(e) => setNoteInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") addNote(dateKey);
+                            if (e.key === "Escape") setAddingNoteDate(null);
+                          }}
+                          placeholder="Ex: Stories promocional"
+                          className="w-full bg-zinc-800 border border-zinc-500 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-zinc-300 placeholder-zinc-500"
+                        />
+                        <div className="flex gap-0.5">
+                          <button onClick={() => addNote(dateKey)} className="flex-1 text-xs py-0.5 bg-zinc-600 hover:bg-zinc-500 text-white rounded transition-colors">✓</button>
+                          <button onClick={() => setAddingNoteDate(null)} className="flex-1 text-xs py-0.5 bg-zinc-800 text-zinc-400 rounded transition-colors">✕</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-0.5">
+                        {dayPosts.slice(0, 4).map((post) => (
+                          <DraggablePost key={post.id} post={post} compact onPreview={setPreviewPost} />
+                        ))}
+                        {dayNotes.map((note, idx) => (
+                          <ManualNote key={idx} label={note} onRemove={() => removeNote(dateKey, idx)} />
+                        ))}
+                        {total > 4 && dayNotes.length === 0 && (
+                          <div className="text-xs text-gray-500 px-1">+{total - 4} mais</div>
+                        )}
+                      </div>
+                    )}
+                  </DroppableDay>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        {/* Calendar */}
-        <div className="flex-1 flex flex-col gap-2 min-w-0">
-          <div className="flex items-center justify-end gap-2">
-            <button onClick={prevMonth} className="w-7 h-7 rounded bg-white/5 hover:bg-white/10 text-white text-lg flex items-center justify-center transition-colors">‹</button>
-            <span className="text-white font-semibold text-sm w-36 text-center">{MONTHS[viewMonth]} {viewYear}</span>
-            <button onClick={nextMonth} className="w-7 h-7 rounded bg-white/5 hover:bg-white/10 text-white text-lg flex items-center justify-center transition-colors">›</button>
-          </div>
-
-          <div className="grid grid-cols-7 gap-1">
-            {WEEKDAYS.map((d) => (
-              <div key={d} className="text-center text-xs text-gray-500 font-medium py-0.5">{d}</div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-1 flex-1 overflow-y-auto content-start">
-            {calendarDays.map((dateKey, i) => {
-              if (!dateKey) return <div key={`e-${i}`} />;
-              const dayNum = Number(dateKey.slice(8));
-              const dayPosts = getPostsForDate(dateKey);
-              const dayNotes = notes[dateKey] ?? [];
-              const isToday = dateKey === todayKey;
-              const isPast = dateKey < todayKey;
-              const total = dayPosts.length + dayNotes.length;
-
-              return (
-                <DroppableDay key={dateKey} dateKey={dateKey} isToday={isToday} isPast={isPast}
-                  onAddNote={() => { setAddingNoteDate(dateKey); setNoteInput(""); }}>
-                  <div className={`text-xs font-bold mb-1 px-0.5 ${isToday ? "text-emerald-400" : isPast ? "text-gray-600" : "text-gray-300"}`}>
-                    {dayNum}
-                  </div>
-
-                  {addingNoteDate === dateKey ? (
-                    <div className="space-y-0.5">
-                      <input
-                        autoFocus
-                        value={noteInput}
-                        onChange={(e) => setNoteInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") addNote(dateKey);
-                          if (e.key === "Escape") setAddingNoteDate(null);
-                        }}
-                        placeholder="Ex: Stories promocional"
-                        className="w-full bg-zinc-800 border border-zinc-500 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-zinc-300 placeholder-zinc-500"
-                      />
-                      <div className="flex gap-0.5">
-                        <button onClick={() => addNote(dateKey)} className="flex-1 text-xs py-0.5 bg-zinc-600 hover:bg-zinc-500 text-white rounded transition-colors">✓</button>
-                        <button onClick={() => setAddingNoteDate(null)} className="flex-1 text-xs py-0.5 bg-zinc-800 text-zinc-400 rounded transition-colors">✕</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-0.5">
-                      {dayPosts.slice(0, 4).map((post) => (
-                        <DraggablePost key={post.id} post={post} compact />
-                      ))}
-                      {dayNotes.map((note, idx) => (
-                        <ManualNote key={idx} label={note} onRemove={() => removeNote(dateKey, idx)} />
-                      ))}
-                      {total > 4 && dayNotes.length === 0 && (
-                        <div className="text-xs text-gray-500 px-1">+{total - 4} mais</div>
-                      )}
-                    </div>
-                  )}
-                </DroppableDay>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <DragOverlay>
-        {activePost && (
-          <div style={{ width: 180 }}>
-            <PostCard post={activePost} compact />
-          </div>
-        )}
-      </DragOverlay>
-    </DndContext>
+        <DragOverlay>
+          {activePost && (
+            <div style={{ width: 180 }}>
+              <PostCard post={activePost} compact />
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
+    </>
   );
 }

@@ -30,7 +30,9 @@ export default async function PlannerPage() {
     title: string | null;
     contentType: string;
     fileUrl: string;
+    fileType: string;
     coverUrl: string | null;
+    caption: string | null;
     scheduledDate: string | null;
     clientName: string;
     campaignName: string;
@@ -48,7 +50,9 @@ export default async function PlannerPage() {
         title: item.title,
         contentType: item.contentType,
         fileUrl: item.fileUrl,
+        fileType: item.fileType,
         coverUrl: item.coverUrl,
+        caption: item.caption,
         scheduledDate: item.scheduledDate ? item.scheduledDate.toISOString() : null,
         clientName: campaign.client.name,
         campaignName: campaign.name,
