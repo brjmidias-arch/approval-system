@@ -615,6 +615,24 @@ export default function CampaignPage() {
         </div>
       )}
 
+      {/* Internal review link — shown when OPEN campaign has new items pending internal review */}
+      {campaign.status === "OPEN" && campaign.contentItems.some((i) => i.internalReviewItem?.status === "PENDING") && (
+        <div className="bg-violet-900/20 border border-violet-500/30 rounded-xl px-4 py-3 flex items-center gap-3">
+          <span className="text-violet-300 text-sm shrink-0">🔍 Revisão interna:</span>
+          <input
+            readOnly
+            value={`${typeof window !== "undefined" ? window.location.origin : ""}/revisar/${campaign.internalToken}`}
+            className="flex-1 bg-transparent text-sm text-violet-200/70 focus:outline-none"
+          />
+          <button
+            onClick={() => navigator.clipboard.writeText(`${window.location.origin}/revisar/${campaign.internalToken}`)}
+            className="text-xs px-3 py-1.5 bg-violet-900/40 hover:bg-violet-900/60 text-violet-300 rounded-lg transition-colors shrink-0"
+          >
+            Copiar
+          </button>
+        </div>
+      )}
+
       {/* Folder Upload Modal */}
       {showFolderUpload && (
         <FolderUploadModal
