@@ -152,11 +152,26 @@ function DraggablePost({ post, compact, onPreview }: { post: Post; compact?: boo
   );
 }
 
-function ManualNote({ label, onRemove }: { label: string; onRemove: () => void }) {
+const NOTE_COLORS = [
+  { id: "zinc",   bg: "bg-zinc-700",   border: "border-zinc-500",   text: "text-zinc-100",   dot: "bg-zinc-400"   },
+  { id: "yellow", bg: "bg-yellow-700", border: "border-yellow-500", text: "text-yellow-100", dot: "bg-yellow-400" },
+  { id: "orange", bg: "bg-orange-700", border: "border-orange-500", text: "text-orange-100", dot: "bg-orange-400" },
+  { id: "red",    bg: "bg-red-800",    border: "border-red-600",    text: "text-red-100",    dot: "bg-red-400"    },
+  { id: "green",  bg: "bg-green-800",  border: "border-green-600",  text: "text-green-100",  dot: "bg-green-400"  },
+  { id: "blue",   bg: "bg-blue-800",   border: "border-blue-600",   text: "text-blue-100",   dot: "bg-blue-400"   },
+  { id: "purple", bg: "bg-purple-800", border: "border-purple-600", text: "text-purple-100", dot: "bg-purple-400" },
+];
+
+function getNoteStyle(colorId: string) {
+  return NOTE_COLORS.find((c) => c.id === colorId) ?? NOTE_COLORS[0];
+}
+
+function ManualNote({ label, color, onRemove }: { label: string; color: string; onRemove: () => void }) {
+  const s = getNoteStyle(color);
   return (
-    <div className="rounded border px-1.5 py-0.5 text-xs bg-zinc-700 border-zinc-500 text-zinc-100 flex items-center gap-1 group">
+    <div className={`rounded border px-1.5 py-0.5 text-xs flex items-center gap-1 group ${s.bg} ${s.border} ${s.text}`}>
       <span className="truncate flex-1">{label}</span>
-      <button onClick={onRemove} className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-400 transition-all leading-none shrink-0">×</button>
+      <button onClick={onRemove} className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all leading-none shrink-0">×</button>
     </div>
   );
 }
@@ -201,7 +216,8 @@ function DroppableDay({ dateKey, isToday, isPast, children, onAddNote }: {
   );
 }
 
-interface NoteMap { [dateKey: string]: string[] }
+interface NoteEntry { label: string; color: string }
+interface NoteMap { [dateKey: string]: NoteEntry[] }
 
 export default function PlannerCalendar({ initialPosts, clientId, onDateChange }: {
   initialPosts: Post[];
@@ -214,13 +230,21 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
   const [notes, setNotes] = useState<NoteMap>({});
   const [addingNoteDate, setAddingNoteDate] = useState<string | null>(null);
   const [noteInput, setNoteInput] = useState("");
+  const [noteColor, setNoteColor] = useState("zinc");
 
   const storageKey = `planner_notes_${clientId ?? "default"}`;
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(storageKey);
-      if (saved) setNotes(JSON.parse(saved));
+      if (saved) {
+        const parsed = JSON.parse(saved) as Record<string, (string | NoteEntry)[]>;
+        const normalized: NoteMap = {};
+        for (const [k, v] of Object.entries(parsed)) {
+          normalized[k] = v.map((n) => typeof n === "string" ? { label: n, color: "zinc" } : n);
+        }
+        setNotes(normalized);
+      }
     } catch {}
   }, [storageKey]);
 
@@ -232,9 +256,10 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
   function addNote(dateKey: string) {
     const label = noteInput.trim();
     if (!label) return;
-    const updated = { ...notes, [dateKey]: [...(notes[dateKey] ?? []), label] };
+    const updated = { ...notes, [dateKey]: [...(notes[dateKey] ?? []), { label, color: noteColor }] };
     saveNotes(updated);
     setNoteInput("");
+    setNoteColor("zinc");
     setAddingNoteDate(null);
   }
 
@@ -395,9 +420,18 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
                           placeholder="Ex: Stories promocional"
                           className="w-full bg-zinc-800 border border-zinc-500 rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-zinc-300 placeholder-zinc-500"
                         />
+                        <div className="flex gap-0.5 flex-wrap">
+                          {NOTE_COLORS.map((c) => (
+                            <button
+                              key={c.id}
+                              onClick={() => setNoteColor(c.id)}
+                              className={`w-4 h-4 rounded-full ${c.dot} transition-all ${noteColor === c.id ? "ring-2 ring-white ring-offset-1 ring-offset-zinc-900" : "opacity-60 hover:opacity-100"}`}
+                            />
+                          ))}
+                        </div>
                         <div className="flex gap-0.5">
                           <button onClick={() => addNote(dateKey)} className="flex-1 text-xs py-0.5 bg-zinc-600 hover:bg-zinc-500 text-white rounded transition-colors">✓</button>
-                          <button onClick={() => setAddingNoteDate(null)} className="flex-1 text-xs py-0.5 bg-zinc-800 text-zinc-400 rounded transition-colors">✕</button>
+                          <button onClick={() => { setAddingNoteDate(null); setNoteColor("zinc"); }} className="flex-1 text-xs py-0.5 bg-zinc-800 text-zinc-400 rounded transition-colors">✕</button>
                         </div>
                       </div>
                     ) : (
@@ -406,7 +440,7 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
                           <DraggablePost key={post.id} post={post} compact onPreview={setPreviewPost} />
                         ))}
                         {dayNotes.map((note, idx) => (
-                          <ManualNote key={idx} label={note} onRemove={() => removeNote(dateKey, idx)} />
+                          <ManualNote key={idx} label={note.label} color={note.color} onRemove={() => removeNote(dateKey, idx)} />
                         ))}
                         {total > 4 && dayNotes.length === 0 && (
                           <div className="text-xs text-gray-500 px-1">+{total - 4} mais</div>
