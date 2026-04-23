@@ -166,12 +166,22 @@ function getNoteStyle(colorId: string) {
   return NOTE_COLORS.find((c) => c.id === colorId) ?? NOTE_COLORS[0];
 }
 
-function ManualNote({ label, color, onRemove }: { label: string; color: string; onRemove: () => void }) {
+function ManualNote({ label, color, onRemove }: { label: string; color: string; onRemove: (e?: React.MouseEvent) => void }) {
   const s = getNoteStyle(color);
   return (
     <div className={`rounded border px-1.5 py-0.5 text-xs flex items-center gap-1 group ${s.bg} ${s.border} ${s.text}`}>
       <span className="truncate flex-1">{label}</span>
-      <button onClick={onRemove} className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all leading-none shrink-0">×</button>
+      <button onClick={(e) => { e.stopPropagation(); onRemove(e); }} className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all leading-none shrink-0">×</button>
+    </div>
+  );
+}
+
+function DraggableNote({ noteId, label, color, onRemove }: { noteId: string; label: string; color: string; onRemove: () => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: noteId });
+  return (
+    <div ref={setNodeRef} {...listeners} {...attributes}
+      style={{ opacity: isDragging ? 0.3 : 1, cursor: "grab", touchAction: "none" }}>
+      <ManualNote label={label} color={color} onRemove={(e?: React.MouseEvent) => { e?.stopPropagation(); onRemove(); }} />
     </div>
   );
 }
@@ -227,6 +237,7 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
   const [posts, setPosts] = useState(initialPosts);
   const [activePost, setActivePost] = useState<Post | null>(null);
   const [previewPost, setPreviewPost] = useState<Post | null>(null);
+  const [activeNote, setActiveNote] = useState<NoteEntry | null>(null);
   const [notes, setNotes] = useState<NoteMap>({});
   const [addingNoteDate, setAddingNoteDate] = useState<string | null>(null);
   const [noteInput, setNoteInput] = useState("");
@@ -307,22 +318,47 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   function handleDragStart(e: DragStartEvent) {
-    setActivePost(posts.find((p) => p.id === e.active.id) ?? null);
+    const id = e.active.id as string;
+    if (id.startsWith("note::")) {
+      const [, dateKey, idxStr] = id.split("::");
+      const entry = notes[dateKey]?.[Number(idxStr)];
+      setActiveNote(entry ?? null);
+    } else {
+      setActivePost(posts.find((p) => p.id === id) ?? null);
+    }
   }
 
   async function handleDragEnd(e: DragEndEvent) {
     setActivePost(null);
+    setActiveNote(null);
     const { active, over } = e;
     if (!over) return;
-    const postId = active.id as string;
+    const activeId = active.id as string;
     const overId = over.id as string;
-    const post = posts.find((p) => p.id === postId);
+
+    // --- Note drag ---
+    if (activeId.startsWith("note::")) {
+      const [, srcDate, idxStr] = activeId.split("::");
+      const srcIdx = Number(idxStr);
+      if (overId === "unscheduled" || !/^\d{4}-\d{2}-\d{2}$/.test(overId)) return;
+      if (overId === srcDate) return;
+      const entry = notes[srcDate]?.[srcIdx];
+      if (!entry) return;
+      const srcList = [...(notes[srcDate] ?? [])];
+      srcList.splice(srcIdx, 1);
+      const dstList = [...(notes[overId] ?? []), entry];
+      saveNotes({ ...notes, [srcDate]: srcList, [overId]: dstList });
+      return;
+    }
+
+    // --- Post drag ---
+    const post = posts.find((p) => p.id === activeId);
     if (!post) return;
 
     if (overId === "unscheduled") {
       if (!post.scheduledDate) return;
-      setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, scheduledDate: null } : p));
-      onDateChange?.(postId, null);
+      setPosts((prev) => prev.map((p) => p.id === activeId ? { ...p, scheduledDate: null } : p));
+      onDateChange?.(activeId, null);
       await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -335,8 +371,8 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
     if (post.scheduledDate?.slice(0, 10) === overId) return;
     const [y, m, d] = overId.split("-").map(Number);
     const localDate = new Date(y, m - 1, d, 12, 0, 0);
-    setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, scheduledDate: localDate.toISOString() } : p));
-    onDateChange?.(postId, overId);
+    setPosts((prev) => prev.map((p) => p.id === activeId ? { ...p, scheduledDate: localDate.toISOString() } : p));
+    onDateChange?.(activeId, overId);
     await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -440,7 +476,7 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
                           <DraggablePost key={post.id} post={post} compact onPreview={setPreviewPost} />
                         ))}
                         {dayNotes.map((note, idx) => (
-                          <ManualNote key={idx} label={note.label} color={note.color} onRemove={() => removeNote(dateKey, idx)} />
+                          <DraggableNote key={idx} noteId={`note::${dateKey}::${idx}`} label={note.label} color={note.color} onRemove={() => removeNote(dateKey, idx)} />
                         ))}
                         {total > 4 && dayNotes.length === 0 && (
                           <div className="text-xs text-gray-500 px-1">+{total - 4} mais</div>
@@ -458,6 +494,11 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
           {activePost && (
             <div style={{ width: 180 }}>
               <PostCard post={activePost} compact />
+            </div>
+          )}
+          {activeNote && (
+            <div style={{ width: 140 }}>
+              <ManualNote label={activeNote.label} color={activeNote.color} onRemove={() => {}} />
             </div>
           )}
         </DragOverlay>
