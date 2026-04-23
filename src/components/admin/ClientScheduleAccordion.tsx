@@ -108,7 +108,7 @@ function PostCard({ post, onMarkPosted }: { post: Post; onMarkPosted: (id: strin
             </span>
             {post.scheduledDate && (
               <span className="text-xs text-gray-400 bg-white/5 px-2 py-0.5 rounded">
-                📅 {new Date(post.scheduledDate).toLocaleDateString("pt-BR")}
+                📅 {new Date(post.scheduledDate!).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
               </span>
             )}
             {isPosted ? (

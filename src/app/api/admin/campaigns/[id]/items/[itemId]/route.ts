@@ -15,7 +15,7 @@ export async function PATCH(
       ...(title !== undefined && { title: title || null }),
       ...(caption !== undefined && { caption: caption || null }),
       ...(scheduledDate !== undefined && {
-        scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+        scheduledDate: scheduledDate ? new Date(`${scheduledDate}T12:00:00.000Z`) : null,
       }),
       ...(fileUrl !== undefined && { fileUrl }),
       ...(fileType !== undefined && { fileType }),

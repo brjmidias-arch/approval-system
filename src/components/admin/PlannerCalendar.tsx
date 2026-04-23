@@ -95,7 +95,7 @@ function PostPreviewModal({ post, onClose }: { post: Post; onClose: () => void }
           <p className="text-xs text-gray-500">{post.clientName} · {post.campaignName}</p>
           {post.scheduledDate && (
             <p className="text-xs text-emerald-400">
-              📅 {new Date(post.scheduledDate).toLocaleDateString("pt-BR")}
+              📅 {new Date(post.scheduledDate).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
             </p>
           )}
           {post.caption && (
