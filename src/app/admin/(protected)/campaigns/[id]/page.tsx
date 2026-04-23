@@ -625,10 +625,10 @@ export default function CampaignPage() {
             className="flex-1 bg-transparent text-sm text-violet-200/70 focus:outline-none"
           />
           <button
-            onClick={() => navigator.clipboard.writeText(`${window.location.origin}/revisar/${campaign.internalToken}`)}
+            onClick={copyInternalLink}
             className="text-xs px-3 py-1.5 bg-violet-900/40 hover:bg-violet-900/60 text-violet-300 rounded-lg transition-colors shrink-0"
           >
-            Copiar
+            {copyFeedback ? "Copiado!" : "Copiar"}
           </button>
         </div>
       )}
