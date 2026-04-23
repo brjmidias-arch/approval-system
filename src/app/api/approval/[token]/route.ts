@@ -4,16 +4,35 @@ import { prisma } from "@/lib/prisma";
 export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
   const campaign = await prisma.campaign.findUnique({
     where: { token: params.token },
-    include: {
-      client: true,
+    select: {
+      id: true,
+      name: true,
+      month: true,
+      year: true,
+      status: true,
+      expiresAt: true,
+      client: { select: { name: true } },
       contentItems: {
         orderBy: { order: "asc" },
-        include: { approvalItem: true, internalReviewItem: true },
         where: {
           OR: [
             { internalReviewItem: { is: null } },
             { internalReviewItem: { is: { status: "APPROVED" } } },
           ],
+        },
+        select: {
+          id: true,
+          fileUrl: true,
+          fileType: true,
+          contentType: true,
+          title: true,
+          caption: true,
+          scheduledDate: true,
+          groupId: true,
+          order: true,
+          coverUrl: true,
+          driveUrl: true,
+          approvalItem: { select: { status: true, clientComment: true } },
         },
       },
     },
@@ -40,8 +59,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
   const body = await req.json();
   const { contentItemId, status, clientComment } = body;
 
-  if (!contentItemId || !status) {
-    return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
+  const VALID_STATUSES = ["APPROVED", "ADJUSTMENT", "REJECTED"];
+  if (!contentItemId || !status || !VALID_STATUSES.includes(status)) {
+    return NextResponse.json({ error: "Campos obrigatórios faltando ou inválidos" }, { status: 400 });
   }
 
   const approvalItem = await prisma.approvalItem.upsert({
@@ -49,6 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     update: {
       status,
       clientComment: clientComment || null,
+      clientCommentResolved: false,
       reviewedAt: new Date(),
     },
     create: {
@@ -56,6 +77,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
       campaignId: campaign.id,
       status,
       clientComment: clientComment || null,
+      clientCommentResolved: false,
       reviewedAt: new Date(),
     },
   });

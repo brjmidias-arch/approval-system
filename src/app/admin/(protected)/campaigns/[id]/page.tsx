@@ -13,12 +13,14 @@ interface ApprovalItem {
   id: string;
   status: ApprovalStatus;
   clientComment: string | null;
+  clientCommentResolved: boolean;
   reviewedAt: string | null;
 }
 
 interface InternalReviewItem {
   status: string;
   comment: string | null;
+  commentResolved: boolean;
 }
 
 interface ContentItem {
@@ -795,15 +797,17 @@ export default function CampaignPage() {
                         </a>
                       )}
                       {item.internalReviewItem?.comment && (
-                        <div className="mt-1.5 text-xs text-violet-300 bg-violet-900/20 border border-violet-500/20 rounded-lg px-2.5 py-1.5">
-                          <span className="text-violet-400/70">Revisão interna: </span>
-                          {item.internalReviewItem.comment}
+                        <div className={`mt-1.5 text-xs rounded-lg px-2.5 py-1.5 ${item.internalReviewItem.commentResolved ? "text-violet-400/50 bg-violet-900/10 border border-violet-500/10" : "text-violet-300 bg-violet-900/20 border border-violet-500/20"}`}>
+                          <span className="opacity-70">Revisão interna: </span>
+                          <span className={item.internalReviewItem.commentResolved ? "line-through opacity-60" : ""}>{item.internalReviewItem.comment}</span>
+                          {item.internalReviewItem.commentResolved && <span className="ml-1.5">✅</span>}
                         </div>
                       )}
                       {item.approvalItem?.clientComment && (
-                        <div className="mt-1.5 text-xs text-gray-400 bg-white/5 rounded-lg px-2.5 py-1.5">
-                          <span className="text-gray-500">Comentário do cliente: </span>
-                          {item.approvalItem.clientComment}
+                        <div className={`mt-1.5 text-xs rounded-lg px-2.5 py-1.5 ${item.approvalItem.clientCommentResolved ? "text-gray-500 bg-white/[0.03]" : "text-gray-400 bg-white/5"}`}>
+                          <span className="opacity-70">Comentário do cliente: </span>
+                          <span className={item.approvalItem.clientCommentResolved ? "line-through opacity-60" : ""}>{item.approvalItem.clientComment}</span>
+                          {item.approvalItem.clientCommentResolved && <span className="ml-1.5">✅</span>}
                         </div>
                       )}
                     </div>
@@ -904,9 +908,10 @@ export default function CampaignPage() {
                     </button>
                   </div>
                   {firstItem.internalReviewItem?.comment && (
-                    <div className="mb-2 text-xs text-violet-300 bg-violet-900/20 border border-violet-500/20 rounded-lg px-2.5 py-1.5">
-                      <span className="text-violet-400/70">Revisão interna: </span>
-                      {firstItem.internalReviewItem.comment}
+                    <div className={`mb-2 text-xs rounded-lg px-2.5 py-1.5 ${firstItem.internalReviewItem.commentResolved ? "text-violet-400/50 bg-violet-900/10 border border-violet-500/10" : "text-violet-300 bg-violet-900/20 border border-violet-500/20"}`}>
+                      <span className="opacity-70">Revisão interna: </span>
+                      <span className={firstItem.internalReviewItem.commentResolved ? "line-through opacity-60" : ""}>{firstItem.internalReviewItem.comment}</span>
+                      {firstItem.internalReviewItem.commentResolved && <span className="ml-1.5">✅</span>}
                     </div>
                   )}
                   <CarouselCard
@@ -917,6 +922,7 @@ export default function CampaignPage() {
                     scheduledDate={firstItem.scheduledDate}
                     driveUrl={firstItem.driveUrl}
                     clientComment={slides[0].approvalItem?.clientComment || null}
+                    clientCommentResolved={slides[0].approvalItem?.clientCommentResolved ?? false}
                     onDelete={handleDeleteItem}
                     onEdit={() => openEditGroup(slides)}
                     onReorder={() => {}}

@@ -36,6 +36,7 @@ interface Props {
   scheduledDate: string | null;
   driveUrl: string | null;
   clientComment: string | null;
+  clientCommentResolved: boolean;
   onDelete: (id: string) => void;
   onEdit: () => void;
   onReorder: (slides: SlideItem[]) => void;
@@ -241,6 +242,7 @@ export default function CarouselCard({
   scheduledDate,
   driveUrl,
   clientComment,
+  clientCommentResolved,
   onDelete,
   onEdit,
   onReorder,
@@ -354,9 +356,10 @@ export default function CarouselCard({
         </a>
       )}
       {clientComment && (
-        <div className="mt-2 text-xs text-amber-400 bg-amber-900/20 rounded-lg px-2.5 py-1.5">
-          <span className="text-amber-500/70">Comentário do cliente: </span>
-          {clientComment}
+        <div className={`mt-2 text-xs rounded-lg px-2.5 py-1.5 ${clientCommentResolved ? "text-amber-400/50 bg-amber-900/10" : "text-amber-400 bg-amber-900/20"}`}>
+          <span className="opacity-70">Comentário do cliente: </span>
+          <span className={clientCommentResolved ? "line-through opacity-60" : ""}>{clientComment}</span>
+          {clientCommentResolved && <span className="ml-1.5">✅</span>}
         </div>
       )}
       <div className="flex gap-2 mt-3">

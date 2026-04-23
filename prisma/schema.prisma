@@ -65,25 +65,27 @@ model ContentItem {
 }
 
 model InternalReviewItem {
-  id            String      @id @default(cuid())
-  contentItemId String      @unique
-  contentItem   ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
-  campaignId    String
-  campaign      Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  status        String      @default("PENDING")
-  comment       String?
-  reviewedAt    DateTime?
-  createdAt     DateTime    @default(now())
+  id              String      @id @default(cuid())
+  contentItemId   String      @unique
+  contentItem     ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  campaignId      String
+  campaign        Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  status          String      @default("PENDING")
+  comment         String?
+  commentResolved Boolean     @default(false)
+  reviewedAt      DateTime?
+  createdAt       DateTime    @default(now())
 }
 
 model ApprovalItem {
-  id            String      @id @default(cuid())
-  contentItemId String      @unique
-  contentItem   ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
-  campaignId    String
-  campaign      Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  status        String      @default("PENDING")
-  clientComment String?
-  reviewedAt    DateTime?
-  createdAt     DateTime    @default(now())
+  id                    String      @id @default(cuid())
+  contentItemId         String      @unique
+  contentItem           ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  campaignId            String
+  campaign              Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  status                String      @default("PENDING")
+  clientComment         String?
+  clientCommentResolved Boolean     @default(false)
+  reviewedAt            DateTime?
+  createdAt             DateTime    @default(now())
 }

@@ -29,14 +29,14 @@ export async function PATCH(
   if (resetApproval) {
     await prisma.approvalItem.updateMany({
       where: { contentItemId: params.itemId },
-      data: { status: "PENDING", clientComment: null, reviewedAt: null },
+      data: { status: "PENDING", clientCommentResolved: true, reviewedAt: null },
     });
   }
 
   if (resetInternalReview) {
     await prisma.internalReviewItem.updateMany({
       where: { contentItemId: params.itemId },
-      data: { status: "PENDING", comment: null, reviewedAt: null },
+      data: { status: "PENDING", commentResolved: true, reviewedAt: null },
     });
   }
 

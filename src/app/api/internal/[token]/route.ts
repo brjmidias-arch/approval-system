@@ -4,11 +4,32 @@ import { prisma } from "@/lib/prisma";
 export async function GET(_req: NextRequest, { params }: { params: { token: string } }) {
   const campaign = await prisma.campaign.findUnique({
     where: { internalToken: params.token },
-    include: {
-      client: true,
+    select: {
+      id: true,
+      name: true,
+      month: true,
+      year: true,
+      status: true,
+      expiresAt: true,
+      internalToken: true,
+      client: { select: { name: true } },
       contentItems: {
         orderBy: { order: "asc" },
-        include: { internalReviewItem: true },
+        select: {
+          id: true,
+          fileUrl: true,
+          fileType: true,
+          contentType: true,
+          title: true,
+          caption: true,
+          scheduledDate: true,
+          groupId: true,
+          order: true,
+          coverUrl: true,
+          coverDriveUrl: true,
+          driveUrl: true,
+          internalReviewItem: { select: { status: true, comment: true } },
+        },
       },
     },
   });
@@ -30,8 +51,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
   const body = await req.json();
   const { contentItemId, status, comment } = body;
 
-  if (!contentItemId || !status) {
-    return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
+  const VALID_STATUSES = ["APPROVED", "ADJUSTMENT", "REJECTED"];
+  if (!contentItemId || !status || !VALID_STATUSES.includes(status)) {
+    return NextResponse.json({ error: "Campos obrigatórios faltando ou inválidos" }, { status: 400 });
   }
 
   const item = await prisma.internalReviewItem.upsert({
@@ -39,6 +61,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     update: {
       status,
       comment: comment || null,
+      commentResolved: false,
       reviewedAt: new Date(),
     },
     create: {
@@ -46,6 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
       campaignId: campaign.id,
       status,
       comment: comment || null,
+      commentResolved: false,
       reviewedAt: new Date(),
     },
   });
