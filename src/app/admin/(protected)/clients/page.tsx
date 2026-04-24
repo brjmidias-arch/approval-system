@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import PlannerCalendar from "@/components/admin/PlannerCalendar";
 
 interface Client {
   id: string;
@@ -12,6 +13,20 @@ interface Client {
   campaigns: { id: string; name: string; status: string }[];
 }
 
+interface PlannerPost {
+  id: string;
+  title: string | null;
+  contentType: string;
+  fileUrl: string;
+  fileType: string;
+  coverUrl: string | null;
+  caption: string | null;
+  scheduledDate: string | null;
+  clientName: string;
+  campaignName: string;
+  campaignId: string;
+}
+
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,6 +34,11 @@ export default function ClientsPage() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [form, setForm] = useState({ name: "", email: "", whatsapp: "" });
   const [saving, setSaving] = useState(false);
+
+  // Planner state
+  const [plannerClient, setPlannerClient] = useState<Client | null>(null);
+  const [plannerPosts, setPlannerPosts] = useState<PlannerPost[]>([]);
+  const [plannerLoading, setPlannerLoading] = useState(false);
 
   const fetchClients = useCallback(async () => {
     const res = await fetch("/api/admin/clients");
@@ -30,6 +50,34 @@ export default function ClientsPage() {
   useEffect(() => {
     fetchClients();
   }, [fetchClients]);
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPlannerClient(null);
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
+
+  async function openPlanner(client: Client) {
+    setPlannerClient(client);
+    setPlannerLoading(true);
+    setPlannerPosts([]);
+    const res = await fetch(`/api/admin/clients/${client.id}/planner-posts`);
+    const data = await res.json();
+    setPlannerPosts(data);
+    setPlannerLoading(false);
+  }
+
+  function handleDateChange(postId: string, dateKey: string | null) {
+    setPlannerPosts((prev) =>
+      prev.map((p) => {
+        if (p.id !== postId) return p;
+        if (!dateKey) return { ...p, scheduledDate: null };
+        return { ...p, scheduledDate: `${dateKey}T12:00:00.000Z` };
+      })
+    );
+  }
 
   function openNew() {
     setEditingClient(null);
@@ -46,7 +94,6 @@ export default function ClientsPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-
     if (editingClient) {
       await fetch(`/api/admin/clients/${editingClient.id}`, {
         method: "PUT",
@@ -60,7 +107,6 @@ export default function ClientsPage() {
         body: JSON.stringify(form),
       });
     }
-
     setSaving(false);
     setShowForm(false);
     fetchClients();
@@ -83,6 +129,47 @@ export default function ClientsPage() {
           + Novo Cliente
         </button>
       </div>
+
+      {/* Planner Modal */}
+      {plannerClient && (
+        <div className="fixed inset-0 z-50 bg-black/85 flex flex-col">
+          <div className="flex items-center justify-between px-6 py-3 bg-[#111] border-b border-white/10 shrink-0">
+            <div>
+              <h2 className="text-white font-semibold">Planner — {plannerClient.name}</h2>
+              <p className="text-gray-500 text-xs mt-0.5">
+                Posts aprovados · mês atual em diante · arraste para definir ou mover datas
+              </p>
+            </div>
+            <button
+              onClick={() => setPlannerClient(null)}
+              className="text-gray-400 hover:text-white text-2xl leading-none transition-colors"
+            >
+              ×
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden p-4">
+            {plannerLoading ? (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                Carregando posts...
+              </div>
+            ) : plannerPosts.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <p className="text-2xl mb-3">📅</p>
+                  <p className="text-gray-400">Nenhum post aprovado para agendar.</p>
+                  <p className="text-gray-600 text-sm mt-1">Posts aparecem aqui quando o cliente aprovar.</p>
+                </div>
+              </div>
+            ) : (
+              <PlannerCalendar
+                initialPosts={plannerPosts}
+                clientId={plannerClient.id}
+                onDateChange={handleDateChange}
+              />
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Form Modal */}
       {showForm && (
@@ -175,11 +262,17 @@ export default function ClientsPage() {
                       {client.name}
                     </Link>
                   </td>
-                  <td className="px-5 py-3.5 text-sm text-gray-400">{client.email}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-400">{client.email || "—"}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-400">{client.whatsapp || "—"}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-400">{client.campaigns.length}</td>
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center gap-3 justify-end">
+                      <button
+                        onClick={() => openPlanner(client)}
+                        className="text-violet-400 hover:text-violet-300 text-sm transition-colors font-medium"
+                      >
+                        📅 Planner
+                      </button>
                       <Link
                         href={`/admin/clients/${client.id}`}
                         className="text-gray-400 hover:text-white text-sm transition-colors"
