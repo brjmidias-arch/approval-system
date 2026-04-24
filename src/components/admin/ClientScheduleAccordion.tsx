@@ -47,6 +47,7 @@ interface ClientGroup {
   clientName: string;
   campaigns: CampaignGroup[];
   totalPosts: number;
+  scheduledPosts: number;
   postedPosts: number;
   pendingPosts: number;
   maxDaysWaiting: number;
@@ -319,7 +320,8 @@ export default function ClientScheduleAccordion({ clients: initialClients }: { c
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <p className="text-gray-500 text-xs">
                       {client.totalPosts} {client.totalPosts === 1 ? "post aprovado" : "posts aprovados"}
-                      {client.postedPosts > 0 && ` · ${client.postedPosts} agendados`}
+                      {client.scheduledPosts > 0 && ` · ${client.scheduledPosts} no planner`}
+                      {client.postedPosts > 0 && ` · ${client.postedPosts} publicados`}
                     </p>
                     {pendingCount > 0 && days > 0 && (
                       <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${

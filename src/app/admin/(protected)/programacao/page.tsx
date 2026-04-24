@@ -115,8 +115,10 @@ export default async function ProgramacaoPage({ searchParams }: { searchParams: 
 
   const clients = Array.from(clientMap.values()).map((c) => {
     const allPosts = c.campaigns.flatMap((camp) => camp.posts);
-    const pendingPosts = allPosts.filter((p) => !p.postedAt);
+    // "pending" = approved but not yet scheduled in planner (and not posted)
+    const pendingPosts = allPosts.filter((p) => !p.scheduledDate && !p.postedAt);
     const totalPosts = allPosts.length;
+    const scheduledPosts = allPosts.filter((p) => p.scheduledDate && !p.postedAt).length;
     const postedPosts = allPosts.filter((p) => p.postedAt).length;
 
     // Max days waiting: oldest unscheduled approved post
@@ -129,6 +131,7 @@ export default async function ProgramacaoPage({ searchParams }: { searchParams: 
     return {
       ...c,
       totalPosts,
+      scheduledPosts,
       postedPosts,
       pendingPosts: pendingPosts.length,
       maxDaysWaiting,
