@@ -113,6 +113,24 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
   const publishedCampaigns = sortedCampaigns.filter(({ campaign }) => campaign.status === "PUBLISHED");
   const displayCampaigns = tab === "concluidas" ? publishedCampaigns : activeCampaigns;
 
+  // Campaigns where ALL posts are approved AND some have no scheduled date
+  const plannerPendingCampaigns = allCampaigns.filter(({ campaign }) => {
+    const counts = getStatusCounts(campaign);
+    if (!(counts.total > 0 && counts.approved === counts.total)) return false;
+    return campaign.contentItems.some((item) => !item.scheduledDate && !item.postedAt);
+  });
+  const plannerPostCount = plannerPendingCampaigns.reduce((sum, { campaign }) => {
+    const seen = new Set<string>();
+    return sum + campaign.contentItems.filter((item) => {
+      if (item.postedAt || item.scheduledDate) return false;
+      if (item.contentType === "CARROSSEL" && item.groupId) {
+        if (seen.has(item.groupId)) return false;
+        seen.add(item.groupId);
+      }
+      return true;
+    }).length;
+  }, 0);
+
   return (
     <div className="space-y-6">
       <AutoRefresh intervalMs={60000} />
@@ -149,6 +167,28 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           <p className={`text-3xl font-bold mt-1 ${awaitingAction > 0 ? "text-amber-400" : "text-white"}`}>{awaitingAction}</p>
         </div>
       </div>
+
+      {/* Tasks */}
+      {plannerPendingCampaigns.length > 0 && (
+        <div className="bg-sky-900/20 border border-sky-500/30 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-sky-400 text-xl shrink-0">📅</span>
+            <div className="min-w-0">
+              <p className="text-sky-300 text-sm font-semibold">Preencher Planner</p>
+              <p className="text-sky-400/70 text-xs mt-0.5">
+                {plannerPostCount} {plannerPostCount === 1 ? "post aprovado" : "posts aprovados"} sem data de publicação
+                {" "}em {plannerPendingCampaigns.length} {plannerPendingCampaigns.length === 1 ? "campanha" : "campanhas"}
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/admin/programacao"
+            className="shrink-0 text-xs px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-medium rounded-lg transition-colors whitespace-nowrap"
+          >
+            Ir para Programação →
+          </Link>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-white/5 rounded-lg p-1 w-fit">
