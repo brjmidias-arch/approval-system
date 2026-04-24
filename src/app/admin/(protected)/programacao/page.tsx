@@ -169,7 +169,7 @@ export default async function ProgramacaoPage({ searchParams }: { searchParams: 
         </Link>
       </div>
 
-      <ClientScheduleAccordion clients={displayClients} />
+      <ClientScheduleAccordion key={tab} clients={displayClients} />
     </div>
   );
 }
