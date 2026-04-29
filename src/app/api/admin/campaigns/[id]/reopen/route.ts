@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import nodemailer from "nodemailer";
 
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
 
   const campaign = await prisma.campaign.findUnique({
@@ -44,8 +48,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         subject: `[BRJ Mídias] Conteúdo atualizado — ${campaign.name}`,
         html: `
           <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
-            <h2>Olá, ${campaign.client.name}!</h2>
-            <p>Fizemos os ajustes solicitados em <strong>${campaign.name}</strong> e o conteúdo está pronto para uma nova revisão.</p>
+            <h2>Olá, ${escapeHtml(campaign.client.name)}!</h2>
+            <p>Fizemos os ajustes solicitados em <strong>${escapeHtml(campaign.name)}</strong> e o conteúdo está pronto para uma nova revisão.</p>
             <p>Clique no botão abaixo para revisar e aprovar:</p>
             <a href="${approvalUrl}" style="display:inline-block;background:#10b981;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;">
               Revisar Conteúdo

@@ -64,6 +64,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     return NextResponse.json({ error: "Campos obrigatórios faltando ou inválidos" }, { status: 400 });
   }
 
+  // IDOR guard: ensure the item belongs to this campaign
+  const contentItem = await prisma.contentItem.findFirst({
+    where: { id: contentItemId, campaignId: campaign.id },
+  });
+  if (!contentItem) {
+    return NextResponse.json({ error: "Item não encontrado" }, { status: 404 });
+  }
+
   const approvalItem = await prisma.approvalItem.upsert({
     where: { contentItemId },
     update: {

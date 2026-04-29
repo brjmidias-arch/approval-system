@@ -99,16 +99,23 @@ export default function ApprovalPage() {
 
   async function saveGroupReview(groupKey: string, review: LocalReview, groupItems: ContentItem[]) {
     setSavingGroup(groupKey);
-    for (const item of groupItems) {
-      await fetch(`/api/approval/${token}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contentItemId: item.id,
-          status: review.status,
-          clientComment: review.comment || null,
-        }),
-      });
+    try {
+      for (const item of groupItems) {
+        const res = await fetch(`/api/approval/${token}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contentItemId: item.id,
+            status: review.status,
+            clientComment: review.comment || null,
+          }),
+        });
+        if (!res.ok) throw new Error("Erro ao salvar avaliação. Tente novamente.");
+      }
+    } catch (err) {
+      setSavingGroup(null);
+      alert(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
+      throw err;
     }
     setSavingGroup(null);
   }

@@ -1,5 +1,15 @@
 import nodemailer from "nodemailer";
 
+function escapeHtml(str: string | null | undefined): string {
+  if (!str) return "—";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT) || 587,
@@ -36,10 +46,10 @@ export async function sendApprovalNotification(summary: ApprovalSummary) {
     .map(
       (item) => `
       <tr>
-        <td style="padding:8px;border:1px solid #ddd;">${item.contentType.replace("_", " ")}</td>
-        <td style="padding:8px;border:1px solid #ddd;">${item.caption || "—"}</td>
-        <td style="padding:8px;border:1px solid #ddd;">${statusLabel[item.status] || item.status}</td>
-        <td style="padding:8px;border:1px solid #ddd;">${item.clientComment || "—"}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${escapeHtml(item.contentType.replace("_", " "))}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${escapeHtml(item.caption)}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${statusLabel[item.status] || escapeHtml(item.status)}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${escapeHtml(item.clientComment)}</td>
       </tr>`
     )
     .join("");
@@ -47,8 +57,8 @@ export async function sendApprovalNotification(summary: ApprovalSummary) {
   const html = `
     <div style="font-family:sans-serif;max-width:700px;margin:0 auto;">
       <h2 style="color:#0f0f0f;">📋 Revisão de Conteúdo Finalizada</h2>
-      <p><strong>Cliente:</strong> ${summary.clientName}</p>
-      <p><strong>Campanha:</strong> ${summary.campaignName}</p>
+      <p><strong>Cliente:</strong> ${escapeHtml(summary.clientName)}</p>
+      <p><strong>Campanha:</strong> ${escapeHtml(summary.campaignName)}</p>
       <hr/>
       <h3>Resumo</h3>
       <ul>
