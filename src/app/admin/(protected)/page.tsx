@@ -117,15 +117,26 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
   const plannerPendingCampaigns = allCampaigns.filter(({ campaign }) => {
     const counts = getStatusCounts(campaign);
     if (!(counts.total > 0 && counts.approved === counts.total)) return false;
-    return campaign.contentItems.some((item) => !item.scheduledDate && !item.postedAt);
+    const seenGroups = new Set<string>();
+    return campaign.contentItems.some((item) => {
+      if (item.postedAt) return false;
+      if (item.contentType === "CARROSSEL" && item.groupId) {
+        if (seenGroups.has(item.groupId)) return false;
+        seenGroups.add(item.groupId);
+      }
+      return !item.scheduledDate;
+    });
   });
   const plannerPostCount = plannerPendingCampaigns.reduce((sum, { campaign }) => {
     const seen = new Set<string>();
     return sum + campaign.contentItems.filter((item) => {
-      if (item.postedAt || item.scheduledDate) return false;
+      if (item.postedAt) return false;
       if (item.contentType === "CARROSSEL" && item.groupId) {
         if (seen.has(item.groupId)) return false;
         seen.add(item.groupId);
+        if (item.scheduledDate) return false;
+      } else {
+        if (item.scheduledDate) return false;
       }
       return true;
     }).length;
@@ -251,14 +262,16 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                 rowBg = "bg-blue-900/10";
               }
 
-              // Unscheduled approved posts
+              // Unscheduled approved posts (deduplicate carousels before scheduledDate check)
               const seenGroupIdsUnsched = new Set<string>();
               const unscheduledApproved = (campaign.contentItems ?? []).filter((item) => {
                 if (item.postedAt) return false;
-                if (item.scheduledDate) return false;
                 if (item.contentType === "CARROSSEL" && item.groupId) {
                   if (seenGroupIdsUnsched.has(item.groupId)) return false;
                   seenGroupIdsUnsched.add(item.groupId);
+                  if (item.scheduledDate) return false;
+                } else {
+                  if (item.scheduledDate) return false;
                 }
                 const approval = campaign.approvalItems.find((a) => a.contentItemId === item.id);
                 return approval?.status === "APPROVED";

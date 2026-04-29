@@ -11,6 +11,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
       year: true,
       status: true,
       expiresAt: true,
+      token: true,
       internalToken: true,
       client: { select: { name: true } },
       contentItems: {

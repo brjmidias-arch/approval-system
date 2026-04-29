@@ -26,6 +26,14 @@ export async function PATCH(
     },
   });
 
+  // Propagate scheduledDate to all slides in the same carousel group
+  if (scheduledDate !== undefined && item.groupId && item.contentType === "CARROSSEL") {
+    await prisma.contentItem.updateMany({
+      where: { campaignId: params.id, groupId: item.groupId, id: { not: params.itemId } },
+      data: { scheduledDate: scheduledDate ? new Date(`${scheduledDate}T12:00:00.000Z`) : null },
+    });
+  }
+
   if (resetApproval) {
     await prisma.approvalItem.updateMany({
       where: { contentItemId: params.itemId },
