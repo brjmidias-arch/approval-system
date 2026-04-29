@@ -381,6 +381,21 @@ export default function ApprovalPage() {
                         <div className="absolute inset-0 flex items-end justify-end p-3 pointer-events-none">
                           <span className="text-white/30 text-xs font-medium tracking-wider select-none">PRÉVIA · BRJ Mídias</span>
                         </div>
+                        {currentItem.contentType === "REELS" && currentItem.driveUrl && (
+                          <a
+                            href={currentItem.driveUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="absolute inset-0 flex items-center justify-center bg-black/40 hover:bg-black/50 transition-colors"
+                          >
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-16 h-16 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center backdrop-blur-sm transition-colors">
+                                <span className="text-white text-3xl ml-1">▶</span>
+                              </div>
+                              <span className="text-white/80 text-sm font-medium">Assistir vídeo no Drive</span>
+                            </div>
+                          </a>
+                        )}
                       </div>
                     )}
                     {currentItem.fileType === "VIDEO" && (
