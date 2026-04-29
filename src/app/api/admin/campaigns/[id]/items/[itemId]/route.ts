@@ -75,7 +75,7 @@ export async function PATCH(
         }
         return true;
       });
-      const approvedPosts = uniquePosts.filter((ci) => ci.approvalItem?.status === "APPROVED");
+      const approvedPosts = uniquePosts.filter((ci) => ci.approvalItem?.status === "APPROVED" && ci.contentType !== "TEXTO");
       if (approvedPosts.length > 0 && approvedPosts.every((ci) => ci.scheduledDate)) {
         const campaign = await prisma.campaign.findUnique({ where: { id: params.id }, select: { status: true } });
         if (campaign?.status === "CLOSED") {

@@ -120,6 +120,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     const seenGroups = new Set<string>();
     return campaign.contentItems.some((item) => {
       if (item.postedAt) return false;
+      if (item.contentType === "TEXTO") return false;
       if (item.contentType === "CARROSSEL" && item.groupId) {
         if (seenGroups.has(item.groupId)) return false;
         seenGroups.add(item.groupId);
@@ -266,6 +267,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
               const seenGroupIdsUnsched = new Set<string>();
               const unscheduledApproved = (campaign.contentItems ?? []).filter((item) => {
                 if (item.postedAt) return false;
+                if (item.contentType === "TEXTO") return false;
                 if (item.contentType === "CARROSSEL" && item.groupId) {
                   if (seenGroupIdsUnsched.has(item.groupId)) return false;
                   seenGroupIdsUnsched.add(item.groupId);
@@ -347,6 +349,11 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                     {pendingInternalCount > 0 && (
                       <span className="flex items-center gap-1 text-xs font-semibold text-violet-400 bg-violet-900/30 border border-violet-500/30 px-2.5 py-1 rounded-full animate-pulse">
                         🔍 {pendingInternalCount} revisão interna
+                      </span>
+                    )}
+                    {campaign.contentItems.some((i) => i.contentType === "TEXTO") && (
+                      <span className="flex items-center gap-1 text-xs font-medium text-blue-400 bg-blue-900/20 border border-blue-500/20 px-2.5 py-1 rounded-full">
+                        📝 Texto
                       </span>
                     )}
                     {unscheduledCount > 0 && (

@@ -18,6 +18,7 @@ export async function GET(
         contentItems: {
           where: {
             approvalItem: { status: "APPROVED" },
+            contentType: { not: "TEXTO" },
             OR: [
               { scheduledDate: null },
               { scheduledDate: { gte: startOfMonth } },

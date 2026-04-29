@@ -40,6 +40,7 @@ export default async function ProgramacaoPage({ searchParams }: { searchParams: 
 
     for (const item of campaign.contentItems) {
       if (item.approvalItem?.status !== "APPROVED") continue;
+      if (item.contentType === "TEXTO") continue;
 
       const base = {
         approvedAt: item.approvalItem.reviewedAt,

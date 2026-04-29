@@ -1,5 +1,5 @@
-export type FileType = "IMAGE" | "VIDEO" | "PDF";
-export type ContentType = "POST_FEED" | "CARROSSEL" | "REELS" | "STORIES";
+export type FileType = "IMAGE" | "VIDEO" | "PDF" | "DOCUMENT";
+export type ContentType = "POST_FEED" | "CARROSSEL" | "REELS" | "STORIES" | "TEXTO";
 export type ApprovalStatus = "PENDING" | "APPROVED" | "ADJUSTMENT" | "REJECTED";
 export type CampaignStatus = "OPEN" | "CLOSED";
 
@@ -8,6 +8,7 @@ export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
   CARROSSEL: "Carrossel",
   REELS: "Reels",
   STORIES: "Stories",
+  TEXTO: "Texto",
 };
 
 export const APPROVAL_STATUS_LABELS: Record<ApprovalStatus, string> = {

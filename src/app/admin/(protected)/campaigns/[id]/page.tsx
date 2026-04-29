@@ -66,6 +66,10 @@ export default function CampaignPage() {
   const [nameValue, setNameValue] = useState("");
 
   const [showFolderUpload, setShowFolderUpload] = useState(false);
+  const [showTextModal, setShowTextModal] = useState(false);
+  const [textModalId, setTextModalId] = useState<string | null>(null);
+  const [textForm, setTextForm] = useState({ title: "", docUrl: "", caption: "" });
+  const [savingText, setSavingText] = useState(false);
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
@@ -289,6 +293,45 @@ export default function CampaignPage() {
     }
   }
 
+  function openTextModal(item?: ContentItem) {
+    if (item) {
+      setTextModalId(item.id);
+      setTextForm({ title: item.title || "", docUrl: item.fileUrl, caption: item.caption || "" });
+    } else {
+      setTextModalId(null);
+      setTextForm({ title: "", docUrl: "", caption: "" });
+    }
+    setShowTextModal(true);
+  }
+
+  async function handleTextSave() {
+    if (!textForm.docUrl.trim()) { alert("Informe o link do documento."); return; }
+    setSavingText(true);
+    try {
+      if (textModalId) {
+        const res = await fetch(`/api/admin/campaigns/${id}/items/${textModalId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: textForm.title || null, caption: textForm.caption || null, fileUrl: textForm.docUrl }),
+        });
+        if (!res.ok) throw new Error();
+      } else {
+        const res = await fetch(`/api/admin/campaigns/${id}/items`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileUrl: textForm.docUrl, fileType: "DOCUMENT", contentType: "TEXTO", title: textForm.title || null, caption: textForm.caption || null, order: campaign!.contentItems.length }),
+        });
+        if (!res.ok) throw new Error();
+      }
+      setShowTextModal(false);
+      fetchCampaign();
+    } catch {
+      alert("Erro ao salvar. Tente novamente.");
+    } finally {
+      setSavingText(false);
+    }
+  }
+
   async function handleResetApprovals() {
     if (!confirm("Isso vai apagar todas as aprovações, ajustes e reprovações do cliente, resetando tudo para Pendente. A campanha será reaberta. Continuar?")) return;
     try {
@@ -485,6 +528,9 @@ export default function CampaignPage() {
                 <button onClick={() => setShowFolderUpload(true)} className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
                   + Adicionar conteúdo
                 </button>
+                <button onClick={() => openTextModal()} className="text-sm px-3 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg transition-colors">
+                  + Adicionar Texto
+                </button>
                 <button onClick={handleSendInternal} className="text-sm px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-colors">
                   Enviar para Revisão Interna
                 </button>
@@ -496,6 +542,9 @@ export default function CampaignPage() {
               <>
                 <button onClick={() => setShowFolderUpload(true)} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
                   + Adicionar conteúdo
+                </button>
+                <button onClick={() => openTextModal()} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-blue-400 rounded-lg transition-colors">
+                  + Adicionar Texto
                 </button>
                 <button onClick={copyInternalLink} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
                   {copyFeedback ? "Copiado!" : "Copiar Link Interno"}
@@ -524,6 +573,9 @@ export default function CampaignPage() {
                 </button>
                 <button onClick={() => setShowFolderUpload(true)} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
                   + Adicionar conteúdo
+                </button>
+                <button onClick={() => openTextModal()} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-blue-400 rounded-lg transition-colors">
+                  + Adicionar Texto
                 </button>
                 <button onClick={handleResetApprovals} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg transition-colors">
                   Resetar Aprovações
@@ -715,6 +767,62 @@ export default function CampaignPage() {
       )}
 
 
+      {/* Text Content Modal */}
+      {showTextModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 w-full max-w-md">
+            <h2 className="text-white font-medium mb-4">{textModalId ? "Editar Texto" : "Adicionar Conteúdo em Texto"}</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Título</label>
+                <input
+                  type="text"
+                  value={textForm.title}
+                  onChange={(e) => setTextForm({ ...textForm, title: e.target.value })}
+                  placeholder="Ex: Roteiro da semana 1"
+                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Link do documento <span className="text-red-400">*</span></label>
+                <input
+                  type="url"
+                  value={textForm.docUrl}
+                  onChange={(e) => setTextForm({ ...textForm, docUrl: e.target.value })}
+                  placeholder="https://docs.google.com/... ou https://notion.so/..."
+                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 placeholder-gray-600"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Observações <span className="text-gray-600">(opcional)</span></label>
+                <textarea
+                  value={textForm.caption}
+                  onChange={(e) => setTextForm({ ...textForm, caption: e.target.value })}
+                  rows={3}
+                  placeholder="Instruções ou contexto para o cliente..."
+                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 resize-none placeholder-gray-600"
+                />
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setShowTextModal(false)}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 py-2.5 rounded-lg text-sm transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleTextSave}
+                  disabled={savingText}
+                  className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm transition-colors font-medium"
+                >
+                  {savingText ? "Salvando..." : "Salvar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Lightbox */}
       {lightboxUrl && (
         <div
@@ -861,6 +969,8 @@ export default function CampaignPage() {
                         />
                       ) : item.fileType === "VIDEO" ? (
                         <span className="text-2xl">🎬</span>
+                      ) : item.fileType === "DOCUMENT" ? (
+                        <span className="text-2xl">📝</span>
                       ) : (
                         <span className="text-2xl">📄</span>
                       )}
@@ -880,7 +990,12 @@ export default function CampaignPage() {
                         )}
                       </div>
                       {item.caption && <p className="text-sm text-gray-300 line-clamp-2">{item.caption}</p>}
-                      {item.driveUrl && (
+                      {item.fileType === "DOCUMENT" && (
+                        <a href={item.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                          📝 Abrir documento
+                        </a>
+                      )}
+                      {item.driveUrl && item.fileType !== "DOCUMENT" && (
                         <a href={item.driveUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1 text-xs text-blue-400 hover:text-blue-300 transition-colors">
                           🔗 Ver no Drive
                         </a>
@@ -936,9 +1051,15 @@ export default function CampaignPage() {
                           {markingDoneItemId === item.id ? "..." : "Ajuste feito"}
                         </button>
                       )}
-                      <button onClick={() => openEditGroup([item])} className="text-gray-400 hover:text-white text-sm transition-colors">
-                        Editar
-                      </button>
+                      {item.fileType === "DOCUMENT" ? (
+                        <button onClick={() => openTextModal(item)} className="text-gray-400 hover:text-white text-sm transition-colors">
+                          Editar
+                        </button>
+                      ) : (
+                        <button onClick={() => openEditGroup([item])} className="text-gray-400 hover:text-white text-sm transition-colors">
+                          Editar
+                        </button>
+                      )}
                       <button onClick={() => handleDeleteItem(item.id)} className="text-red-500 hover:text-red-400 text-sm transition-colors">
                         Remover
                       </button>

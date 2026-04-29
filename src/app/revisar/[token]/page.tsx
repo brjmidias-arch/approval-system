@@ -420,6 +420,22 @@ export default function InternalReviewPage() {
                         <a href={currentItem.fileUrl} target="_blank" rel="noopener noreferrer" className="text-violet-400 text-sm">Abrir PDF →</a>
                       </div>
                     )}
+                    {currentItem.fileType === "DOCUMENT" && (
+                      <div className="flex flex-col items-center justify-center gap-4 py-10 px-6">
+                        <span className="text-6xl">📝</span>
+                        <div className="text-center">
+                          <p className="text-gray-300 text-sm mb-4">Documento de texto para revisão</p>
+                          <a
+                            href={currentItem.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white text-sm px-5 py-2.5 rounded-lg transition-colors font-medium"
+                          >
+                            Abrir Documento →
+                          </a>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   {currentItem.contentType === "REELS" && currentItem.coverUrl && (
                     <div className="border-t border-white/10">

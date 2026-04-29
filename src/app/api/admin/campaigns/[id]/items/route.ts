@@ -6,7 +6,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const body = await req.json();
   const { fileUrl, fileType, title, caption, scheduledDate, driveUrl, coverUrl, coverDriveUrl, contentType, order, groupId } = body;
 
-  if (!fileUrl || !fileType || !contentType) {
+  if ((!fileUrl && contentType !== "TEXTO") || !fileType || !contentType) {
     return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
   }
 
