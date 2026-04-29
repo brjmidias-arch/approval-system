@@ -230,9 +230,12 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
   async function handleSave() {
     setStep("saving");
     let baseOrder = existingItemCount + 1;
+    let failedPosts = 0;
+    let savedPosts = 0;
 
     for (const post of posts) {
       const groupId = post.contentType === "CARROSSEL" ? uuidv4() : null;
+      let postFailed = false;
 
       for (let i = 0; i < post.slides.length; i++) {
         const slide = post.slides[i];
@@ -244,28 +247,40 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
         const coverUrl = post.coverFileId ? driveThumbUrl(post.coverFileId) : null;
         const coverDriveUrl = post.coverDriveUrl || (post.coverFileId ? driveFileViewUrl(post.coverFileId) : null);
 
-        await fetch(`/api/admin/campaigns/${campaignId}/items`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileUrl,
-            fileType: mimeToFileType(slide.mimeType),
-            title: post.title || null,
-            caption: post.caption || null,
-            scheduledDate: post.scheduledDate || null,
-            driveUrl,
-            contentType: post.contentType,
-            groupId,
-            order: baseOrder++,
-            coverUrl: i === 0 ? coverUrl : null,
-            coverDriveUrl: i === 0 ? coverDriveUrl : null,
-          }),
-        });
+        try {
+          const res = await fetch(`/api/admin/campaigns/${campaignId}/items`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileUrl,
+              fileType: mimeToFileType(slide.mimeType),
+              title: post.title || null,
+              caption: post.caption || null,
+              scheduledDate: post.scheduledDate || null,
+              driveUrl,
+              contentType: post.contentType,
+              groupId,
+              order: baseOrder++,
+              coverUrl: i === 0 ? coverUrl : null,
+              coverDriveUrl: i === 0 ? coverDriveUrl : null,
+            }),
+          });
+          if (!res.ok) { postFailed = true; break; }
+        } catch {
+          postFailed = true;
+          break;
+        }
       }
+
+      if (postFailed) failedPosts++;
+      else savedPosts++;
     }
 
-    setSavedCount(posts.length);
+    setSavedCount(savedPosts);
     setStep("done");
+    if (failedPosts > 0) {
+      alert(`${failedPosts} ${failedPosts === 1 ? "post falhou" : "posts falharam"} ao salvar. Verifique a campanha e tente adicionar novamente.`);
+    }
     onDone();
   }
 

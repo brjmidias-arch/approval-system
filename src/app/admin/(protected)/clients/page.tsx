@@ -41,10 +41,16 @@ export default function ClientsPage() {
   const [plannerLoading, setPlannerLoading] = useState(false);
 
   const fetchClients = useCallback(async () => {
-    const res = await fetch("/api/admin/clients");
-    const data = await res.json();
-    setClients(data);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/admin/clients");
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setClients(data);
+    } catch {
+      // keep current state on failure
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -63,10 +69,17 @@ export default function ClientsPage() {
     setPlannerClient(client);
     setPlannerLoading(true);
     setPlannerPosts([]);
-    const res = await fetch(`/api/admin/clients/${client.id}/planner-posts`);
-    const data = await res.json();
-    setPlannerPosts(data);
-    setPlannerLoading(false);
+    try {
+      const res = await fetch(`/api/admin/clients/${client.id}/planner-posts`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setPlannerPosts(data);
+    } catch {
+      alert("Erro ao carregar posts do planner. Tente novamente.");
+      setPlannerClient(null);
+    } finally {
+      setPlannerLoading(false);
+    }
   }
 
   function handleDateChange(postId: string, dateKey: string | null) {
@@ -94,28 +107,37 @@ export default function ClientsPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    if (editingClient) {
-      await fetch(`/api/admin/clients/${editingClient.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-    } else {
-      await fetch("/api/admin/clients", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+    try {
+      const res = editingClient
+        ? await fetch(`/api/admin/clients/${editingClient.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(form),
+          })
+        : await fetch("/api/admin/clients", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(form),
+          });
+      if (!res.ok) throw new Error();
+      setShowForm(false);
+      fetchClients();
+    } catch {
+      alert("Erro ao salvar cliente. Tente novamente.");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    setShowForm(false);
-    fetchClients();
   }
 
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Deletar cliente "${name}" e todas as campanhas? Esta ação não pode ser desfeita.`)) return;
-    await fetch(`/api/admin/clients/${id}`, { method: "DELETE" });
-    fetchClients();
+    try {
+      const res = await fetch(`/api/admin/clients/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      fetchClients();
+    } catch {
+      alert("Erro ao deletar cliente. Tente novamente.");
+    }
   }
 
   return (

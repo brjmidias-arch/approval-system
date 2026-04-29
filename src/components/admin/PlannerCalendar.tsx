@@ -357,27 +357,43 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
 
     if (overId === "unscheduled") {
       if (!post.scheduledDate) return;
+      const prevDate = post.scheduledDate;
       setPosts((prev) => prev.map((p) => p.id === activeId ? { ...p, scheduledDate: null } : p));
       onDateChange?.(activeId, null);
-      await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scheduledDate: null }),
-      });
+      try {
+        const res = await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scheduledDate: null }),
+        });
+        if (!res.ok) throw new Error();
+      } catch {
+        setPosts((cur) => cur.map((p) => p.id === activeId ? { ...p, scheduledDate: prevDate } : p));
+        onDateChange?.(activeId, prevDate.slice(0, 10));
+        alert("Erro ao remover data. Tente novamente.");
+      }
       return;
     }
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(overId)) return;
     if (post.scheduledDate?.slice(0, 10) === overId) return;
+    const prevDate = post.scheduledDate;
     const [y, m, d] = overId.split("-").map(Number);
     const localDate = new Date(y, m - 1, d, 12, 0, 0);
     setPosts((prev) => prev.map((p) => p.id === activeId ? { ...p, scheduledDate: localDate.toISOString() } : p));
     onDateChange?.(activeId, overId);
-    await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scheduledDate: overId }),
-    });
+    try {
+      const res = await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduledDate: overId }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setPosts((cur) => cur.map((p) => p.id === activeId ? { ...p, scheduledDate: prevDate } : p));
+      onDateChange?.(activeId, prevDate ? prevDate.slice(0, 10) : null);
+      alert("Erro ao salvar data. Tente novamente.");
+    }
   }
 
   return (

@@ -84,15 +84,21 @@ function SortableSlide({
     setSaving(true);
     const newFileUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`;
     const newDriveUrl = `https://drive.google.com/file/d/${fileId}/view`;
-    await fetch(`/api/admin/campaigns/${campaignId}/items/${slide.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fileUrl: newFileUrl, fileType: "IMAGE", driveUrl: newDriveUrl }),
-    });
-    onReplaced(slide.id, newFileUrl, "IMAGE");
-    setSaving(false);
-    setReplacing(false);
-    setDriveInput("");
+    try {
+      const res = await fetch(`/api/admin/campaigns/${campaignId}/items/${slide.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileUrl: newFileUrl, fileType: "IMAGE", driveUrl: newDriveUrl }),
+      });
+      if (!res.ok) throw new Error();
+      onReplaced(slide.id, newFileUrl, "IMAGE");
+      setReplacing(false);
+      setDriveInput("");
+    } catch {
+      alert("Erro ao substituir slide. Tente novamente.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -269,7 +275,7 @@ export default function CarouselCard({
         const st = s.approvalItem?.status;
         return st === "ADJUSTMENT" || st === "REJECTED";
       });
-      await Promise.all(
+      const results = await Promise.all(
         toReset.map((s) =>
           fetch(`/api/admin/campaigns/${campaignId}/items/${s.id}`, {
             method: "PATCH",
@@ -278,6 +284,7 @@ export default function CarouselCard({
           })
         )
       );
+      if (results.some((r) => !r.ok)) throw new Error();
       setSlides((prev) =>
         prev.map((s) => {
           const st = s.approvalItem?.status;
@@ -304,16 +311,24 @@ export default function CarouselCard({
 
     const oldIndex = slides.findIndex((s) => s.id === active.id);
     const newIndex = slides.findIndex((s) => s.id === over.id);
+    const prevSlides = slides;
     const reordered = arrayMove(slides, oldIndex, newIndex).map((s, i) => ({ ...s, order: i + 1 }));
 
     setSlides(reordered);
     onReorder(reordered);
 
-    await fetch(`/api/admin/campaigns/${campaignId}/reorder`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: reordered.map((s) => ({ id: s.id, order: s.order })) }),
-    });
+    try {
+      const res = await fetch(`/api/admin/campaigns/${campaignId}/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: reordered.map((s) => ({ id: s.id, order: s.order })) }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setSlides(prevSlides);
+      onReorder(prevSlides);
+      alert("Erro ao reordenar slides. Tente novamente.");
+    }
   }
 
   return (

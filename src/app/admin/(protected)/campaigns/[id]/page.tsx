@@ -85,12 +85,18 @@ export default function CampaignPage() {
 
 
   const fetchCampaign = useCallback(async () => {
-    const res = await fetch(`/api/admin/campaigns/${id}`, { cache: "no-store" });
-    const data = await res.json();
-    setCampaign(data);
-    setLoading(false);
-    const items: { status: string }[] = data.approvalItems ?? [];
-    setLiveStatus({ reviewed: items.filter((i) => i.status !== "PENDING").length, total: items.length });
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}`, { cache: "no-store" });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setCampaign(data);
+      const items: { status: string }[] = data.approvalItems ?? [];
+      setLiveStatus({ reviewed: items.filter((i) => i.status !== "PENDING").length, total: items.length });
+    } catch {
+      // keep current state on refresh failure
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
   useEffect(() => { fetchCampaign(); }, [fetchCampaign]);
@@ -118,76 +124,90 @@ export default function CampaignPage() {
     if (!editingGroup) return;
     setAddingSlides(true);
 
-    // Derive coverUrl from coverDriveUrl
     let coverUrl: string | null = null;
     if (editForm.coverDriveUrl.trim()) {
       const m = editForm.coverDriveUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
       if (m) coverUrl = `https://drive.google.com/thumbnail?id=${m[1]}&sz=w800`;
     }
 
-    // Update title/caption/date for all items in group
-    for (const item of editingGroup.items) {
-      await fetch(`/api/admin/campaigns/${id}/items/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: editForm.title || null,
-          caption: editForm.caption || null,
-          scheduledDate: editForm.scheduledDate || null,
-          driveUrl: editForm.driveUrl || null,
-          ...(editForm.coverDriveUrl.trim() !== "" && {
-            coverUrl,
-            coverDriveUrl: editForm.coverDriveUrl.trim() || null,
-          }),
-        }),
-      });
-    }
-
-    // Add new slides from Drive links
-    if (newSlideLinks.trim()) {
-      const links = newSlideLinks.split("\n").map((l) => l.trim()).filter(Boolean);
-      const baseOrder = editingGroup.items[editingGroup.items.length - 1].order + 1;
-      for (let i = 0; i < links.length; i++) {
-        const url = links[i];
-        const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-        if (!m) continue;
-        const fileId = m[1];
-        await fetch(`/api/admin/campaigns/${id}/items`, {
-          method: "POST",
+    try {
+      for (const item of editingGroup.items) {
+        const res = await fetch(`/api/admin/campaigns/${id}/items/${item.id}`, {
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            fileUrl: `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`,
-            fileType: "IMAGE",
             title: editForm.title || null,
             caption: editForm.caption || null,
             scheduledDate: editForm.scheduledDate || null,
-            driveUrl: url,
-            contentType: "CARROSSEL",
-            groupId: editingGroup.groupId,
-            order: baseOrder + i,
+            driveUrl: editForm.driveUrl || null,
+            ...(editForm.coverDriveUrl.trim() !== "" && {
+              coverUrl,
+              coverDriveUrl: editForm.coverDriveUrl.trim() || null,
+            }),
           }),
         });
+        if (!res.ok) throw new Error("Erro ao salvar post.");
       }
-    }
 
-    setAddingSlides(false);
-    setEditingGroup(null);
-    setNewSlideLinks("");
-    fetchCampaign();
+      if (newSlideLinks.trim()) {
+        const links = newSlideLinks.split("\n").map((l) => l.trim()).filter(Boolean);
+        const baseOrder = editingGroup.items[editingGroup.items.length - 1].order + 1;
+        for (let i = 0; i < links.length; i++) {
+          const url = links[i];
+          const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+          if (!m) continue;
+          const fileId = m[1];
+          const res = await fetch(`/api/admin/campaigns/${id}/items`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileUrl: `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`,
+              fileType: "IMAGE",
+              title: editForm.title || null,
+              caption: editForm.caption || null,
+              scheduledDate: editForm.scheduledDate || null,
+              driveUrl: url,
+              contentType: "CARROSSEL",
+              groupId: editingGroup.groupId,
+              order: baseOrder + i,
+            }),
+          });
+          if (!res.ok) throw new Error("Erro ao adicionar slide.");
+        }
+      }
+
+      setEditingGroup(null);
+      setNewSlideLinks("");
+      fetchCampaign();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
+    } finally {
+      setAddingSlides(false);
+    }
   }
 
   async function handleDeleteGroup(items: ContentItem[]) {
     if (!confirm(`Excluir este post (${items.length} ${items.length === 1 ? "slide" : "slides"})? Esta ação não pode ser desfeita.`)) return;
-    for (const item of items) {
-      await fetch(`/api/admin/campaigns/${id}/items/${item.id}`, { method: "DELETE" });
+    try {
+      for (const item of items) {
+        const res = await fetch(`/api/admin/campaigns/${id}/items/${item.id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Erro ao excluir post.");
+      }
+      fetchCampaign();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao excluir. Tente novamente.");
     }
-    fetchCampaign();
   }
 
   async function handleDeleteItem(itemId: string) {
     if (!confirm("Remover este item?")) return;
-    await fetch(`/api/admin/campaigns/${id}/items/${itemId}`, { method: "DELETE" });
-    fetchCampaign();
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}/items/${itemId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      fetchCampaign();
+    } catch {
+      alert("Erro ao remover item. Tente novamente.");
+    }
   }
 
   function copyLink() {
@@ -198,48 +218,69 @@ export default function CampaignPage() {
   }
 
   async function handleResend() {
-    await fetch(`/api/admin/campaigns/${id}/resend`, { method: "POST" });
-    alert("E-mail reenviado com sucesso!");
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}/resend`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      alert("E-mail reenviado com sucesso!");
+    } catch {
+      alert("Erro ao reenviar e-mail. Tente novamente.");
+    }
   }
 
   async function handleSaveName() {
     if (!nameValue.trim()) return;
-    await fetch(`/api/admin/campaigns/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: nameValue.trim() }),
-    });
-    setEditingName(false);
-    fetchCampaign();
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: nameValue.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      setEditingName(false);
+      fetchCampaign();
+    } catch {
+      alert("Erro ao salvar nome. Tente novamente.");
+    }
   }
 
 
 
   async function handleDeleteCampaign() {
     if (!confirm(`Excluir a campanha "${campaign!.name}" e todos os conteúdos? Esta ação não pode ser desfeita.`)) return;
-    await fetch(`/api/admin/campaigns/${id}`, { method: "DELETE" });
-    window.location.href = `/admin/clients/${campaign!.client.id}`;
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      window.location.href = `/admin/clients/${campaign!.client.id}`;
+    } catch {
+      alert("Erro ao excluir campanha. Tente novamente.");
+    }
   }
 
   async function handleToggleStatus() {
     const newStatus = campaign!.status === "OPEN" ? "CLOSED" : "OPEN";
-    await fetch(`/api/admin/campaigns/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus }),
-    });
-    fetchCampaign();
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error();
+      fetchCampaign();
+    } catch {
+      alert("Erro ao alterar status. Tente novamente.");
+    }
   }
 
 
   async function handleMarkItemDone(itemId: string) {
     setMarkingDoneItemId(itemId);
     try {
-      await fetch(`/api/admin/campaigns/${id}/items/${itemId}`, {
+      const res = await fetch(`/api/admin/campaigns/${id}/items/${itemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resetApproval: true }),
       });
+      if (!res.ok) throw new Error();
       fetchCampaign();
     } catch {
       alert("Erro ao marcar ajuste. Tente novamente.");
@@ -250,8 +291,13 @@ export default function CampaignPage() {
 
   async function handleResetApprovals() {
     if (!confirm("Isso vai apagar todas as aprovações, ajustes e reprovações do cliente, resetando tudo para Pendente. A campanha será reaberta. Continuar?")) return;
-    await fetch(`/api/admin/campaigns/${id}/reset-approvals`, { method: "POST" });
-    fetchCampaign();
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}/reset-approvals`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      fetchCampaign();
+    } catch {
+      alert("Erro ao resetar aprovações. Tente novamente.");
+    }
   }
 
   async function handleReopen() {
@@ -265,14 +311,19 @@ export default function CampaignPage() {
   }
 
   async function handleResetInternalItem(itemIds: string[]) {
-    for (const itemId of itemIds) {
-      await fetch(`/api/admin/campaigns/${id}/items/${itemId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resetInternalReview: true }),
-      });
+    try {
+      for (const itemId of itemIds) {
+        const res = await fetch(`/api/admin/campaigns/${id}/items/${itemId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resetInternalReview: true }),
+        });
+        if (!res.ok) throw new Error();
+      }
+      fetchCampaign();
+    } catch {
+      alert("Erro ao marcar ajuste. Tente novamente.");
     }
-    fetchCampaign();
   }
 
   async function handleSendInternal() {
@@ -280,14 +331,24 @@ export default function CampaignPage() {
       alert("Adicione pelo menos um conteúdo antes de enviar para revisão interna.");
       return;
     }
-    await fetch(`/api/admin/campaigns/${id}/send-internal`, { method: "POST" });
-    fetchCampaign();
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}/send-internal`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      fetchCampaign();
+    } catch {
+      alert("Erro ao enviar para revisão interna. Tente novamente.");
+    }
   }
 
   async function handleSendClient() {
     if (!confirm("Enviar para o cliente? Isso tornará a campanha visível para aprovação.")) return;
-    await fetch(`/api/admin/campaigns/${id}/send-client`, { method: "POST" });
-    fetchCampaign();
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}/send-client`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      fetchCampaign();
+    } catch {
+      alert("Erro ao enviar para o cliente. Tente novamente.");
+    }
   }
 
   function copyInternalLink() {
@@ -470,12 +531,17 @@ export default function CampaignPage() {
                 <button
                   onClick={async () => {
                     if (!confirm("Marcar campanha como Publicada? Ela será movida para Concluídas no dashboard.")) return;
-                    await fetch(`/api/admin/campaigns/${id}`, {
-                      method: "PUT",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ status: "PUBLISHED" }),
-                    });
-                    fetchCampaign();
+                    try {
+                      const res = await fetch(`/api/admin/campaigns/${id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ status: "PUBLISHED" }),
+                      });
+                      if (!res.ok) throw new Error();
+                      fetchCampaign();
+                    } catch {
+                      alert("Erro ao marcar como publicada. Tente novamente.");
+                    }
                   }}
                   className="text-sm px-3 py-2 bg-teal-900/20 hover:bg-teal-900/30 text-teal-400 rounded-lg transition-colors"
                 >
@@ -488,12 +554,17 @@ export default function CampaignPage() {
             {campaign.status === "PUBLISHED" && (
               <button
                 onClick={async () => {
-                  await fetch(`/api/admin/campaigns/${id}`, {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ status: "CLOSED" }),
-                  });
-                  fetchCampaign();
+                  try {
+                    const res = await fetch(`/api/admin/campaigns/${id}`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ status: "CLOSED" }),
+                    });
+                    if (!res.ok) throw new Error();
+                    fetchCampaign();
+                  } catch {
+                    alert("Erro ao reabrir campanha. Tente novamente.");
+                  }
                 }}
                 className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg transition-colors"
               >

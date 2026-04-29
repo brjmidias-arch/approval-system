@@ -62,26 +62,38 @@ function PostCard({ post, onMarkPosted }: { post: Post; onMarkPosted: (id: strin
 
   async function handleSaveDrive() {
     setSavingDrive(true);
-    await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ driveUrl: driveUrl || null }),
-    });
-    setSavingDrive(false);
-    setEditingDrive(false);
+    try {
+      const res = await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ driveUrl: driveUrl || null }),
+      });
+      if (!res.ok) throw new Error();
+      setEditingDrive(false);
+    } catch {
+      alert("Erro ao salvar link do Drive. Tente novamente.");
+    } finally {
+      setSavingDrive(false);
+    }
   }
 
   async function handleMarkPosted() {
     if (isPosted) return;
     setLoading(true);
-    await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ postedAt: new Date().toISOString() }),
-    });
-    setIsPosted(true);
-    setLoading(false);
-    onMarkPosted(post.id);
+    try {
+      const res = await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postedAt: new Date().toISOString() }),
+      });
+      if (!res.ok) throw new Error();
+      setIsPosted(true);
+      onMarkPosted(post.id);
+    } catch {
+      alert("Erro ao marcar como agendado. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
