@@ -9,23 +9,28 @@ export async function GET(
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const campaigns = await prisma.campaign.findMany({
-    where: { clientId: params.id },
-    include: {
-      client: { select: { name: true } },
-      contentItems: {
-        where: {
-          approvalItem: { status: "APPROVED" },
-          OR: [
-            { scheduledDate: null },
-            { scheduledDate: { gte: startOfMonth } },
-          ],
+  let campaigns;
+  try {
+    campaigns = await prisma.campaign.findMany({
+      where: { clientId: params.id },
+      include: {
+        client: { select: { name: true } },
+        contentItems: {
+          where: {
+            approvalItem: { status: "APPROVED" },
+            OR: [
+              { scheduledDate: null },
+              { scheduledDate: { gte: startOfMonth } },
+            ],
+          },
+          orderBy: { order: "asc" },
+          include: { approvalItem: true },
         },
-        orderBy: { order: "asc" },
-        include: { approvalItem: true },
       },
-    },
-  });
+    });
+  } catch {
+    return NextResponse.json({ error: "Erro ao buscar posts" }, { status: 500 });
+  }
 
   const seenGroupIds = new Set<string>();
   const posts: {

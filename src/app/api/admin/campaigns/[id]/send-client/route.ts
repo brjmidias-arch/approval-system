@@ -7,10 +7,13 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const campaign = await prisma.campaign.update({
-    where: { id: params.id },
-    data: { status: "OPEN" },
-  });
-
-  return NextResponse.json(campaign);
+  try {
+    const campaign = await prisma.campaign.update({
+      where: { id: params.id },
+      data: { status: "OPEN" },
+    });
+    return NextResponse.json(campaign);
+  } catch {
+    return NextResponse.json({ error: "Erro ao enviar para cliente" }, { status: 500 });
+  }
 }
