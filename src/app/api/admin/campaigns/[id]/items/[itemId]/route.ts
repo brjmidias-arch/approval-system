@@ -62,6 +62,31 @@ export async function PATCH(
       }
     }
 
+    if (scheduledDate !== undefined && scheduledDate) {
+      const campaignItems = await prisma.contentItem.findMany({
+        where: { campaignId: params.id },
+        include: { approvalItem: true },
+      });
+      const seenGroupIds = new Set<string>();
+      const uniquePosts = campaignItems.filter((ci) => {
+        if (ci.contentType === "CARROSSEL" && ci.groupId) {
+          if (seenGroupIds.has(ci.groupId)) return false;
+          seenGroupIds.add(ci.groupId);
+        }
+        return true;
+      });
+      const approvedPosts = uniquePosts.filter((ci) => ci.approvalItem?.status === "APPROVED");
+      if (approvedPosts.length > 0 && approvedPosts.every((ci) => ci.scheduledDate)) {
+        const campaign = await prisma.campaign.findUnique({ where: { id: params.id }, select: { status: true } });
+        if (campaign?.status === "CLOSED") {
+          await prisma.campaign.update({
+            where: { id: params.id },
+            data: { status: "PUBLISHED" },
+          });
+        }
+      }
+    }
+
     return NextResponse.json(item);
   } catch {
     return NextResponse.json({ error: "Erro ao atualizar item" }, { status: 500 });
