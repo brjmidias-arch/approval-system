@@ -92,6 +92,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
         reviewedAt: new Date(),
       },
     });
+
+    // Auto-close when all items are reviewed (no PENDING left)
+    const allItems = await prisma.approvalItem.findMany({
+      where: { campaignId: campaign.id },
+    });
+    const allReviewed = allItems.length > 0 && allItems.every((a) => a.status !== "PENDING");
+    if (allReviewed) {
+      await prisma.campaign.update({
+        where: { id: campaign.id },
+        data: { status: "CLOSED" },
+      });
+    }
+
     return NextResponse.json(approvalItem);
   } catch {
     return NextResponse.json({ error: "Erro ao salvar avaliação" }, { status: 500 });
