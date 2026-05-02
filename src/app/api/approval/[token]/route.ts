@@ -93,11 +93,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
       },
     });
 
-    // Auto-close when all items are reviewed (no PENDING left)
+    // Auto-close when every client-visible item has been reviewed (no PENDING left)
+    const totalVisible = await prisma.contentItem.count({
+      where: {
+        campaignId: campaign.id,
+        OR: [
+          { internalReviewItem: { is: null } },
+          { internalReviewItem: { is: { status: "APPROVED" } } },
+        ],
+      },
+    });
     const allItems = await prisma.approvalItem.findMany({
       where: { campaignId: campaign.id },
     });
-    const allReviewed = allItems.length > 0 && allItems.every((a) => a.status !== "PENDING");
+    const allReviewed =
+      totalVisible > 0 &&
+      allItems.length === totalVisible &&
+      allItems.every((a) => a.status !== "PENDING");
     if (allReviewed) {
       await prisma.campaign.update({
         where: { id: campaign.id },

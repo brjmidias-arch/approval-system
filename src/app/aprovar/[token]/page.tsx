@@ -66,9 +66,6 @@ export default function ApprovalPage() {
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [carouselSlide, setCarouselSlide] = useState<Record<string, number>>({});
   const [savingGroup, setSavingGroup] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [submitResult, setSubmitResult] = useState<{ approved: number; adjustment: number; rejected: number } | null>(null);
 
   const fetchCampaign = useCallback(async () => {
     const res = await fetch(`/api/approval/${token}`);
@@ -153,20 +150,6 @@ export default function ApprovalPage() {
     return firstItem.approvalItem?.status !== "APPROVED";
   });
 
-  async function handleSubmit() {
-    const allDone = needsReviewGroups.every((g) => {
-      const r = reviews[g.groupKey];
-      return r && r.status !== "PENDING";
-    });
-    if (!allDone) { alert("Por favor, revise todos os itens antes de enviar."); return; }
-    setSubmitting(true);
-    const res = await fetch(`/api/approval/${token}/submit`, { method: "POST" });
-    const data = await res.json();
-    if (res.ok) { setSubmitted(true); setSubmitResult(data); }
-    else alert(data.error || "Erro ao enviar revisão.");
-    setSubmitting(false);
-  }
-
   if (loading) return (
     <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
       <p className="text-gray-400">Carregando...</p>
@@ -186,30 +169,6 @@ export default function ApprovalPage() {
           <h1 className="text-xl font-semibold text-white mb-2">{m.title}</h1>
           <p className="text-gray-400 text-sm">{m.desc}</p>
           <p className="text-gray-600 text-xs mt-6">BRJ Mídias</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (submitted && submitResult) {
-    return (
-      <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center p-4">
-        <div className="text-center max-w-sm">
-          <div className="text-5xl mb-4">✅</div>
-          <h1 className="text-xl font-semibold text-white mb-2">Revisão Enviada!</h1>
-          <p className="text-gray-400 text-sm mb-6">Obrigado! A equipe da BRJ Mídias já foi notificada.</p>
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4 text-sm space-y-2">
-            <div className="flex justify-between text-gray-300">
-              <span>Aprovados</span><span className="text-emerald-400 font-medium">{submitResult.approved}</span>
-            </div>
-            <div className="flex justify-between text-gray-300">
-              <span>Com ajuste</span><span className="text-amber-400 font-medium">{submitResult.adjustment}</span>
-            </div>
-            <div className="flex justify-between text-gray-300">
-              <span>Reprovados</span><span className="text-red-400 font-medium">{submitResult.rejected}</span>
-            </div>
-          </div>
-          <p className="text-gray-600 text-xs mt-8">BRJ Mídias</p>
         </div>
       </div>
     );
@@ -611,19 +570,14 @@ export default function ApprovalPage() {
           </div>
         )}
 
-        {/* Submit */}
-        <div className="sticky bottom-4 pt-2">
-          <button
-            onClick={handleSubmit}
-            disabled={!allDone || submitting || savingGroup !== null}
-            className={`w-full py-4 rounded-xl text-base font-semibold transition-all ${
-              allDone ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/40"
-              : "bg-white/5 text-gray-500 cursor-not-allowed"
-            }`}
-          >
-            {submitting ? "Enviando..." : savingGroup !== null ? "Salvando..." : allDone ? "Finalizar e Enviar Revisão" : `Revise todos os itens (${reviewedCount}/${total})`}
-          </button>
-        </div>
+        {/* Completion state */}
+        {allDone && (
+          <div className="bg-emerald-900/20 border border-emerald-500/30 rounded-xl p-6 text-center">
+            <div className="text-4xl mb-3">✅</div>
+            <p className="text-emerald-400 font-semibold text-lg mb-1">Revisão concluída!</p>
+            <p className="text-gray-400 text-sm">Obrigado! A equipe da BRJ Mídias já foi notificada.</p>
+          </div>
+        )}
       </main>
 
       <footer className="text-center py-8 text-gray-700 text-xs">
