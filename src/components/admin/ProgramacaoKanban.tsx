@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import PlannerCalendar from "./PlannerCalendar";
 import CopyButton from "./CopyButton";
 
@@ -108,13 +109,16 @@ function ProgPostRow({
     }
   }
 
+  const hasDriveLinks = post.driveUrl || (post.contentType === "REELS" && post.coverDriveUrl);
+
   return (
     <div className="bg-[#0f0f0f] border border-white/[0.06] rounded-xl overflow-hidden">
-      <div className="flex items-center gap-3 p-2.5">
+      {/* Header: thumb + type + date + action */}
+      <div className="flex items-start gap-3 p-3">
         <Thumb post={post} />
         <div className="min-w-0 flex-1 space-y-1">
           {post.title && (
-            <p className="text-white text-xs font-medium truncate">{post.title}</p>
+            <p className="text-white text-xs font-medium">{post.title}</p>
           )}
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs text-emerald-400 bg-emerald-900/20 px-1.5 py-0.5 rounded">
@@ -140,10 +144,40 @@ function ProgPostRow({
           {loading ? "..." : "Agendado ✓"}
         </button>
       </div>
+
+      {/* Drive links */}
+      {hasDriveLinks && (
+        <div className="border-t border-white/5 px-3 py-2 flex flex-wrap gap-2">
+          {post.driveUrl && (
+            <a
+              href={post.driveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/20 border border-blue-500/20 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              🔗 Arquivo no Drive
+            </a>
+          )}
+          {post.contentType === "REELS" && post.coverDriveUrl && (
+            <a
+              href={post.coverDriveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 bg-purple-900/20 border border-purple-500/20 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              🖼️ Capa no Drive
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* Caption */}
       {post.caption && (
-        <div className="border-t border-white/5 px-3 py-2">
-          <p className="text-xs text-gray-500 line-clamp-2">{post.caption}</p>
-          <CopyButton text={post.caption} />
+        <div className="border-t border-white/5 px-3 py-3">
+          <p className="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed">{post.caption}</p>
+          <div className="mt-2">
+            <CopyButton text={post.caption} />
+          </div>
         </div>
       )}
     </div>
@@ -213,6 +247,7 @@ export default function ProgramacaoKanban({
   clients: ClientData[];
   now: string;
 }) {
+  const router = useRouter();
   const [scheduledDates, setScheduledDates] = useState<Record<string, string | null>>(() => {
     const dates: Record<string, string | null> = {};
     for (const c of initialClients)
@@ -238,6 +273,7 @@ export default function ProgramacaoKanban({
 
   function handleMarkPosted(postId: string) {
     setPostedIds((prev) => new Set(prev).add(postId));
+    router.refresh();
   }
 
   const nowDate = new Date(now);
