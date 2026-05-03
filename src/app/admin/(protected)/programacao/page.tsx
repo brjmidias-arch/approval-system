@@ -2,10 +2,15 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import ClientScheduleAccordion from "@/components/admin/ClientScheduleAccordion";
+import ProgramacaoKanban, { type ClientData, type Post } from "@/components/admin/ProgramacaoKanban";
 
-export default async function ProgramacaoPage({ searchParams }: { searchParams: { tab?: string } }) {
+export default async function ProgramacaoPage({
+  searchParams,
+}: {
+  searchParams: { tab?: string };
+}) {
   const tab = searchParams.tab === "concluidos" ? "concluidos" : "pendentes";
+
   const campaigns = await prisma.campaign.findMany({
     include: {
       client: true,
@@ -19,39 +24,26 @@ export default async function ProgramacaoPage({ searchParams }: { searchParams: 
 
   type CampaignWithItems = (typeof campaigns)[0];
 
-  function getApprovedGroups(campaign: CampaignWithItems) {
-    const seenGroupIds = new Set<string>();
-    const groups: {
-      id: string;
-      groupId: string | null;
-      title: string | null;
-      caption: string | null;
-      driveUrl: string | null;
-      coverUrl: string | null;
-      coverDriveUrl: string | null;
-      scheduledDate: Date | null;
-      contentType: string;
-      fileType: string;
-      fileUrl: string;
-      approvedAt: Date | null;
-      postedAt: Date | null;
-      campaignId: string;
-    }[] = [];
+  function getApprovedPosts(campaign: CampaignWithItems): Post[] {
+    const seen = new Set<string>();
+    const posts: Post[] = [];
 
     for (const item of campaign.contentItems) {
       if (item.approvalItem?.status !== "APPROVED") continue;
       if (item.contentType === "TEXTO") continue;
 
       const base = {
-        approvedAt: item.approvalItem.reviewedAt,
-        postedAt: item.postedAt,
         campaignId: campaign.id,
+        campaignName: campaign.name,
+        approvedAt: item.approvalItem.reviewedAt?.toISOString() ?? null,
+        postedAt: item.postedAt?.toISOString() ?? null,
+        scheduledDate: item.scheduledDate?.toISOString() ?? null,
       };
 
       if (item.contentType === "CARROSSEL" && item.groupId) {
-        if (seenGroupIds.has(item.groupId)) continue;
-        seenGroupIds.add(item.groupId);
-        groups.push({
+        if (seen.has(item.groupId)) continue;
+        seen.add(item.groupId);
+        posts.push({
           id: item.id,
           groupId: item.groupId,
           title: item.title,
@@ -59,14 +51,13 @@ export default async function ProgramacaoPage({ searchParams }: { searchParams: 
           driveUrl: item.driveUrl,
           coverUrl: item.coverUrl,
           coverDriveUrl: item.coverDriveUrl,
-          scheduledDate: item.scheduledDate,
           contentType: item.contentType,
           fileType: item.fileType,
           fileUrl: item.fileUrl,
           ...base,
         });
       } else if (item.contentType !== "CARROSSEL") {
-        groups.push({
+        posts.push({
           id: item.id,
           groupId: null,
           title: item.title,
@@ -74,7 +65,6 @@ export default async function ProgramacaoPage({ searchParams }: { searchParams: 
           driveUrl: item.driveUrl,
           coverUrl: item.coverUrl,
           coverDriveUrl: item.coverDriveUrl,
-          scheduledDate: item.scheduledDate,
           contentType: item.contentType,
           fileType: item.fileType,
           fileUrl: item.fileUrl,
@@ -82,66 +72,39 @@ export default async function ProgramacaoPage({ searchParams }: { searchParams: 
         });
       }
     }
-
-    return groups;
+    return posts;
   }
 
-  // Group by client
-  const clientMap = new Map<string, {
-    clientId: string;
-    clientName: string;
-    campaigns: { id: string; name: string; month: number; year: number; posts: ReturnType<typeof getApprovedGroups> }[];
-  }>();
+  // Build per-client data
+  const clientMap = new Map<string, { clientId: string; clientName: string; posts: Post[] }>();
 
   for (const campaign of campaigns) {
-    const posts = getApprovedGroups(campaign);
+    const posts = getApprovedPosts(campaign);
     if (posts.length === 0) continue;
-
     const { id: clientId, name: clientName } = campaign.client;
-
-    if (!clientMap.has(clientId)) {
-      clientMap.set(clientId, { clientId, clientName, campaigns: [] });
-    }
-
-    clientMap.get(clientId)!.campaigns.push({
-      id: campaign.id,
-      name: campaign.name,
-      month: campaign.month,
-      year: campaign.year,
-      posts,
-    });
+    if (!clientMap.has(clientId)) clientMap.set(clientId, { clientId, clientName, posts: [] });
+    clientMap.get(clientId)!.posts.push(...posts);
   }
 
   const now = new Date();
 
-  const clients = Array.from(clientMap.values()).map((c) => {
-    const allPosts = c.campaigns.flatMap((camp) => camp.posts);
-    // "pending" = approved but not yet scheduled in planner (and not posted)
-    const pendingPosts = allPosts.filter((p) => !p.scheduledDate && !p.postedAt);
-    const totalPosts = allPosts.length;
-    const scheduledPosts = allPosts.filter((p) => p.scheduledDate && !p.postedAt).length;
-    const postedPosts = allPosts.filter((p) => p.postedAt).length;
+  const clients: ClientData[] = Array.from(clientMap.values())
+    .map((c) => {
+      const pending = c.posts.filter((p) => !p.scheduledDate && !p.postedAt);
+      const maxDaysWaiting = pending.reduce((max, p) => {
+        if (!p.approvedAt) return max;
+        const days = Math.floor(
+          (now.getTime() - new Date(p.approvedAt).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        return Math.max(max, days);
+      }, 0);
+      return { ...c, maxDaysWaiting };
+    })
+    .sort((a, b) => b.maxDaysWaiting - a.maxDaysWaiting);
 
-    // Max days waiting: oldest unscheduled approved post
-    const maxDaysWaiting = pendingPosts.reduce((max, p) => {
-      if (!p.approvedAt) return max;
-      const days = Math.floor((now.getTime() - new Date(p.approvedAt).getTime()) / (1000 * 60 * 60 * 24));
-      return Math.max(max, days);
-    }, 0);
-
-    return {
-      ...c,
-      totalPosts,
-      scheduledPosts,
-      postedPosts,
-      pendingPosts: pendingPosts.length,
-      maxDaysWaiting,
-    };
-  }).sort((a, b) => b.maxDaysWaiting - a.maxDaysWaiting);
-
-  const pendingClients = clients.filter((c) => c.pendingPosts > 0);
-  const doneClients = clients.filter((c) => c.pendingPosts === 0);
-  const displayClients = tab === "concluidos" ? doneClients : pendingClients;
+  // Pendentes = any post without postedAt; Concluídos = all posts have postedAt
+  const pendingClients = clients.filter((c) => c.posts.some((p) => !p.postedAt));
+  const doneClients    = clients.filter((c) => c.posts.length > 0 && c.posts.every((p) => p.postedAt));
 
   return (
     <div className="space-y-6">
@@ -158,19 +121,58 @@ export default async function ProgramacaoPage({ searchParams }: { searchParams: 
       <div className="flex gap-1 bg-white/5 rounded-lg p-1 w-fit">
         <Link
           href="/admin/programacao"
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "pendentes" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"}`}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            tab === "pendentes" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"
+          }`}
         >
-          Pendentes {pendingClients.length > 0 && <span className="ml-1 text-xs opacity-60">{pendingClients.length}</span>}
+          Pendentes{" "}
+          {pendingClients.length > 0 && (
+            <span className="ml-1 text-xs opacity-60">{pendingClients.length}</span>
+          )}
         </Link>
         <Link
           href="/admin/programacao?tab=concluidos"
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "concluidos" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"}`}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            tab === "concluidos" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"
+          }`}
         >
-          Concluídos {doneClients.length > 0 && <span className="ml-1 text-xs opacity-60">{doneClients.length}</span>}
+          Concluídos{" "}
+          {doneClients.length > 0 && (
+            <span className="ml-1 text-xs opacity-60">{doneClients.length}</span>
+          )}
         </Link>
       </div>
 
-      <ClientScheduleAccordion key={tab} clients={displayClients} />
+      {tab === "pendentes" ? (
+        <ProgramacaoKanban clients={pendingClients} now={now.toISOString()} />
+      ) : (
+        <div className="space-y-3">
+          {doneClients.length === 0 ? (
+            <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 text-center">
+              <p className="text-gray-400 text-sm">
+                Nenhum cliente com todos os posts publicados ainda.
+              </p>
+            </div>
+          ) : (
+            doneClients.map((client) => (
+              <div
+                key={client.clientId}
+                className="bg-[#1a1a1a] border border-white/10 rounded-xl px-5 py-4 flex items-center justify-between"
+              >
+                <div>
+                  <p className="text-white font-semibold">{client.clientName}</p>
+                  <p className="text-gray-500 text-xs">
+                    {client.posts.filter((p) => p.postedAt).length} posts publicados
+                  </p>
+                </div>
+                <span className="text-xs text-emerald-400 bg-emerald-900/20 px-3 py-1 rounded-full">
+                  ✅ Concluído
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
