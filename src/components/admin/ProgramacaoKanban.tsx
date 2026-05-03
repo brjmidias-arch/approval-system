@@ -526,8 +526,8 @@ export default function ProgramacaoKanban({
                   clientName={client.clientName}
                   subtitle={
                     earliest
-                      ? `${count} ${count === 1 ? "post" : "posts"} · próximo em ${earliest}`
-                      : `${count} ${count === 1 ? "post agendado" : "posts agendados"}`
+                      ? `${count} ${count === 1 ? "post" : "posts"} p/ agendar · próximo em ${earliest}`
+                      : `${count} ${count === 1 ? "post" : "posts"} para agendar`
                   }
                   isOpen={openProg === client.clientId}
                   onToggle={() =>
