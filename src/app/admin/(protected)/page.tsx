@@ -43,11 +43,12 @@ function getStatusCounts(campaign: {
   return { total, approved, adjustment, rejected, pending, clientFinished, allReviewed };
 }
 
-type KanbanCol = "draft" | "internal" | "waiting" | "adjustments" | "planner" | "publish";
+type KanbanCol = "draft" | "internal" | "internalAdj" | "waiting" | "adjustments" | "planner" | "publish";
 
 const COLUMNS: { id: KanbanCol; label: string; color: string; dot: string }[] = [
   { id: "draft",       label: "Rascunho",         color: "text-gray-400",    dot: "bg-gray-500"    },
   { id: "internal",    label: "Revisão Interna",   color: "text-violet-400",  dot: "bg-violet-500"  },
+  { id: "internalAdj", label: "Ajuste Interno",    color: "text-amber-400",   dot: "bg-amber-500"   },
   { id: "waiting",     label: "Aguard. Cliente",   color: "text-emerald-400", dot: "bg-emerald-500" },
   { id: "adjustments", label: "Ajustes",           color: "text-amber-400",   dot: "bg-amber-500"   },
   { id: "planner",     label: "Preencher Planner", color: "text-sky-400",     dot: "bg-sky-500"     },
@@ -74,12 +75,17 @@ function unscheduledNonTextoCount(
 function classifyCampaign(
   campaign: {
     status: string;
-    contentItems: { postedAt: Date | null; contentType: string; groupId: string | null; scheduledDate: Date | null }[];
+    contentItems: { postedAt: Date | null; contentType: string; groupId: string | null; scheduledDate: Date | null; internalReviewItem: { status: string } | null }[];
   },
   counts: { adjustment: number; rejected: number }
 ): KanbanCol {
   if (campaign.status === "DRAFT") return "draft";
-  if (campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE") return "internal";
+  if (campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE") {
+    const hasAdj = campaign.contentItems.some(
+      (i) => i.internalReviewItem?.status === "ADJUSTMENT" || i.internalReviewItem?.status === "REJECTED"
+    );
+    return hasAdj ? "internalAdj" : "internal";
+  }
   if (campaign.status === "OPEN") return "waiting";
   if (campaign.status === "CLOSED") {
     if (counts.adjustment > 0 || counts.rejected > 0) return "adjustments";
@@ -151,7 +157,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     counts: ReturnType<typeof getStatusCounts>;
   };
   const buckets: Record<KanbanCol, BucketEntry[]> = {
-    draft: [], internal: [], waiting: [], adjustments: [], planner: [], publish: [],
+    draft: [], internal: [], internalAdj: [], waiting: [], adjustments: [], planner: [], publish: [],
   };
   for (const { campaign, client } of activeCampaigns) {
     const counts = getStatusCounts(campaign);
@@ -160,11 +166,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
   }
 
   // Notification bar data
-  const internalAdjustItems = buckets.internal.filter(({ campaign }) =>
-    campaign.contentItems.some(
-      (i) => i.internalReviewItem?.status === "ADJUSTMENT" || i.internalReviewItem?.status === "REJECTED"
-    )
-  );
+  const internalAdjustItems = buckets.internalAdj;
   const internalAdjustCount = internalAdjustItems.length;
   const adjustmentCount = buckets.adjustments.length;
   const longWaitItems = buckets.waiting.filter(({ campaign }) => {
@@ -233,7 +235,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
         <div className="flex flex-wrap gap-2 px-3 py-2.5 bg-white/[0.02] border border-white/10 rounded-xl">
           {internalAdjustCount > 0 && (
             <Link
-              href={internalAdjustCount === 1 ? `/admin/campaigns/${internalAdjustItems[0].campaign.id}` : "#kanban-col-internal"}
+              href={internalAdjustCount === 1 ? `/admin/campaigns/${internalAdjustItems[0].campaign.id}` : "#kanban-col-internalAdj"}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-300 bg-violet-900/40 border border-violet-500/40 px-3 py-1.5 rounded-full animate-pulse hover:bg-violet-900/60 transition-colors"
             >
               🔍 {internalAdjustCount} {internalAdjustCount === 1 ? "campanha" : "campanhas"} com ajuste interno
@@ -375,11 +377,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                               )}
 
                               {col.id === "internal" &&
-                                (hasInternalAdj ? (
-                                  <span className="text-[10px] font-medium text-amber-400 bg-amber-900/30 px-1.5 py-0.5 rounded">
-                                    ⚠️ Ajuste
-                                  </span>
-                                ) : campaign.status === "INTERNAL_DONE" ? (
+                                (campaign.status === "INTERNAL_DONE" ? (
                                   <span className="text-[10px] font-medium text-emerald-400 bg-emerald-900/30 px-1.5 py-0.5 rounded">
                                     ✅ Pronto
                                   </span>
@@ -388,6 +386,12 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                                     🔍 {pendingInternalCount} pend.
                                   </span>
                                 ) : null)}
+
+                              {col.id === "internalAdj" && (
+                                <span className="text-[10px] font-medium text-amber-400 bg-amber-900/30 px-1.5 py-0.5 rounded">
+                                  ⚠️ Ajuste interno
+                                </span>
+                              )}
 
                               {col.id === "waiting" && (
                                 <span
