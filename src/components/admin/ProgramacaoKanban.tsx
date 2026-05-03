@@ -54,29 +54,70 @@ function Thumb({ post }: { post: Post }) {
 
 // ── post row inside "Preencher Planner" ───────────────────────────────────────
 function PlannerPostRow({ post, daysWaiting }: { post: Post; daysWaiting: number }) {
+  const hasDriveLinks = post.driveUrl || (post.contentType === "REELS" && post.coverDriveUrl);
+
   return (
-    <div className="flex items-center gap-3 p-2.5 bg-[#0f0f0f] border border-white/[0.06] rounded-xl">
-      <Thumb post={post} />
-      <div className="min-w-0 flex-1">
-        {post.title && (
-          <p className="text-white text-xs font-medium truncate">{post.title}</p>
+    <div className="bg-[#0f0f0f] border border-white/[0.06] rounded-xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-start gap-3 p-3">
+        <Thumb post={post} />
+        <div className="min-w-0 flex-1 space-y-1">
+          {post.title && (
+            <p className="text-white text-xs font-medium">{post.title}</p>
+          )}
+          <span className="text-xs text-emerald-400 bg-emerald-900/20 px-1.5 py-0.5 rounded">
+            {CONTENT_TYPE_LABELS[post.contentType] ?? post.contentType}
+          </span>
+        </div>
+        {daysWaiting > 0 && (
+          <span
+            className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
+              daysWaiting >= 7
+                ? "bg-red-900/30 text-red-400"
+                : daysWaiting >= 3
+                ? "bg-amber-900/30 text-amber-400"
+                : "bg-yellow-900/20 text-yellow-500"
+            }`}
+          >
+            {daysWaiting}d
+          </span>
         )}
-        <span className="text-xs text-emerald-400 bg-emerald-900/20 px-1.5 py-0.5 rounded">
-          {CONTENT_TYPE_LABELS[post.contentType] ?? post.contentType}
-        </span>
       </div>
-      {daysWaiting > 0 && (
-        <span
-          className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
-            daysWaiting >= 7
-              ? "bg-red-900/30 text-red-400"
-              : daysWaiting >= 3
-              ? "bg-amber-900/30 text-amber-400"
-              : "bg-yellow-900/20 text-yellow-500"
-          }`}
-        >
-          {daysWaiting}d
-        </span>
+
+      {/* Drive links */}
+      {hasDriveLinks && (
+        <div className="border-t border-white/5 px-3 py-2 flex flex-wrap gap-2">
+          {post.driveUrl && (
+            <a
+              href={post.driveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/20 border border-blue-500/20 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              🔗 Arquivo no Drive
+            </a>
+          )}
+          {post.contentType === "REELS" && post.coverDriveUrl && (
+            <a
+              href={post.coverDriveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 bg-purple-900/20 border border-purple-500/20 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              🖼️ Capa no Drive
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* Caption */}
+      {post.caption && (
+        <div className="border-t border-white/5 px-3 py-3">
+          <p className="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed">{post.caption}</p>
+          <div className="mt-2">
+            <CopyButton text={post.caption} />
+          </div>
+        </div>
       )}
     </div>
   );
