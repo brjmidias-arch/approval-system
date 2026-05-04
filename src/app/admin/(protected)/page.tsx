@@ -195,11 +195,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-5 gap-4">
-        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4">
-          <p className="text-gray-400 text-xs uppercase tracking-wider">Clientes</p>
-          <p className="text-3xl font-bold text-white mt-1">{totalClients}</p>
-        </div>
+      <div className="grid grid-cols-4 gap-4">
         <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4">
           <p className="text-gray-400 text-xs uppercase tracking-wider">Campanhas</p>
           <p className="text-3xl font-bold text-white mt-1">{totalCampaigns}</p>
