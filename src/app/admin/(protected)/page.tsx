@@ -563,26 +563,75 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
         </div>
       )}
 
-      {/* Clients quick access */}
-      {clients.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs text-gray-500 uppercase tracking-wider">Clientes</p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {clients.map((client) => (
-              <Link
-                key={client.id}
-                href={`/admin/clients/${client.id}`}
-                className="bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 hover:bg-white/[0.05] transition-colors"
-              >
-                <p className="text-white text-sm font-medium truncate">{client.name}</p>
-                <p className="text-gray-500 text-xs mt-0.5">
-                  {client.campaigns.length} {client.campaigns.length === 1 ? "campanha" : "campanhas"}
-                </p>
-              </Link>
-            ))}
+      {/* Clients with active campaigns */}
+      {(() => {
+        const activeClients = clients
+          .map((client) => {
+            const active = client.campaigns.filter((c) => c.status !== "PUBLISHED");
+            return { client, active };
+          })
+          .filter(({ active }) => active.length > 0);
+
+        if (activeClients.length === 0) return null;
+
+        return (
+          <div className="space-y-2">
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">
+              Clientes com campanha ativa
+            </p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {activeClients.map(({ client, active }) => {
+                const hasAdj = active.some((c) => {
+                  const counts = getStatusCounts(c);
+                  return counts.adjustment > 0 || counts.rejected > 0;
+                });
+                const hasInternalAdj = active.some((c) =>
+                  c.contentItems.some(
+                    (i) => i.internalReviewItem?.status === "ADJUSTMENT" || i.internalReviewItem?.status === "REJECTED"
+                  )
+                );
+                const hasOpen = active.some((c) => c.status === "OPEN");
+                const hasInternal = active.some(
+                  (c) => c.status === "INTERNAL_REVIEW" || c.status === "INTERNAL_DONE"
+                );
+
+                const statusDots: { color: string; label: string }[] = [];
+                if (hasAdj) statusDots.push({ color: "bg-amber-400", label: "Ajuste cliente" });
+                if (hasInternalAdj) statusDots.push({ color: "bg-violet-400", label: "Ajuste interno" });
+                if (hasOpen) statusDots.push({ color: "bg-emerald-400", label: "Com cliente" });
+                if (hasInternal && !hasInternalAdj) statusDots.push({ color: "bg-violet-400", label: "Revisão interna" });
+
+                return (
+                  <Link
+                    key={client.id}
+                    href={`/admin/clients/${client.id}`}
+                    className="bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 hover:bg-white/[0.05] transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-white text-sm font-medium truncate">{client.name}</p>
+                      <span className="text-[10px] text-gray-500 shrink-0 mt-0.5">
+                        {active.length} ativa{active.length > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    {statusDots.length > 0 ? (
+                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        {statusDots.map((dot, i) => (
+                          <span key={i} className="flex items-center gap-1 text-[10px] text-gray-400">
+                            <span className={`w-1.5 h-1.5 rounded-full ${dot.color}`} />
+                            {dot.label}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-600 text-xs mt-1">em andamento</p>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
