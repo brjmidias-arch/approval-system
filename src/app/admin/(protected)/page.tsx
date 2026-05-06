@@ -39,20 +39,26 @@ function getStatusCounts(campaign: {
   const pending = total - approved - adjustment - rejected;
   const clientFinished = campaign.status === "CLOSED" && total > 0;
   const allReviewed = total > 0 && pending === 0;
+  const hasApprovedTexto = campaign.contentItems.some(
+    (item) =>
+      item.contentType === "TEXTO" &&
+      campaign.approvalItems.some((a) => a.contentItemId === item.id && a.status === "APPROVED")
+  );
 
-  return { total, approved, adjustment, rejected, pending, clientFinished, allReviewed };
+  return { total, approved, adjustment, rejected, pending, clientFinished, allReviewed, hasApprovedTexto };
 }
 
-type KanbanCol = "draft" | "internal" | "internalAdj" | "waiting" | "adjustments" | "planner" | "publish";
+type KanbanCol = "draft" | "internal" | "internalAdj" | "waiting" | "adjustments" | "planner" | "production" | "publish";
 
 const COLUMNS: { id: KanbanCol; label: string; color: string; dot: string }[] = [
-  { id: "draft",       label: "Rascunho",         color: "text-gray-400",    dot: "bg-gray-500"    },
-  { id: "internal",    label: "Revisão Interna",   color: "text-violet-400",  dot: "bg-violet-500"  },
-  { id: "internalAdj", label: "Ajuste Interno",    color: "text-amber-400",   dot: "bg-amber-500"   },
-  { id: "waiting",     label: "Aguard. Cliente",   color: "text-emerald-400", dot: "bg-emerald-500" },
-  { id: "adjustments", label: "Ajustes",           color: "text-amber-400",   dot: "bg-amber-500"   },
-  { id: "planner",     label: "Preencher Planner", color: "text-sky-400",     dot: "bg-sky-500"     },
-  { id: "publish",     label: "Publicar",          color: "text-teal-400",    dot: "bg-teal-500"    },
+  { id: "draft",       label: "Rascunho",           color: "text-gray-400",    dot: "bg-gray-500"    },
+  { id: "internal",    label: "Revisão Interna",     color: "text-violet-400",  dot: "bg-violet-500"  },
+  { id: "internalAdj", label: "Ajuste Interno",      color: "text-amber-400",   dot: "bg-amber-500"   },
+  { id: "waiting",     label: "Aguard. Cliente",     color: "text-emerald-400", dot: "bg-emerald-500" },
+  { id: "adjustments", label: "Ajustes",             color: "text-amber-400",   dot: "bg-amber-500"   },
+  { id: "planner",     label: "Preencher Planner",   color: "text-sky-400",     dot: "bg-sky-500"     },
+  { id: "production",  label: "Enviar p/ Produção",  color: "text-orange-400",  dot: "bg-orange-500"  },
+  { id: "publish",     label: "Publicar",            color: "text-teal-400",    dot: "bg-teal-500"    },
 ];
 
 function unscheduledNonTextoCount(
@@ -77,7 +83,7 @@ function classifyCampaign(
     status: string;
     contentItems: { postedAt: Date | null; contentType: string; groupId: string | null; scheduledDate: Date | null; internalReviewItem: { status: string } | null }[];
   },
-  counts: { adjustment: number; rejected: number }
+  counts: { adjustment: number; rejected: number; hasApprovedTexto: boolean }
 ): KanbanCol {
   if (campaign.status === "DRAFT") return "draft";
   if (campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE") {
@@ -90,6 +96,7 @@ function classifyCampaign(
   if (campaign.status === "CLOSED") {
     if (counts.adjustment > 0 || counts.rejected > 0) return "adjustments";
     if (unscheduledNonTextoCount(campaign.contentItems) > 0) return "planner";
+    if (counts.hasApprovedTexto) return "production";
     return "publish";
   }
   return "draft";
@@ -157,7 +164,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     counts: ReturnType<typeof getStatusCounts>;
   };
   const buckets: Record<KanbanCol, BucketEntry[]> = {
-    draft: [], internal: [], internalAdj: [], waiting: [], adjustments: [], planner: [], publish: [],
+    draft: [], internal: [], internalAdj: [], waiting: [], adjustments: [], planner: [], production: [], publish: [],
   };
   for (const { campaign, client } of activeCampaigns) {
     const counts = getStatusCounts(campaign);
@@ -417,6 +424,12 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                               {col.id === "planner" && (
                                 <span className="text-[10px] font-medium text-sky-400 bg-sky-900/30 px-1.5 py-0.5 rounded">
                                   📅 {unscheduled} p/ agendar
+                                </span>
+                              )}
+
+                              {col.id === "production" && (
+                                <span className="text-[10px] font-medium text-orange-400 bg-orange-900/30 px-1.5 py-0.5 rounded">
+                                  📝 Texto aprovado
                                 </span>
                               )}
 
