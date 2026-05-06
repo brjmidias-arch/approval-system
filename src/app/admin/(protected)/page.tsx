@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import ChargeButton from "@/components/admin/ChargeButton";
+import SentToProductionButton from "@/components/admin/SentToProductionButton";
 import AutoRefresh from "@/components/admin/AutoRefresh";
 
 function getStatusCounts(campaign: {
@@ -81,6 +82,7 @@ function unscheduledNonTextoCount(
 function classifyCampaign(
   campaign: {
     status: string;
+    sentToProduction: boolean;
     contentItems: { postedAt: Date | null; contentType: string; groupId: string | null; scheduledDate: Date | null; internalReviewItem: { status: string } | null }[];
   },
   counts: { adjustment: number; rejected: number; hasApprovedTexto: boolean }
@@ -96,7 +98,7 @@ function classifyCampaign(
   if (campaign.status === "CLOSED") {
     if (counts.adjustment > 0 || counts.rejected > 0) return "adjustments";
     if (unscheduledNonTextoCount(campaign.contentItems) > 0) return "planner";
-    if (counts.hasApprovedTexto) return "production";
+    if (counts.hasApprovedTexto && !campaign.sentToProduction) return "production";
     return "publish";
   }
   return "draft";
@@ -433,6 +435,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                                 </span>
                               )}
 
+
                               {col.id === "publish" && (
                                 <span className="text-[10px] font-medium text-teal-400 bg-teal-900/30 px-1.5 py-0.5 rounded">
                                   ✅ Todos aprovados
@@ -448,6 +451,15 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                                     (campaign as { lastChargedAt?: Date | null }).lastChargedAt?.toISOString() ?? null
                                   }
                                   daysSinceOpen={Math.max(0, daysSinceOpen)}
+                                />
+                              </div>
+                            )}
+
+                            {col.id === "production" && (
+                              <div className="mt-1.5">
+                                <SentToProductionButton
+                                  campaignId={campaign.id}
+                                  alreadySent={(campaign as { sentToProduction?: boolean }).sentToProduction ?? false}
                                 />
                               </div>
                             )}

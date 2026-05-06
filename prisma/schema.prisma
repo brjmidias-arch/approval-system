@@ -37,6 +37,7 @@ model Campaign {
   expiresAt           DateTime
   status              String               @default("DRAFT")
   lastChargedAt       DateTime?
+  sentToProduction    Boolean              @default(false)
   createdAt           DateTime             @default(now())
   contentItems        ContentItem[]
   approvalItems       ApprovalItem[]

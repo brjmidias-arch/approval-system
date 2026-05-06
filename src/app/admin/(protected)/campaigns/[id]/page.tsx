@@ -49,6 +49,7 @@ interface Campaign {
   internalToken: string;
   expiresAt: string;
   status: string;
+  sentToProduction: boolean;
   client: { id: string; name: string; email: string };
   contentItems: ContentItem[];
 }
@@ -560,6 +561,31 @@ export default function CampaignPage() {
             {/* OPEN / CLOSED: original buttons */}
             {(campaign.status === "OPEN" || campaign.status === "CLOSED") && (
               <>
+                {campaign.status === "CLOSED" &&
+                  campaign.contentItems.some(
+                    (i) => i.contentType === "TEXTO" && i.approvalItem?.status === "APPROVED"
+                  ) && (
+                  campaign.sentToProduction ? (
+                    <span className="text-sm px-3 py-2 bg-orange-900/20 text-orange-400 border border-orange-500/20 rounded-lg">
+                      ✅ Enviado p/ Produção
+                    </span>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        const res = await fetch(`/api/admin/campaigns/${id}`, {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ sentToProduction: true }),
+                        });
+                        if (res.ok) fetchCampaign();
+                        else alert("Erro ao marcar como enviado para produção.");
+                      }}
+                      className="text-sm px-3 py-2 bg-orange-900/30 hover:bg-orange-900/50 text-orange-400 border border-orange-500/30 rounded-lg transition-colors"
+                    >
+                      📤 Enviado para Produção
+                    </button>
+                  )
+                )}
                 <button onClick={copyLink} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
                   {copyFeedback ? "Copiado!" : "Copiar Link"}
                 </button>

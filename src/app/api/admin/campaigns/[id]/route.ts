@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  const { name, month, year, expiresAt, status } = body;
+  const { name, month, year, expiresAt, status, sentToProduction } = body;
   const oneDayFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000);
   try {
     const campaign = await prisma.campaign.update({
@@ -33,6 +33,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         ...(year && { year: Number(year) }),
         ...(status === "OPEN" ? { expiresAt: oneDayFromNow } : expiresAt ? { expiresAt: new Date(expiresAt) } : {}),
         ...(status && { status }),
+        ...(sentToProduction !== undefined && { sentToProduction }),
       },
     });
     return NextResponse.json(campaign);
