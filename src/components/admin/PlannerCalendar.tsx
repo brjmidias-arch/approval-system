@@ -289,6 +289,9 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const scheduledPosts = posts.filter((p) => p.scheduledDate !== null);
   const unscheduledPosts = posts.filter((p) => p.scheduledDate === null);
+  const feedPosts = [...scheduledPosts].sort(
+    (a, b) => new Date(b.scheduledDate!).getTime() - new Date(a.scheduledDate!).getTime()
+  );
 
   function getPostsForDate(dateKey: string) {
     return scheduledPosts.filter((p) => p.scheduledDate!.slice(0, 10) === dateKey);
@@ -401,10 +404,10 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
       {previewPost && <PostPreviewModal post={previewPost} onClose={() => setPreviewPost(null)} />}
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 h-full">
+        <div className="flex gap-3 h-full">
 
           {/* Sidebar */}
-          <div className="w-52 shrink-0 flex flex-col gap-2">
+          <div className="w-44 shrink-0 flex flex-col gap-2">
             <UnscheduledDropzone count={unscheduledPosts.length}>
               {unscheduledPosts.length === 0 && (
                 <p className="text-xs text-gray-600 text-center mt-4">Todos os posts têm data</p>
@@ -429,7 +432,7 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
           </div>
 
           {/* Calendar */}
-          <div className="flex-1 flex flex-col gap-2 min-w-0">
+          <div className="flex-1 flex flex-col gap-2 min-w-0 overflow-x-hidden">
             <div className="flex items-center justify-end gap-2">
               <button onClick={prevMonth} className="w-7 h-7 rounded bg-white/5 hover:bg-white/10 text-white text-lg flex items-center justify-center transition-colors">‹</button>
               <span className="text-white font-semibold text-sm w-36 text-center">{MONTHS[viewMonth]} {viewYear}</span>
@@ -502,6 +505,117 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
                   </DroppableDay>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Instagram Feed Preview */}
+          <div className="w-[172px] shrink-0 flex flex-col gap-2">
+            <div className="bg-[#111] border border-white/10 rounded-xl overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 120px)" }}>
+              {/* Header */}
+              <div className="px-3 py-2.5 border-b border-white/10 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-pink-400">▣</span>
+                  <p className="text-xs font-semibold text-gray-300">Preview Feed</p>
+                </div>
+                <span className="text-[10px] text-gray-600">{feedPosts.length} posts</span>
+              </div>
+
+              {/* Month indicator */}
+              <div className="px-3 py-1.5 border-b border-white/5 shrink-0">
+                <p className="text-[10px] text-gray-500">
+                  <span className="text-emerald-400/80">—</span> {MONTHS[viewMonth]} {viewYear}
+                </p>
+              </div>
+
+              {/* 3-col grid */}
+              <div className="overflow-y-auto flex-1">
+                {feedPosts.length === 0 ? (
+                  <div className="p-4 text-center space-y-1.5 mt-4">
+                    <p className="text-2xl">🖼️</p>
+                    <p className="text-gray-600 text-[11px] leading-snug">
+                      Arraste posts para o calendário para ver o preview
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-px bg-black/40">
+                    {feedPosts.map((post) => {
+                      const thumb = post.coverUrl || (post.fileType === "IMAGE" ? post.fileUrl : null);
+                      const currentMonthKey = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
+                      const inCurrentMonth = post.scheduledDate?.slice(0, 7) === currentMonthKey;
+                      return (
+                        <button
+                          key={post.id}
+                          className="relative aspect-square bg-[#1a1a1a] overflow-hidden group"
+                          onClick={() => setPreviewPost(post)}
+                          title={`${post.title || post.clientName} · ${post.scheduledDate ? new Date(post.scheduledDate).toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit" }) : ""}`}
+                        >
+                          {thumb ? (
+                            <img
+                              src={thumb}
+                              alt=""
+                              className={`w-full h-full object-cover transition-opacity ${inCurrentMonth ? "opacity-100" : "opacity-25"}`}
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                            />
+                          ) : (
+                            <div className={`w-full h-full flex items-center justify-center text-xl ${inCurrentMonth ? "opacity-70" : "opacity-20"}`}>
+                              {post.contentType === "REELS" ? "🎬" : post.contentType === "STORIES" ? "📱" : "🖼️"}
+                            </div>
+                          )}
+
+                          {/* Hover overlay */}
+                          <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-0.5 p-1">
+                            <span className="text-white text-[9px] font-semibold text-center line-clamp-2 leading-tight">
+                              {post.title || post.clientName}
+                            </span>
+                            <span className="text-gray-300 text-[8px]">
+                              {post.scheduledDate
+                                ? new Date(post.scheduledDate).toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit" })
+                                : ""}
+                            </span>
+                          </div>
+
+                          {/* Type icon */}
+                          {post.contentType === "REELS" && (
+                            <div className="absolute top-0.5 right-0.5 text-[9px] drop-shadow">🎬</div>
+                          )}
+                          {post.contentType === "CARROSSEL" && (
+                            <div className="absolute top-0.5 right-0.5 opacity-90">
+                              <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                                <rect x="0" y="0" width="4" height="4" rx="0.5" fill="white"/>
+                                <rect x="5" y="0" width="4" height="4" rx="0.5" fill="white"/>
+                                <rect x="0" y="5" width="4" height="4" rx="0.5" fill="white"/>
+                                <rect x="5" y="5" width="4" height="4" rx="0.5" fill="white"/>
+                              </svg>
+                            </div>
+                          )}
+                          {post.contentType === "STORIES" && (
+                            <div className="absolute top-0.5 right-0.5 text-[8px] drop-shadow">📱</div>
+                          )}
+
+                          {/* Current-month indicator line */}
+                          {inCurrentMonth && (
+                            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-emerald-400/70" />
+                          )}
+                        </button>
+                      );
+                    })}
+                    {/* Fill last row */}
+                    {feedPosts.length % 3 !== 0 &&
+                      Array.from({ length: 3 - (feedPosts.length % 3) }).map((_, i) => (
+                        <div key={`fill-${i}`} className="aspect-square bg-[#111]" />
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer legend */}
+              <div className="px-3 py-2 border-t border-white/5 shrink-0">
+                <div className="flex items-center gap-1.5 text-[9px] text-gray-600">
+                  <span className="inline-block w-3 h-[2px] bg-emerald-400/70 rounded" />
+                  <span>{MONTHS[viewMonth]}</span>
+                  <span className="ml-2 opacity-40">outros meses</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
