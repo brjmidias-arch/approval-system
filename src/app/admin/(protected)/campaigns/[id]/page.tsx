@@ -468,61 +468,64 @@ export default function CampaignPage() {
           <span>/</span>
           <span className="text-white">{campaign.name}</span>
         </div>
-        <div className="flex items-start justify-between gap-4">
-          <div>
+
+        {/* Title + status */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {editingName ? (
             <div className="flex items-center gap-2">
-              {editingName ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    autoFocus
-                    value={nameValue}
-                    onChange={(e) => setNameValue(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleSaveName(); if (e.key === "Escape") setEditingName(false); }}
-                    className="bg-[#0f0f0f] border border-emerald-500 rounded-lg px-3 py-1.5 text-white text-lg font-semibold focus:outline-none w-64"
-                  />
-                  <button onClick={handleSaveName} className="text-emerald-400 hover:text-emerald-300 text-sm">Salvar</button>
-                  <button onClick={() => setEditingName(false)} className="text-gray-500 hover:text-gray-300 text-sm">Cancelar</button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-semibold text-white">{campaign.name}</h1>
-                  <button
-                    onClick={() => { setNameValue(campaign.name); setEditingName(true); }}
-                    className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
-                  >
-                    ✏️
-                  </button>
-                </div>
-              )}
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                campaign.status === "PUBLISHED" ? "bg-teal-900/30 text-teal-400"
-                : campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
-                : campaign.status === "DRAFT" ? "bg-gray-800 text-gray-400"
-                : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "bg-violet-900/30 text-violet-400"
-                : "bg-emerald-900/30 text-emerald-400"
-              }`}>
-                {campaign.status === "PUBLISHED" ? "Publicado"
-                : campaign.status === "CLOSED" ? "Fechado"
-                : campaign.status === "DRAFT" ? "Rascunho"
-                : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "Revisão Interna"
-                : "Aberto"}
-              </span>
-              {liveStatus && liveStatus.reviewed < liveStatus.total && campaign.status === "OPEN" && (
-                <span className="flex items-center gap-1.5 text-xs text-amber-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  Cliente revisando
-                </span>
-              )}
+              <input
+                autoFocus
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSaveName(); if (e.key === "Escape") setEditingName(false); }}
+                className="bg-[#0f0f0f] border border-emerald-500 rounded-lg px-3 py-1.5 text-white text-lg font-semibold focus:outline-none w-64"
+              />
+              <button onClick={handleSaveName} className="text-emerald-400 hover:text-emerald-300 text-sm">Salvar</button>
+              <button onClick={() => setEditingName(false)} className="text-gray-500 hover:text-gray-300 text-sm">Cancelar</button>
             </div>
-            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              <span className="text-gray-400 text-sm">{campaign.client.name}</span>
-              <span className="text-gray-600 text-sm">·</span>
-              <span className="text-gray-400 text-sm">
-                Prazo: {new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          ) : (
+            <>
+              <h1 className="text-xl font-semibold text-white">{campaign.name}</h1>
+              <button
+                onClick={() => { setNameValue(campaign.name); setEditingName(true); }}
+                className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
+              >
+                ✏️
+              </button>
+            </>
+          )}
+          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+            campaign.status === "PUBLISHED" ? "bg-teal-900/30 text-teal-400"
+            : campaign.status === "CLOSED" ? "bg-gray-800 text-gray-400"
+            : campaign.status === "DRAFT" ? "bg-gray-800 text-gray-400"
+            : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "bg-violet-900/30 text-violet-400"
+            : "bg-emerald-900/30 text-emerald-400"
+          }`}>
+            {campaign.status === "PUBLISHED" ? "Publicado"
+            : campaign.status === "CLOSED" ? "Fechado"
+            : campaign.status === "DRAFT" ? "Rascunho"
+            : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "Revisão Interna"
+            : "Aberto"}
+          </span>
+          {liveStatus && liveStatus.reviewed < liveStatus.total && campaign.status === "OPEN" && (
+            <span className="flex items-center gap-1.5 text-xs text-amber-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              Cliente revisando
+            </span>
+          )}
+        </div>
+
+        {/* Subtitle */}
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <span className="text-gray-400 text-sm">{campaign.client.name}</span>
+          <span className="text-gray-600 text-sm">·</span>
+          <span className="text-gray-400 text-sm">
+            Prazo: {new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}
+          </span>
+        </div>
+
+        {/* Action buttons — full width row, wraps on smaller screens */}
+        <div className="flex items-center gap-2 flex-wrap mt-3">
             {/* DRAFT: upload + send to internal review */}
             {campaign.status === "DRAFT" && (
               <>
@@ -654,7 +657,6 @@ export default function CampaignPage() {
               Excluir
             </button>
           </div>
-        </div>
       </div>
 
       {/* Stats */}
