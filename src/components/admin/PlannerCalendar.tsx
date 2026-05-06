@@ -238,6 +238,7 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
   const [activePost, setActivePost] = useState<Post | null>(null);
   const [previewPost, setPreviewPost] = useState<Post | null>(null);
   const [activeNote, setActiveNote] = useState<NoteEntry | null>(null);
+  const [feedExpanded, setFeedExpanded] = useState(false);
   const [notes, setNotes] = useState<NoteMap>({});
   const [addingNoteDate, setAddingNoteDate] = useState<string | null>(null);
   const [noteInput, setNoteInput] = useState("");
@@ -258,6 +259,14 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
       }
     } catch {}
   }, [storageKey]);
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setFeedExpanded(false);
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
 
   function saveNotes(updated: NoteMap) {
     setNotes(updated);
@@ -403,6 +412,123 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
     <>
       {previewPost && <PostPreviewModal post={previewPost} onClose={() => setPreviewPost(null)} />}
 
+      {/* Expanded feed modal */}
+      {feedExpanded && (
+        <div
+          className="fixed inset-0 bg-black/85 z-[200] flex items-center justify-center p-6"
+          onClick={() => setFeedExpanded(false)}
+        >
+          <div
+            className="bg-[#111] border border-white/10 rounded-2xl overflow-hidden flex flex-col w-full max-w-2xl max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-pink-400">▣</span>
+                <p className="text-sm font-semibold text-white">Preview do Feed — Instagram</p>
+                <span className="text-xs text-gray-500">{feedPosts.length} posts agendados</span>
+              </div>
+              <button
+                onClick={() => setFeedExpanded(false)}
+                className="text-gray-500 hover:text-white transition-colors text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Legend row */}
+            <div className="px-5 py-2 border-b border-white/5 flex items-center gap-4 shrink-0">
+              <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                <span className="inline-block w-4 h-[2px] bg-emerald-400/70 rounded" />
+                <span>{MONTHS[viewMonth]} {viewYear}</span>
+              </div>
+              <span className="text-[11px] text-gray-600">posts de outros meses aparecem em 25% opacidade</span>
+            </div>
+
+            {/* Grid */}
+            <div className="overflow-y-auto flex-1">
+              {feedPosts.length === 0 ? (
+                <div className="p-12 text-center space-y-2">
+                  <p className="text-4xl">🖼️</p>
+                  <p className="text-gray-500 text-sm">Nenhum post agendado ainda</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-px bg-black/40">
+                  {feedPosts.map((post) => {
+                    const thumb = post.coverUrl || (post.fileType === "IMAGE" ? post.fileUrl : null);
+                    const currentMonthKey = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
+                    const inCurrentMonth = post.scheduledDate?.slice(0, 7) === currentMonthKey;
+                    return (
+                      <button
+                        key={post.id}
+                        className="relative aspect-square bg-[#1a1a1a] overflow-hidden group"
+                        onClick={() => { setFeedExpanded(false); setPreviewPost(post); }}
+                      >
+                        {thumb ? (
+                          <img
+                            src={thumb}
+                            alt=""
+                            className={`w-full h-full object-cover transition-opacity ${inCurrentMonth ? "opacity-100" : "opacity-25"}`}
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                          />
+                        ) : (
+                          <div className={`w-full h-full flex items-center justify-center text-4xl ${inCurrentMonth ? "opacity-70" : "opacity-20"}`}>
+                            {post.contentType === "REELS" ? "🎬" : post.contentType === "STORIES" ? "📱" : "🖼️"}
+                          </div>
+                        )}
+
+                        {/* Hover overlay */}
+                        <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-end justify-end p-2 gap-0.5">
+                          <span className="text-white text-xs font-semibold text-right line-clamp-2 leading-tight w-full">
+                            {post.title || post.clientName}
+                          </span>
+                          <span className="text-gray-300 text-[11px]">
+                            {post.scheduledDate
+                              ? new Date(post.scheduledDate).toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "2-digit" })
+                              : ""}
+                          </span>
+                          {post.clientName && post.title && (
+                            <span className="text-gray-500 text-[10px]">{post.clientName}</span>
+                          )}
+                        </div>
+
+                        {/* Type badge */}
+                        {post.contentType === "REELS" && (
+                          <div className="absolute top-1.5 right-1.5 text-sm drop-shadow">🎬</div>
+                        )}
+                        {post.contentType === "CARROSSEL" && (
+                          <div className="absolute top-1.5 right-1.5 opacity-90">
+                            <svg width="12" height="12" viewBox="0 0 9 9" fill="none">
+                              <rect x="0" y="0" width="4" height="4" rx="0.5" fill="white"/>
+                              <rect x="5" y="0" width="4" height="4" rx="0.5" fill="white"/>
+                              <rect x="0" y="5" width="4" height="4" rx="0.5" fill="white"/>
+                              <rect x="5" y="5" width="4" height="4" rx="0.5" fill="white"/>
+                            </svg>
+                          </div>
+                        )}
+                        {post.contentType === "STORIES" && (
+                          <div className="absolute top-1.5 right-1.5 text-sm drop-shadow">📱</div>
+                        )}
+
+                        {/* Month indicator */}
+                        {inCurrentMonth && (
+                          <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-emerald-400/70" />
+                        )}
+                      </button>
+                    );
+                  })}
+                  {feedPosts.length % 3 !== 0 &&
+                    Array.from({ length: 3 - (feedPosts.length % 3) }).map((_, i) => (
+                      <div key={`fill-${i}`} className="aspect-square bg-[#111]" />
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex gap-3 h-full">
 
@@ -512,13 +638,20 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
           <div className="w-[172px] shrink-0 flex flex-col gap-2">
             <div className="bg-[#111] border border-white/10 rounded-xl overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 120px)" }}>
               {/* Header */}
-              <div className="px-3 py-2.5 border-b border-white/10 flex items-center justify-between shrink-0">
+              <button
+                className="px-3 py-2.5 border-b border-white/10 flex items-center justify-between shrink-0 w-full hover:bg-white/[0.03] transition-colors group"
+                onClick={() => setFeedExpanded(true)}
+                title="Expandir preview do feed"
+              >
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] text-pink-400">▣</span>
                   <p className="text-xs font-semibold text-gray-300">Preview Feed</p>
                 </div>
-                <span className="text-[10px] text-gray-600">{feedPosts.length} posts</span>
-              </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-gray-600">{feedPosts.length} posts</span>
+                  <span className="text-gray-600 group-hover:text-gray-300 transition-colors text-[11px]">⤢</span>
+                </div>
+              </button>
 
               {/* Month indicator */}
               <div className="px-3 py-1.5 border-b border-white/5 shrink-0">

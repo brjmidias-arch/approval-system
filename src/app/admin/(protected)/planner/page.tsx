@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma";
 import PlannerCalendar from "@/components/admin/PlannerCalendar";
 
 export default async function PlannerPage() {
-  const oneMonthAgo = new Date();
-  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+  const twoMonthsAgo = new Date();
+  twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
 
   const campaigns = await prisma.campaign.findMany({
     include: {
@@ -15,7 +15,7 @@ export default async function PlannerPage() {
           approvalItem: { status: "APPROVED" },
           OR: [
             { scheduledDate: null },
-            { scheduledDate: { gte: oneMonthAgo } },
+            { scheduledDate: { gte: twoMonthsAgo } },
           ],
         },
         orderBy: { order: "asc" },
