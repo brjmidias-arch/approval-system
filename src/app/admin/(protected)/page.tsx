@@ -130,7 +130,6 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
   });
 
   const totalClients = clients.length;
-  const totalCampaigns = clients.reduce((acc, c) => acc + c.campaigns.length, 0);
   const openCampaigns = clients.reduce(
     (acc, c) => acc + c.campaigns.filter((cam) => cam.status === "OPEN").length,
     0
@@ -204,34 +203,91 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4">
-          <p className="text-gray-400 text-xs uppercase tracking-wider">Campanhas</p>
-          <p className="text-3xl font-bold text-white mt-1">{totalCampaigns}</p>
+      <div className="grid grid-cols-4 gap-3">
+        {/* Ativas */}
+        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4 flex flex-col justify-between gap-3">
+          <div className="flex items-center justify-between">
+            <p className="text-gray-500 text-xs uppercase tracking-wider font-medium">Ativas</p>
+            <span className="text-lg">📋</span>
+          </div>
+          <div>
+            <p className="text-3xl font-bold text-white">{activeCampaigns.length}</p>
+            <p className="text-xs text-gray-600 mt-1">
+              {publishedCampaigns.length > 0
+                ? `${publishedCampaigns.length} publicada${publishedCampaigns.length > 1 ? "s" : ""}`
+                : "nenhuma publicada"}
+            </p>
+          </div>
         </div>
-        <div
-          className={`border rounded-xl p-4 ${
-            internalReviewCampaigns > 0 ? "bg-violet-900/20 border-violet-500/30" : "bg-[#1a1a1a] border-white/10"
-          }`}
-        >
-          <p className="text-gray-400 text-xs uppercase tracking-wider">Revisão Interna</p>
-          <p className={`text-3xl font-bold mt-1 ${internalReviewCampaigns > 0 ? "text-violet-400" : "text-white"}`}>
-            {internalReviewCampaigns}
-          </p>
+
+        {/* Revisão Interna */}
+        <div className={`border rounded-xl p-4 flex flex-col justify-between gap-3 ${
+          internalReviewCampaigns > 0 ? "bg-violet-900/20 border-violet-500/30" : "bg-[#1a1a1a] border-white/10"
+        }`}>
+          <div className="flex items-center justify-between">
+            <p className="text-gray-500 text-xs uppercase tracking-wider font-medium">Revisão Interna</p>
+            <span className="text-lg">🔍</span>
+          </div>
+          <div>
+            <p className={`text-3xl font-bold ${internalReviewCampaigns > 0 ? "text-violet-400" : "text-white"}`}>
+              {internalReviewCampaigns}
+            </p>
+            <p className="text-xs mt-1">
+              {internalAdjustCount > 0
+                ? <span className="text-amber-400">{internalAdjustCount} com ajuste pendente</span>
+                : <span className="text-gray-600">sem ajustes pendentes</span>}
+            </p>
+          </div>
         </div>
-        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4">
-          <p className="text-gray-400 text-xs uppercase tracking-wider">Em Aberto</p>
-          <p className="text-3xl font-bold text-emerald-400 mt-1">{openCampaigns}</p>
+
+        {/* Com Cliente */}
+        <div className={`border rounded-xl p-4 flex flex-col justify-between gap-3 ${
+          longWaitCount > 0 ? "bg-orange-900/10 border-orange-500/20"
+          : openCampaigns > 0 ? "bg-emerald-900/10 border-emerald-500/20"
+          : "bg-[#1a1a1a] border-white/10"
+        }`}>
+          <div className="flex items-center justify-between">
+            <p className="text-gray-500 text-xs uppercase tracking-wider font-medium">Com Cliente</p>
+            <span className="text-lg">👤</span>
+          </div>
+          <div>
+            <p className={`text-3xl font-bold ${
+              longWaitCount > 0 ? "text-orange-400"
+              : openCampaigns > 0 ? "text-emerald-400"
+              : "text-white"
+            }`}>
+              {openCampaigns}
+            </p>
+            <p className="text-xs mt-1">
+              {longWaitCount > 0
+                ? <span className="text-orange-400">⚠ {longWaitCount} aguardam 7+ dias</span>
+                : openCampaigns > 0
+                ? <span className="text-gray-500">dentro do prazo</span>
+                : <span className="text-gray-600">nenhuma enviada</span>}
+            </p>
+          </div>
         </div>
-        <div
-          className={`border rounded-xl p-4 ${
-            awaitingAction > 0 ? "bg-amber-900/20 border-amber-500/30" : "bg-[#1a1a1a] border-white/10"
-          }`}
-        >
-          <p className="text-gray-400 text-xs uppercase tracking-wider">Aguardando Ação</p>
-          <p className={`text-3xl font-bold mt-1 ${awaitingAction > 0 ? "text-amber-400" : "text-white"}`}>
-            {awaitingAction}
-          </p>
+
+        {/* Pós-aprovação */}
+        <div className={`border rounded-xl p-4 flex flex-col justify-between gap-3 ${
+          awaitingAction > 0 ? "bg-amber-900/20 border-amber-500/30" : "bg-[#1a1a1a] border-white/10"
+        }`}>
+          <div className="flex items-center justify-between">
+            <p className="text-gray-500 text-xs uppercase tracking-wider font-medium">Pós-aprovação</p>
+            <span className="text-lg">✅</span>
+          </div>
+          <div>
+            <p className={`text-3xl font-bold ${awaitingAction > 0 ? "text-amber-400" : "text-white"}`}>
+              {awaitingAction}
+            </p>
+            <p className="text-xs text-gray-600 mt-1 flex flex-wrap gap-x-2">
+              {adjustmentCount > 0 && <span className="text-amber-500">{adjustmentCount} ajuste{adjustmentCount > 1 ? "s" : ""}</span>}
+              {buckets.planner.length > 0 && <span className="text-sky-500">{buckets.planner.length} p/ agendar</span>}
+              {buckets.production.length > 0 && <span className="text-orange-500">{buckets.production.length} produção</span>}
+              {buckets.publish.length > 0 && <span className="text-teal-500">{buckets.publish.length} p/ publicar</span>}
+              {awaitingAction === 0 && <span>nenhuma pendente</span>}
+            </p>
+          </div>
         </div>
       </div>
 
