@@ -9,7 +9,7 @@ import AutoRefresh from "@/components/admin/AutoRefresh";
 function getStatusCounts(campaign: {
   status: string;
   approvalItems: { status: string; contentItemId: string }[];
-  contentItems: { id: string; groupId: string | null; contentType: string }[];
+  contentItems: { id: string; groupId: string | null; contentType: string; scheduledDate: Date | null }[];
 }) {
   const seenGroupIds = new Set<string>();
   const posts: { id: string; groupId: string | null }[] = [];
@@ -46,7 +46,21 @@ function getStatusCounts(campaign: {
       campaign.approvalItems.some((a) => a.contentItemId === item.id && a.status === "APPROVED")
   );
 
-  return { total, approved, adjustment, rejected, pending, clientFinished, allReviewed, hasApprovedTexto };
+  const approvedUnscheduledNonTexto = posts.filter((p) => {
+    const item = campaign.contentItems.find((c) => c.id === p.id);
+    if (!item || item.contentType === "TEXTO") return false;
+    if (getPostStatus(p) !== "APPROVED") return false;
+    return !item.scheduledDate;
+  }).length;
+
+  const approvedScheduledNonTexto = posts.filter((p) => {
+    const item = campaign.contentItems.find((c) => c.id === p.id);
+    if (!item || item.contentType === "TEXTO") return false;
+    if (getPostStatus(p) !== "APPROVED") return false;
+    return !!item.scheduledDate;
+  }).length;
+
+  return { total, approved, adjustment, rejected, pending, clientFinished, allReviewed, hasApprovedTexto, approvedUnscheduledNonTexto, approvedScheduledNonTexto };
 }
 
 type KanbanCol = "draft" | "internal" | "internalAdj" | "waiting" | "adjustments" | "planner" | "production" | "publish";
@@ -85,23 +99,25 @@ function classifyCampaign(
     sentToProduction: boolean;
     contentItems: { postedAt: Date | null; contentType: string; groupId: string | null; scheduledDate: Date | null; internalReviewItem: { status: string } | null }[];
   },
-  counts: { adjustment: number; rejected: number; hasApprovedTexto: boolean }
-): KanbanCol {
-  if (campaign.status === "DRAFT") return "draft";
+  counts: { adjustment: number; rejected: number; hasApprovedTexto: boolean; approvedUnscheduledNonTexto: number; approvedScheduledNonTexto: number }
+): KanbanCol[] {
+  if (campaign.status === "DRAFT") return ["draft"];
   if (campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE") {
     const hasAdj = campaign.contentItems.some(
       (i) => i.internalReviewItem?.status === "ADJUSTMENT" || i.internalReviewItem?.status === "REJECTED"
     );
-    return hasAdj ? "internalAdj" : "internal";
+    return [hasAdj ? "internalAdj" : "internal"];
   }
-  if (campaign.status === "OPEN") return "waiting";
+  if (campaign.status === "OPEN") return ["waiting"];
   if (campaign.status === "CLOSED") {
-    if (counts.adjustment > 0 || counts.rejected > 0) return "adjustments";
-    if (unscheduledNonTextoCount(campaign.contentItems) > 0) return "planner";
-    if (counts.hasApprovedTexto && !campaign.sentToProduction) return "production";
-    return "publish";
+    const cols: KanbanCol[] = [];
+    if (counts.adjustment > 0 || counts.rejected > 0) cols.push("adjustments");
+    if (counts.approvedUnscheduledNonTexto > 0) cols.push("planner");
+    if (counts.hasApprovedTexto && !campaign.sentToProduction) cols.push("production");
+    if (counts.approvedScheduledNonTexto > 0) cols.push("publish");
+    return cols.length > 0 ? cols : ["adjustments"];
   }
-  return "draft";
+  return ["draft"];
 }
 
 export default async function AdminDashboard({ searchParams }: { searchParams: { tab?: string } }) {
@@ -153,7 +169,15 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     client.campaigns.map((campaign) => ({ campaign, client }))
   );
 
-  const activeCampaigns = allCampaigns.filter(({ campaign }) => campaign.status !== "PUBLISHED");
+  const activeCampaigns = allCampaigns.filter(({ campaign }) => {
+    if (campaign.status === "PUBLISHED") return false;
+    // Texto-only campaigns already sent to production are done — exclude from active kanban
+    if (
+      (campaign as { sentToProduction?: boolean }).sentToProduction &&
+      !campaign.contentItems.some((i) => i.contentType !== "TEXTO")
+    ) return false;
+    return true;
+  });
   const publishedCampaigns = allCampaigns
     .filter(({ campaign }) => campaign.status === "PUBLISHED")
     .sort((a, b) => new Date(b.campaign.createdAt).getTime() - new Date(a.campaign.createdAt).getTime());
@@ -169,8 +193,10 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
   };
   for (const { campaign, client } of activeCampaigns) {
     const counts = getStatusCounts(campaign);
-    const col = classifyCampaign(campaign, counts);
-    buckets[col].push({ campaign, client, counts });
+    const cols = classifyCampaign(campaign, counts);
+    for (const col of cols) {
+      buckets[col].push({ campaign, client, counts });
+    }
   }
 
   // Notification bar data
@@ -183,7 +209,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
   });
   const longWaitCount = longWaitItems.length;
   const plannerPostCount = buckets.planner.reduce(
-    (sum, { campaign }) => sum + unscheduledNonTextoCount(campaign.contentItems),
+    (sum, { counts }) => sum + counts.approvedUnscheduledNonTexto,
     0
   );
   const hasAlerts = internalAdjustCount > 0 || adjustmentCount > 0 || longWaitCount > 0 || buckets.planner.length > 0;
@@ -415,7 +441,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                           (i) => !i.internalReviewItem || i.internalReviewItem.status === "PENDING"
                         ).length;
                         const unscheduled =
-                          col.id === "planner" ? unscheduledNonTextoCount(campaign.contentItems) : 0;
+                          col.id === "planner" ? counts.approvedUnscheduledNonTexto : 0;
                         const hasTexto = campaign.contentItems.some((i) => i.contentType === "TEXTO");
 
                         return (
@@ -494,7 +520,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
 
                               {col.id === "publish" && (
                                 <span className="text-[10px] font-medium text-teal-400 bg-teal-900/30 px-1.5 py-0.5 rounded">
-                                  ✅ Todos aprovados
+                                  📅 {counts.approvedScheduledNonTexto} agendado{counts.approvedScheduledNonTexto !== 1 ? "s" : ""}
                                 </span>
                               )}
                             </div>
@@ -516,6 +542,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                                 <SentToProductionButton
                                   campaignId={campaign.id}
                                   alreadySent={(campaign as { sentToProduction?: boolean }).sentToProduction ?? false}
+                                  isTextoOnly={!campaign.contentItems.some((i) => i.contentType !== "TEXTO")}
                                 />
                               </div>
                             )}

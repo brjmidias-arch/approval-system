@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 interface Props {
   campaignId: string;
   alreadySent: boolean;
+  isTextoOnly?: boolean;
 }
 
-export default function SentToProductionButton({ campaignId, alreadySent }: Props) {
+export default function SentToProductionButton({ campaignId, alreadySent, isTextoOnly }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -20,7 +21,10 @@ export default function SentToProductionButton({ campaignId, alreadySent }: Prop
     await fetch(`/api/admin/campaigns/${campaignId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sentToProduction: true }),
+      body: JSON.stringify({
+        sentToProduction: true,
+        ...(isTextoOnly && { status: "PUBLISHED" }),
+      }),
     });
     setLoading(false);
     router.refresh();

@@ -575,10 +575,14 @@ export default function CampaignPage() {
                   ) : (
                     <button
                       onClick={async () => {
+                        const isTextoOnly = campaign.contentItems.every((i) => i.contentType === "TEXTO");
                         const res = await fetch(`/api/admin/campaigns/${id}`, {
                           method: "PUT",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ sentToProduction: true }),
+                          body: JSON.stringify({
+                            sentToProduction: true,
+                            ...(isTextoOnly && { status: "PUBLISHED" }),
+                          }),
                         });
                         if (res.ok) fetchCampaign();
                         else alert("Erro ao marcar como enviado para produção.");
