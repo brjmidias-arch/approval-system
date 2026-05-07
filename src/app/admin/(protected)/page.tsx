@@ -108,7 +108,18 @@ function classifyCampaign(
     );
     return [hasAdj ? "internalAdj" : "internal"];
   }
-  if (campaign.status === "OPEN") return ["waiting"];
+  if (campaign.status === "OPEN") {
+    const cols: KanbanCol[] = ["waiting"];
+    const hasInternalAdj = campaign.contentItems.some(
+      (i) => i.internalReviewItem?.status === "ADJUSTMENT" || i.internalReviewItem?.status === "REJECTED"
+    );
+    const hasInternalPending = campaign.contentItems.some(
+      (i) => !i.internalReviewItem || i.internalReviewItem.status === "PENDING"
+    );
+    if (hasInternalAdj) cols.push("internalAdj");
+    else if (hasInternalPending) cols.push("internal");
+    return cols;
+  }
   if (campaign.status === "CLOSED") {
     const cols: KanbanCol[] = [];
     if (counts.adjustment > 0 || counts.rejected > 0) cols.push("adjustments");
