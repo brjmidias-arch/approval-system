@@ -9,7 +9,7 @@ import AutoRefresh from "@/components/admin/AutoRefresh";
 function getStatusCounts(campaign: {
   status: string;
   approvalItems: { status: string; contentItemId: string }[];
-  contentItems: { id: string; groupId: string | null; contentType: string; scheduledDate: Date | null }[];
+  contentItems: { id: string; groupId: string | null; contentType: string; scheduledDate: Date | null; internalReviewItem: { status: string } | null }[];
 }) {
   const seenGroupIds = new Set<string>();
   const posts: { id: string; groupId: string | null }[] = [];
@@ -60,7 +60,18 @@ function getStatusCounts(campaign: {
     return !!item.scheduledDate;
   }).length;
 
-  return { total, approved, adjustment, rejected, pending, clientFinished, allReviewed, hasApprovedTexto, approvedUnscheduledNonTexto, approvedScheduledNonTexto };
+  // Count by grouped posts (carousel = 1 post), not individual items
+  const pendingInternalPosts = posts.filter((p) => {
+    const item = campaign.contentItems.find((c) => c.id === p.id);
+    return !item?.internalReviewItem || item.internalReviewItem.status === "PENDING";
+  }).length;
+
+  const adjInternalPosts = posts.filter((p) => {
+    const item = campaign.contentItems.find((c) => c.id === p.id);
+    return item?.internalReviewItem?.status === "ADJUSTMENT" || item?.internalReviewItem?.status === "REJECTED";
+  }).length;
+
+  return { total, approved, adjustment, rejected, pending, clientFinished, allReviewed, hasApprovedTexto, approvedUnscheduledNonTexto, approvedScheduledNonTexto, pendingInternalPosts, adjInternalPosts };
 }
 
 type KanbanCol = "draft" | "internal" | "internalAdj" | "waiting" | "adjustments" | "planner" | "production" | "publish";
@@ -448,9 +459,6 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                             i.internalReviewItem?.status === "ADJUSTMENT" ||
                             i.internalReviewItem?.status === "REJECTED"
                         );
-                        const pendingInternalCount = campaign.contentItems.filter(
-                          (i) => !i.internalReviewItem || i.internalReviewItem.status === "PENDING"
-                        ).length;
                         const unscheduled =
                           col.id === "planner" ? counts.approvedUnscheduledNonTexto : 0;
                         const hasTexto = campaign.contentItems.some((i) => i.contentType === "TEXTO");
@@ -479,30 +487,31 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                                   <span className="text-[10px] font-medium text-emerald-400 bg-emerald-900/30 px-1.5 py-0.5 rounded">
                                     ✅ Pronto
                                   </span>
-                                ) : pendingInternalCount > 0 ? (
+                                ) : counts.pendingInternalPosts > 0 ? (
                                   <span className="text-[10px] font-medium text-violet-400 bg-violet-900/30 px-1.5 py-0.5 rounded">
-                                    🔍 {pendingInternalCount} pend.
+                                    🔍 {counts.pendingInternalPosts} {counts.pendingInternalPosts === 1 ? "post pend." : "posts pend."}
                                   </span>
                                 ) : null)}
 
                               {col.id === "internalAdj" && (
                                 <span className="text-[10px] font-medium text-amber-400 bg-amber-900/30 px-1.5 py-0.5 rounded">
-                                  ⚠️ Ajuste interno
+                                  ⚠️ {counts.adjInternalPosts} {counts.adjInternalPosts === 1 ? "post c/ ajuste" : "posts c/ ajuste"}
                                 </span>
                               )}
 
                               {col.id === "waiting" && (
-                                <span
-                                  className={`text-[10px] font-medium ${
-                                    daysSince >= 7
-                                      ? "text-red-400"
-                                      : daysSince >= 3
-                                      ? "text-amber-400"
-                                      : "text-gray-500"
-                                  }`}
-                                >
-                                  · {daysSince === 0 ? "hoje" : `${daysSince}d`}
-                                </span>
+                                <>
+                                  {counts.pending > 0 && (
+                                    <span className="text-[10px] font-medium text-gray-500">
+                                      · {counts.pending} pend.
+                                    </span>
+                                  )}
+                                  <span className={`text-[10px] font-medium ${
+                                    daysSince >= 7 ? "text-red-400" : daysSince >= 3 ? "text-amber-400" : "text-gray-500"
+                                  }`}>
+                                    · {daysSince === 0 ? "hoje" : `${daysSince}d`}
+                                  </span>
+                                </>
                               )}
 
                               {col.id === "adjustments" && (
