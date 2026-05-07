@@ -984,13 +984,18 @@ export default function CampaignPage() {
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-white/5">
+          <div className="flex flex-col gap-3 p-3">
             {grouped.map((group, gi) => {
               if (group.type === "single") {
                 const item = group.item;
                 const statusKey = (item.approvalItem?.status || "PENDING") as ApprovalStatus;
                 return (
-                  <div key={item.id} className="flex items-start gap-4 px-5 py-4">
+                  <div key={item.id} className="bg-black/20 border border-white/[0.08] rounded-xl overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.06]">
+                      <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Post {gi + 1}</span>
+                      {item.title && <span className="text-[11px] text-gray-600 truncate">— {item.title}</span>}
+                    </div>
+                    <div className="flex items-start gap-4 px-5 py-4">
                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-black/40 shrink-0 flex items-center justify-center">
                       {item.fileType === "IMAGE" ? (
                         <img
@@ -1096,6 +1101,7 @@ export default function CampaignPage() {
                         Remover
                       </button>
                     </div>
+                    </div>
                   </div>
                 );
               }
@@ -1104,7 +1110,12 @@ export default function CampaignPage() {
               const slides = group.items;
               const firstItem = slides[0];
               return (
-                <div key={`carousel-${gi}`} className="px-5 py-4">
+                <div key={`carousel-${gi}`} className="bg-black/20 border border-white/[0.08] rounded-xl overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.06]">
+                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Post {gi + 1}</span>
+                    {firstItem.title && <span className="text-[11px] text-gray-600 truncate">— {firstItem.title}</span>}
+                  </div>
+                  <div className="px-5 py-4">
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       {firstItem.title && (
@@ -1169,6 +1180,7 @@ export default function CampaignPage() {
                     onEdit={() => openEditGroup(slides)}
                     onReorder={() => {}}
                   />
+                  </div>
                 </div>
               );
             })}
