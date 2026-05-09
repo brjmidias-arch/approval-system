@@ -134,9 +134,13 @@ function classifyCampaign(
   if (campaign.status === "CLOSED") {
     const cols: KanbanCol[] = [];
     if (counts.adjustment > 0 || counts.rejected > 0) cols.push("adjustments");
-    if (counts.approvedUnscheduledNonTexto > 0) cols.push("planner");
     if (counts.hasApprovedTexto && !campaign.sentToProduction) cols.push("production");
-    if (counts.approvedScheduledNonTexto > 0) cols.push("publish");
+    // Mutually exclusive: planner takes priority while any post is still unscheduled
+    if (counts.approvedUnscheduledNonTexto > 0) {
+      cols.push("planner");
+    } else if (counts.approvedScheduledNonTexto > 0) {
+      cols.push("publish");
+    }
     return cols.length > 0 ? cols : ["adjustments"];
   }
   return ["draft"];

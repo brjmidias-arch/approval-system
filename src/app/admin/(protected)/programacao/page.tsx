@@ -12,11 +12,26 @@ export default async function ProgramacaoPage({
   const tab = searchParams.tab === "concluidos" ? "concluidos" : "pendentes";
 
   const campaigns = await prisma.campaign.findMany({
+    where: { status: { in: ["CLOSED", "PUBLISHED"] } },
     include: {
       client: true,
+      approvalItems: true,
       contentItems: {
         orderBy: { order: "asc" },
-        include: { approvalItem: true },
+        select: {
+          id: true,
+          contentType: true,
+          groupId: true,
+          title: true,
+          caption: true,
+          fileUrl: true,
+          fileType: true,
+          coverUrl: true,
+          coverDriveUrl: true,
+          driveUrl: true,
+          scheduledDate: true,
+          postedAt: true,
+        },
       },
     },
     orderBy: { createdAt: "desc" },
@@ -29,13 +44,14 @@ export default async function ProgramacaoPage({
     const posts: Post[] = [];
 
     for (const item of campaign.contentItems) {
-      if (item.approvalItem?.status !== "APPROVED") continue;
       if (item.contentType === "TEXTO") continue;
+      const approval = campaign.approvalItems.find((a) => a.contentItemId === item.id);
+      if (approval?.status !== "APPROVED") continue;
 
       const base = {
         campaignId: campaign.id,
         campaignName: campaign.name,
-        approvedAt: item.approvalItem.reviewedAt?.toISOString() ?? null,
+        approvedAt: approval.reviewedAt?.toISOString() ?? null,
         postedAt: item.postedAt?.toISOString() ?? null,
         scheduledDate: item.scheduledDate?.toISOString() ?? null,
       };
