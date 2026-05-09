@@ -14,6 +14,22 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       },
     });
     if (!campaign) return NextResponse.json({ error: "Campanha não encontrada" }, { status: 404 });
+
+    // Retroactive fix: auto-close OPEN campaigns where all visible items are already approved.
+    // Catches campaigns stuck due to the approval route count-mismatch bug.
+    if (campaign.status === "OPEN") {
+      const visibleItems = campaign.contentItems.filter(
+        (i) => !i.internalReviewItem || i.internalReviewItem.status === "APPROVED"
+      );
+      const allApproved =
+        visibleItems.length > 0 &&
+        visibleItems.every((i) => i.approvalItem && i.approvalItem.status !== "PENDING");
+      if (allApproved) {
+        await prisma.campaign.update({ where: { id: campaign.id }, data: { status: "CLOSED" } });
+        campaign.status = "CLOSED";
+      }
+    }
+
     return NextResponse.json(campaign);
   } catch {
     return NextResponse.json({ error: "Erro ao buscar campanha" }, { status: 500 });

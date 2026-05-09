@@ -76,6 +76,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
         reviewedAt: new Date(),
       },
     });
+
+    // Auto-transition: when every item has been reviewed, mark internal review done
+    if (campaign.status === "INTERNAL_REVIEW") {
+      const stillPending = await prisma.contentItem.count({
+        where: { campaignId: campaign.id, internalReviewItem: { is: null } },
+      });
+      if (stillPending === 0) {
+        await prisma.campaign.update({
+          where: { id: campaign.id },
+          data: { status: "INTERNAL_DONE" },
+        });
+      }
+    }
+
     return NextResponse.json(item);
   } catch {
     return NextResponse.json({ error: "Erro ao salvar revisão" }, { status: 500 });
