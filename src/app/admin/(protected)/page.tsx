@@ -167,6 +167,27 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     orderBy: { createdAt: "desc" },
   });
 
+  // Retroactive fix: close any OPEN campaigns where all visible items are already approved.
+  for (const client of clients) {
+    for (const campaign of client.campaigns) {
+      if (campaign.status === "OPEN") {
+        const visibleItems = campaign.contentItems.filter(
+          (i) => !i.internalReviewItem || i.internalReviewItem.status === "APPROVED"
+        );
+        const allApproved =
+          visibleItems.length > 0 &&
+          visibleItems.every((i) => {
+            const a = campaign.approvalItems.find((ap) => ap.contentItemId === i.id);
+            return a && a.status !== "PENDING";
+          });
+        if (allApproved) {
+          await prisma.campaign.update({ where: { id: campaign.id }, data: { status: "CLOSED" } });
+          campaign.status = "CLOSED";
+        }
+      }
+    }
+  }
+
   const totalClients = clients.length;
   const openCampaigns = clients.reduce(
     (acc, c) => acc + c.campaigns.filter((cam) => cam.status === "OPEN").length,
