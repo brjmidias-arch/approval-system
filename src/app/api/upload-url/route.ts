@@ -13,6 +13,15 @@ const ALLOWED_TYPES: Record<string, string> = {
   "application/pdf": "PDF",
 };
 
+const ALLOWED_EXTENSIONS: Record<string, string[]> = {
+  "image/jpeg": ["jpg", "jpeg"],
+  "image/jpg": ["jpg", "jpeg"],
+  "image/png": ["png"],
+  "image/webp": ["webp"],
+  "video/mp4": ["mp4"],
+  "application/pdf": ["pdf"],
+};
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,7 +34,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Tipo não permitido." }, { status: 400 });
   }
 
-  const ext = fileName.split(".").pop();
+  const ext = fileName.split(".").pop()?.toLowerCase();
+  const allowedExts = ALLOWED_EXTENSIONS[contentType];
+  if (!ext || !allowedExts.includes(ext)) {
+    return NextResponse.json({ error: "Extensão de arquivo inválida para o tipo selecionado." }, { status: 400 });
+  }
+
   const path = `${uuidv4()}.${ext}`;
 
   const { data, error } = await supabaseAdmin.storage

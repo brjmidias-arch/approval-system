@@ -1,8 +1,12 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "brjmidias";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "#GrupoBRJ123";
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+  throw new Error("ADMIN_USERNAME e ADMIN_PASSWORD devem ser definidos nas variáveis de ambiente");
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
