@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import ProgramacaoKanban, { type ClientData, type Post } from "@/components/admin/ProgramacaoKanban";
+import ProgramacaoKanban, { type CampaignData, type Post } from "@/components/admin/ProgramacaoKanban";
 
 export default async function ProgramacaoPage({
   searchParams,
@@ -91,44 +91,43 @@ export default async function ProgramacaoPage({
     return posts;
   }
 
-  // Build per-client data
-  const clientMap = new Map<string, { clientId: string; clientName: string; posts: Post[] }>();
-
-  for (const campaign of campaigns) {
-    const posts = getApprovedPosts(campaign);
-    if (posts.length === 0) continue;
-    const { id: clientId, name: clientName } = campaign.client;
-    if (!clientMap.has(clientId)) clientMap.set(clientId, { clientId, clientName, posts: [] });
-    clientMap.get(clientId)!.posts.push(...posts);
-  }
-
   const now = new Date();
 
-  const clients: ClientData[] = Array.from(clientMap.values())
-    .map((c) => {
-      const pending = c.posts.filter((p) => !p.scheduledDate && !p.postedAt);
-      const maxDaysWaiting = pending.reduce((max, p) => {
+  // One entry per campaign (matches dashboard structure)
+  const allCampaignData: CampaignData[] = campaigns
+    .map((campaign) => {
+      const posts = getApprovedPosts(campaign);
+      if (posts.length === 0) return null;
+      const unscheduled = posts.filter((p) => !p.scheduledDate && !p.postedAt);
+      const maxDaysWaiting = unscheduled.reduce((max, p) => {
         if (!p.approvedAt) return max;
-        const days = Math.floor(
-          (now.getTime() - new Date(p.approvedAt).getTime()) / (1000 * 60 * 60 * 24)
+        return Math.max(
+          max,
+          Math.floor((now.getTime() - new Date(p.approvedAt).getTime()) / (1000 * 60 * 60 * 24))
         );
-        return Math.max(max, days);
       }, 0);
-      return { ...c, maxDaysWaiting };
+      return {
+        campaignId: campaign.id,
+        campaignName: campaign.name,
+        clientId: campaign.clientId,
+        clientName: campaign.client.name,
+        posts,
+        maxDaysWaiting,
+      };
     })
+    .filter((c): c is CampaignData => c !== null)
     .sort((a, b) => b.maxDaysWaiting - a.maxDaysWaiting);
 
-  // Pendentes = any post without postedAt; Concluídos = all posts have postedAt
-  const pendingClients = clients.filter((c) => c.posts.some((p) => !p.postedAt));
-  const doneClients    = clients.filter((c) => c.posts.length > 0 && c.posts.every((p) => p.postedAt));
+  const pendingCampaigns = allCampaignData.filter((c) => c.posts.some((p) => !p.postedAt));
+  const doneCampaigns = allCampaignData.filter((c) => c.posts.length > 0 && c.posts.every((p) => p.postedAt));
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-white">Programação</h1>
         <p className="text-gray-400 text-sm mt-0.5">
-          {pendingClients.length > 0
-            ? `${pendingClients.length} ${pendingClients.length === 1 ? "cliente" : "clientes"} com posts para agendar`
+          {pendingCampaigns.length > 0
+            ? `${pendingCampaigns.length} ${pendingCampaigns.length === 1 ? "campanha" : "campanhas"} com posts para agendar`
             : "Nenhum post pendente de agendamento"}
         </p>
       </div>
@@ -142,8 +141,8 @@ export default async function ProgramacaoPage({
           }`}
         >
           Pendentes{" "}
-          {pendingClients.length > 0 && (
-            <span className="ml-1 text-xs opacity-60">{pendingClients.length}</span>
+          {pendingCampaigns.length > 0 && (
+            <span className="ml-1 text-xs opacity-60">{pendingCampaigns.length}</span>
           )}
         </Link>
         <Link
@@ -153,32 +152,32 @@ export default async function ProgramacaoPage({
           }`}
         >
           Concluídos{" "}
-          {doneClients.length > 0 && (
-            <span className="ml-1 text-xs opacity-60">{doneClients.length}</span>
+          {doneCampaigns.length > 0 && (
+            <span className="ml-1 text-xs opacity-60">{doneCampaigns.length}</span>
           )}
         </Link>
       </div>
 
       {tab === "pendentes" ? (
-        <ProgramacaoKanban clients={pendingClients} now={now.toISOString()} />
+        <ProgramacaoKanban campaigns={pendingCampaigns} now={now.toISOString()} />
       ) : (
         <div className="space-y-3">
-          {doneClients.length === 0 ? (
+          {doneCampaigns.length === 0 ? (
             <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 text-center">
               <p className="text-gray-400 text-sm">
-                Nenhum cliente com todos os posts publicados ainda.
+                Nenhuma campanha com todos os posts publicados ainda.
               </p>
             </div>
           ) : (
-            doneClients.map((client) => (
+            doneCampaigns.map((c) => (
               <div
-                key={client.clientId}
+                key={c.campaignId}
                 className="bg-[#1a1a1a] border border-white/10 rounded-xl px-5 py-4 flex items-center justify-between"
               >
                 <div>
-                  <p className="text-white font-semibold">{client.clientName}</p>
+                  <p className="text-white font-semibold">{c.clientName}</p>
                   <p className="text-gray-500 text-xs">
-                    {client.posts.filter((p) => p.postedAt).length} posts publicados
+                    {c.campaignName} · {c.posts.filter((p) => p.postedAt).length} posts publicados
                   </p>
                 </div>
                 <span className="text-xs text-emerald-400 bg-emerald-900/20 px-3 py-1 rounded-full">

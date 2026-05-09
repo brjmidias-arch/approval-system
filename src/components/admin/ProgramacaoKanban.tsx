@@ -30,12 +30,17 @@ export interface Post {
   approvedAt: string | null;
 }
 
-export interface ClientData {
+export interface CampaignData {
+  campaignId: string;
+  campaignName: string;
   clientId: string;
   clientName: string;
   posts: Post[];
   maxDaysWaiting: number;
 }
+
+/** @deprecated use CampaignData */
+export type ClientData = CampaignData;
 
 // ── small post thumbnail ──────────────────────────────────────────────────────
 function Thumb({ post }: { post: Post }) {
@@ -282,23 +287,23 @@ function ClientCard({
 
 // ── main component ────────────────────────────────────────────────────────────
 export default function ProgramacaoKanban({
-  clients: initialClients,
+  campaigns: initialCampaigns,
   now,
 }: {
-  clients: ClientData[];
+  campaigns: CampaignData[];
   now: string;
 }) {
   const router = useRouter();
   const [scheduledDates, setScheduledDates] = useState<Record<string, string | null>>(() => {
     const dates: Record<string, string | null> = {};
-    for (const c of initialClients)
+    for (const c of initialCampaigns)
       for (const p of c.posts) dates[p.id] = p.scheduledDate;
     return dates;
   });
   const [postedIds, setPostedIds] = useState<Set<string>>(new Set());
   const [openPlanner, setOpenPlanner] = useState<string | null>(null);
   const [openProg, setOpenProg] = useState<string | null>(null);
-  const [plannerModalClientId, setPlannerModalClientId] = useState<string | null>(null);
+  const [plannerModalCampaignId, setPlannerModalCampaignId] = useState<string | null>(null);
 
   function handleDateChange(postId: string, dateKey: string | null) {
     if (!dateKey) {
@@ -319,10 +324,10 @@ export default function ProgramacaoKanban({
 
   const nowDate = new Date(now);
 
-  // Column 1 — clients with unscheduled posts
-  const plannerClients = useMemo(
+  // Column 1 — campaigns with unscheduled posts
+  const plannerCampaigns = useMemo(
     () =>
-      initialClients
+      initialCampaigns
         .map((c) => {
           const unscheduled = c.posts.filter(
             (p) => !scheduledDates[p.id] && !postedIds.has(p.id) && !p.postedAt
@@ -340,13 +345,13 @@ export default function ProgramacaoKanban({
         })
         .filter((c) => c.unscheduled.length > 0)
         .sort((a, b) => b.maxDays - a.maxDays),
-    [initialClients, scheduledDates, postedIds, nowDate]
+    [initialCampaigns, scheduledDates, postedIds, nowDate]
   );
 
-  // Column 2 — clients with scheduled (not yet posted) posts
-  const progClients = useMemo(
+  // Column 2 — campaigns with scheduled (not yet posted) posts
+  const progCampaigns = useMemo(
     () =>
-      initialClients
+      initialCampaigns
         .map((c) => {
           const scheduled = c.posts
             .filter((p) => scheduledDates[p.id] && !postedIds.has(p.id) && !p.postedAt)
@@ -358,13 +363,13 @@ export default function ProgramacaoKanban({
           return { ...c, scheduled };
         })
         .filter((c) => c.scheduled.length > 0),
-    [initialClients, scheduledDates, postedIds]
+    [initialCampaigns, scheduledDates, postedIds]
   );
 
   // Planner modal data
-  const plannerModalClient = initialClients.find((c) => c.clientId === plannerModalClientId);
-  const plannerModalPosts = plannerModalClient
-    ? plannerModalClient.posts
+  const plannerModalCampaign = initialCampaigns.find((c) => c.campaignId === plannerModalCampaignId);
+  const plannerModalPosts = plannerModalCampaign
+    ? plannerModalCampaign.posts
         .filter((p) => !postedIds.has(p.id) && !p.postedAt)
         .map((p) => ({
           id: p.id,
@@ -375,28 +380,28 @@ export default function ProgramacaoKanban({
           coverUrl: p.coverUrl,
           caption: p.caption,
           scheduledDate: scheduledDates[p.id] ?? null,
-          clientName: plannerModalClient.clientName,
-          campaignName: p.campaignName,
-          campaignId: p.campaignId,
+          clientName: plannerModalCampaign.clientName,
+          campaignName: plannerModalCampaign.campaignName,
+          campaignId: plannerModalCampaign.campaignId,
         }))
     : [];
 
   return (
     <>
       {/* Planner modal */}
-      {plannerModalClient && (
+      {plannerModalCampaign && (
         <div className="fixed inset-0 z-50 bg-black/80 flex flex-col">
           <div className="flex items-center justify-between px-6 py-3 bg-[#111] border-b border-white/10 shrink-0">
             <div>
               <h2 className="text-white font-semibold">
-                Planner — {plannerModalClient.clientName}
+                Planner — {plannerModalCampaign.clientName}
               </h2>
               <p className="text-gray-500 text-xs mt-0.5">
-                Arraste os posts para definir as datas de publicação
+                {plannerModalCampaign.campaignName} · Arraste os posts para definir as datas
               </p>
             </div>
             <button
-              onClick={() => setPlannerModalClientId(null)}
+              onClick={() => setPlannerModalCampaignId(null)}
               className="text-gray-400 hover:text-white text-2xl leading-none transition-colors"
             >
               ×
@@ -405,7 +410,7 @@ export default function ProgramacaoKanban({
           <div className="flex-1 overflow-hidden p-4">
             <PlannerCalendar
               initialPosts={plannerModalPosts}
-              clientId={plannerModalClient.clientId}
+              clientId={plannerModalCampaign.clientId}
               onDateChange={handleDateChange}
             />
           </div>
@@ -417,55 +422,53 @@ export default function ProgramacaoKanban({
         <div className="space-y-3">
           <div className="flex items-center gap-2 mb-1">
             <h2 className="text-white font-semibold text-sm">Preencher Planner</h2>
-            {plannerClients.length > 0 && (
+            {plannerCampaigns.length > 0 && (
               <span className="text-xs bg-amber-900/30 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">
-                {plannerClients.reduce((s, c) => s + c.unscheduled.length, 0)} posts
+                {plannerCampaigns.reduce((s, c) => s + c.unscheduled.length, 0)} posts
               </span>
             )}
           </div>
 
-          {plannerClients.length === 0 ? (
+          {plannerCampaigns.length === 0 ? (
             <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 text-center">
               <p className="text-2xl mb-2">✅</p>
               <p className="text-gray-400 text-sm">Todos com data!</p>
             </div>
           ) : (
-            plannerClients.map((client) => {
+            plannerCampaigns.map((camp) => {
               const urgency =
-                client.maxDays >= 7
+                camp.maxDays >= 7
                   ? ("red" as const)
-                  : client.maxDays >= 3
+                  : camp.maxDays >= 3
                   ? ("amber" as const)
-                  : client.maxDays >= 1
+                  : camp.maxDays >= 1
                   ? ("yellow" as const)
                   : null;
 
               const subtitle =
-                client.unscheduled.length === 1
+                camp.unscheduled.length === 1
                   ? "1 post sem data"
-                  : `${client.unscheduled.length} posts sem data`;
+                  : `${camp.unscheduled.length} posts sem data`;
 
               return (
                 <ClientCard
-                  key={client.clientId}
-                  clientName={client.clientName}
+                  key={camp.campaignId}
+                  clientName={camp.clientName}
                   subtitle={
-                    client.maxDays > 0
-                      ? `${subtitle} · há ${client.maxDays} ${client.maxDays === 1 ? "dia" : "dias"}`
-                      : subtitle
+                    camp.maxDays > 0
+                      ? `${camp.campaignName} · ${subtitle} · há ${camp.maxDays} ${camp.maxDays === 1 ? "dia" : "dias"}`
+                      : `${camp.campaignName} · ${subtitle}`
                   }
                   urgency={urgency}
-                  isOpen={openPlanner === client.clientId}
+                  isOpen={openPlanner === camp.campaignId}
                   onToggle={() =>
-                    setOpenPlanner(
-                      openPlanner === client.clientId ? null : client.clientId
-                    )
+                    setOpenPlanner(openPlanner === camp.campaignId ? null : camp.campaignId)
                   }
                   plannerButton={
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setPlannerModalClientId(client.clientId);
+                        setPlannerModalCampaignId(camp.campaignId);
                       }}
                       className="text-xs px-2.5 py-1 rounded-lg bg-violet-900/30 hover:bg-violet-900/50 text-violet-400 border border-violet-500/30 transition-colors"
                     >
@@ -473,7 +476,7 @@ export default function ProgramacaoKanban({
                     </button>
                   }
                 >
-                  {client.unscheduled.map((post) => {
+                  {camp.unscheduled.map((post) => {
                     const daysWaiting = post.approvedAt
                       ? Math.floor(
                           (nowDate.getTime() - new Date(post.approvedAt).getTime()) /
@@ -498,23 +501,23 @@ export default function ProgramacaoKanban({
         <div className="space-y-3">
           <div className="flex items-center gap-2 mb-1">
             <h2 className="text-white font-semibold text-sm">Programação</h2>
-            {progClients.length > 0 && (
+            {progCampaigns.length > 0 && (
               <span className="text-xs bg-emerald-900/30 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                {progClients.reduce((s, c) => s + c.scheduled.length, 0)} posts
+                {progCampaigns.reduce((s, c) => s + c.scheduled.length, 0)} posts
               </span>
             )}
           </div>
 
-          {progClients.length === 0 ? (
+          {progCampaigns.length === 0 ? (
             <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 text-center">
               <p className="text-2xl mb-2">📅</p>
               <p className="text-gray-400 text-sm">Nenhum post agendado ainda.</p>
             </div>
           ) : (
-            progClients.map((client) => {
-              const count = client.scheduled.length;
-              const earliest = client.scheduled[0]?.scheduledDate
-                ? new Date(scheduledDates[client.scheduled[0].id]!).toLocaleDateString(
+            progCampaigns.map((camp) => {
+              const count = camp.scheduled.length;
+              const earliest = camp.scheduled[0]
+                ? new Date(scheduledDates[camp.scheduled[0].id]!).toLocaleDateString(
                     "pt-BR",
                     { timeZone: "UTC", day: "2-digit", month: "2-digit" }
                   )
@@ -522,19 +525,19 @@ export default function ProgramacaoKanban({
 
               return (
                 <ClientCard
-                  key={client.clientId}
-                  clientName={client.clientName}
+                  key={camp.campaignId}
+                  clientName={camp.clientName}
                   subtitle={
                     earliest
-                      ? `${count} ${count === 1 ? "post" : "posts"} p/ agendar · próximo em ${earliest}`
-                      : `${count} ${count === 1 ? "post" : "posts"} para agendar`
+                      ? `${camp.campaignName} · ${count} ${count === 1 ? "post" : "posts"} · próximo em ${earliest}`
+                      : `${camp.campaignName} · ${count} ${count === 1 ? "post" : "posts"}`
                   }
-                  isOpen={openProg === client.clientId}
+                  isOpen={openProg === camp.campaignId}
                   onToggle={() =>
-                    setOpenProg(openProg === client.clientId ? null : client.clientId)
+                    setOpenProg(openProg === camp.campaignId ? null : camp.campaignId)
                   }
                 >
-                  {client.scheduled.map((post) => (
+                  {camp.scheduled.map((post) => (
                     <ProgPostRow
                       key={post.id}
                       post={post}
