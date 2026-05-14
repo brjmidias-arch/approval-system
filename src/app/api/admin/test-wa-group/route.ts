@@ -12,10 +12,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JID inválido. Deve terminar em @g.us" }, { status: 400 });
   }
 
-  await sendWhatsApp(
-    groupId,
-    "✅ *Teste de conexão — BRJ Mídias*\n\nEste grupo está corretamente vinculado ao sistema de aprovação de conteúdo."
-  );
+  try {
+    await sendWhatsApp(
+      groupId,
+      "✅ *Teste de conexão — BRJ Mídias*\n\nEste grupo está corretamente vinculado ao sistema de aprovação de conteúdo."
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erro desconhecido";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true });
 }

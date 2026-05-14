@@ -25,7 +25,7 @@ export async function sendWhatsApp(to: string, text: string): Promise<void> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: token,
+      apikey: token,
     },
     body: JSON.stringify({ number, text }),
   });
