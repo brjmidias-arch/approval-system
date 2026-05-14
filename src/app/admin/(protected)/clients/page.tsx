@@ -35,6 +35,7 @@ export default function ClientsPage() {
   const [form, setForm] = useState({ name: "", email: "", whatsapp: "" });
   const [saving, setSaving] = useState(false);
   const [resolving, setResolving] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   // Planner state
   const [plannerClient, setPlannerClient] = useState<Client | null>(null);
@@ -103,6 +104,27 @@ export default function ClientsPage() {
     setEditingClient(client);
     setForm({ name: client.name, email: client.email, whatsapp: client.whatsapp || "" });
     setShowForm(true);
+  }
+
+  async function handleTestGroup() {
+    setTesting(true);
+    try {
+      const res = await fetch("/api/admin/test-wa-group", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId: form.whatsapp }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert("Erro: " + (data.error || "Falha ao enviar mensagem de teste."));
+      } else {
+        alert("✅ Mensagem de teste enviada com sucesso! Verifique o grupo no WhatsApp.");
+      }
+    } catch {
+      alert("Erro de conexão ao testar grupo.");
+    } finally {
+      setTesting(false);
+    }
   }
 
   async function handleResolveGroup() {
@@ -273,6 +295,16 @@ export default function ClientsPage() {
                       className="shrink-0 bg-violet-600 hover:bg-violet-500 disabled:opacity-60 text-white text-xs px-3 py-2 rounded-lg transition-colors font-medium"
                     >
                       {resolving ? "..." : "Resolver"}
+                    </button>
+                  )}
+                  {form.whatsapp.includes("@g.us") && (
+                    <button
+                      type="button"
+                      onClick={handleTestGroup}
+                      disabled={testing}
+                      className="shrink-0 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-60 text-white text-xs px-3 py-2 rounded-lg transition-colors font-medium"
+                    >
+                      {testing ? "..." : "Testar"}
                     </button>
                   )}
                 </div>
