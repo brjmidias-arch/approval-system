@@ -549,6 +549,18 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                               )}
                             </div>
 
+                            {(col.id === "waiting" || col.id === "adjustments") && counts.total > 0 && (
+                              <div className="mt-1.5 flex items-center gap-1.5">
+                                <div className="flex-1 bg-white/10 rounded-full h-1">
+                                  <div
+                                    className="bg-emerald-500 h-1 rounded-full transition-all"
+                                    style={{ width: `${Math.round((counts.approved / counts.total) * 100)}%` }}
+                                  />
+                                </div>
+                                <span className="text-[9px] text-gray-600 shrink-0">{counts.approved}/{counts.total}</span>
+                              </div>
+                            )}
+
                             {col.id === "waiting" && (
                               <div className="mt-1.5">
                                 <ChargeButton

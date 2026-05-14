@@ -292,12 +292,12 @@ export default function ApprovalPage() {
                       {items.map((item) => (
                         <div key={item.id} className="w-full shrink-0 relative">
                           {item.fileType === "IMAGE" ? (
-                            <>
-                              <img src={item.fileUrl} alt="" className="w-full max-h-[500px] object-contain" />
+                            <div className="relative mx-auto bg-black" style={{ aspectRatio: "4/5", maxHeight: 500 }}>
+                              <img src={item.fileUrl} alt="" className="w-full h-full object-contain" />
                               <div className="absolute inset-0 flex items-end justify-end p-3 pointer-events-none">
                                 <span className="text-white/30 text-xs font-medium tracking-wider select-none">PRÉVIA · BRJ Mídias</span>
                               </div>
-                            </>
+                            </div>
                           ) : (
                             <div className="flex justify-center bg-black w-full">
                               <div className="relative flex flex-col items-center justify-center overflow-hidden" style={{ aspectRatio: "9/16", maxHeight: 500, width: "calc(500px * 9 / 16)" }}>
@@ -335,8 +335,14 @@ export default function ApprovalPage() {
                 <>
                   <div className="relative bg-black">
                     {currentItem.fileType === "IMAGE" && (
-                      <div className="relative">
-                        <img src={currentItem.fileUrl} alt="" className="w-full max-h-[500px] object-contain" />
+                      <div
+                        className="relative mx-auto bg-black"
+                        style={{
+                          aspectRatio: (currentItem.contentType === "REELS" || currentItem.contentType === "STORIES") ? "9/16" : "4/5",
+                          maxHeight: 500,
+                        }}
+                      >
+                        <img src={currentItem.fileUrl} alt="" className="w-full h-full object-contain" />
                         <div className="absolute inset-0 flex items-end justify-end p-3 pointer-events-none">
                           <span className="text-white/30 text-xs font-medium tracking-wider select-none">PRÉVIA · BRJ Mídias</span>
                         </div>
@@ -402,8 +408,8 @@ export default function ApprovalPage() {
                       <div className="px-4 pt-3 pb-1">
                         <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Capa do Reels</span>
                       </div>
-                      <div className="relative bg-black">
-                        <img src={currentItem.coverUrl} alt="Capa do Reels" className="w-full max-h-[400px] object-contain" />
+                      <div className="relative mx-auto bg-black" style={{ aspectRatio: "4/5", maxHeight: 400 }}>
+                        <img src={currentItem.coverUrl} alt="Capa do Reels" className="w-full h-full object-contain" />
                         <div className="absolute inset-0 flex items-end justify-end p-3 pointer-events-none">
                           <span className="text-white/30 text-xs font-medium tracking-wider select-none">PRÉVIA · BRJ Mídias</span>
                         </div>
@@ -451,32 +457,34 @@ export default function ApprovalPage() {
                 {/* Action buttons */}
                 {status === "PENDING" || isActive ? (
                   <div className="space-y-3">
-                    <div className="flex gap-2">
+                    <div className="space-y-2">
                       <button
                         onClick={() => setGroupStatus(group.groupKey, "APPROVED", items)}
                         disabled={savingGroup === group.groupKey}
-                        className="flex-1 py-2.5 rounded-lg text-sm font-medium border-2 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                        className="w-full py-3 rounded-lg text-sm font-semibold border-2 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 active:bg-emerald-500/20 transition-colors"
                       >
                         ✅ Aprovar
                       </button>
-                      <button
-                        onClick={() => {
-                          setReviews((prev) => ({ ...prev, [group.groupKey]: { status: "ADJUSTMENT", comment: prev[group.groupKey]?.comment || "" } }));
-                          setActiveGroup(group.groupKey);
-                        }}
-                        className="flex-1 py-2.5 rounded-lg text-sm font-medium border-2 border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-colors"
-                      >
-                        ✏️ Solicitar Ajuste
-                      </button>
-                      <button
-                        onClick={() => {
-                          setReviews((prev) => ({ ...prev, [group.groupKey]: { status: "REJECTED", comment: prev[group.groupKey]?.comment || "" } }));
-                          setActiveGroup(group.groupKey);
-                        }}
-                        className="flex-1 py-2.5 rounded-lg text-sm font-medium border-2 border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors"
-                      >
-                        ❌ Reprovar
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setReviews((prev) => ({ ...prev, [group.groupKey]: { status: "ADJUSTMENT", comment: prev[group.groupKey]?.comment || "" } }));
+                            setActiveGroup(group.groupKey);
+                          }}
+                          className="flex-1 py-2.5 rounded-lg text-sm font-medium border-2 border-amber-500/40 text-amber-400 hover:bg-amber-500/10 active:bg-amber-500/20 transition-colors"
+                        >
+                          ✏️ Solicitar Ajuste
+                        </button>
+                        <button
+                          onClick={() => {
+                            setReviews((prev) => ({ ...prev, [group.groupKey]: { status: "REJECTED", comment: prev[group.groupKey]?.comment || "" } }));
+                            setActiveGroup(group.groupKey);
+                          }}
+                          className="flex-1 py-2.5 rounded-lg text-sm font-medium border-2 border-red-500/40 text-red-400 hover:bg-red-500/10 active:bg-red-500/20 transition-colors"
+                        >
+                          ❌ Reprovar
+                        </button>
+                      </div>
                     </div>
 
                     {isActive && (review?.status === "ADJUSTMENT" || review?.status === "REJECTED") && (

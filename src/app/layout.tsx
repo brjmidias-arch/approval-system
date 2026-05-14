@@ -10,6 +10,12 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "BRJ Mídias — Aprovação de Conteúdo",
   description: "Sistema de aprovação de conteúdo para redes sociais",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "BRJ Aprovação",
+  },
 };
 
 export default function RootLayout({

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import nodemailer from "nodemailer";
+import { sendWhatsApp } from "@/lib/whatsapp";
 
 function escapeHtml(str: string): string {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -70,7 +71,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       });
     } catch (err) {
       console.error("Erro ao enviar email:", err);
-      // Don't fail the request if email fails
+    }
+  }
+
+  // Send WhatsApp notification if client has a phone number
+  if (campaign.client.whatsapp) {
+    try {
+      const approvalUrl = `${process.env.NEXTAUTH_URL}/aprovar/${campaign.token}`;
+      const msg =
+        `Olá, ${campaign.client.name}! 👋\n\n` +
+        `Fizemos os ajustes solicitados em *${campaign.name}* e o conteúdo está pronto para uma nova revisão.\n\n` +
+        `Acesse o link abaixo para aprovar:\n${approvalUrl}\n\n` +
+        `Prazo: ${oneDayFromNow.toLocaleDateString("pt-BR")} — _BRJ Mídias_`;
+      await sendWhatsApp(campaign.client.whatsapp, msg);
+    } catch (err) {
+      console.error("Erro ao enviar WhatsApp:", err);
     }
   }
 
