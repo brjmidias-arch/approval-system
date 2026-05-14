@@ -34,6 +34,7 @@ export default function ClientsPage() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [form, setForm] = useState({ name: "", email: "", whatsapp: "" });
   const [saving, setSaving] = useState(false);
+  const [resolving, setResolving] = useState(false);
 
   // Planner state
   const [plannerClient, setPlannerClient] = useState<Client | null>(null);
@@ -102,6 +103,35 @@ export default function ClientsPage() {
     setEditingClient(client);
     setForm({ name: client.name, email: client.email, whatsapp: client.whatsapp || "" });
     setShowForm(true);
+  }
+
+  async function handleResolveGroup() {
+    setResolving(true);
+    try {
+      const res = await fetch("/api/admin/resolve-wa-group", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inviteLink: form.whatsapp }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Erro ao resolver grupo.");
+        return;
+      }
+      if (data.groupId) {
+        setForm({ ...form, whatsapp: data.groupId });
+      } else if (data.groups && data.groups.length > 0) {
+        const names = data.groups.map((g: { id: string; name: string }) => `${g.name} → ${g.id}`).join("\n");
+        const chosen = prompt(`Múltiplos grupos encontrados. Cole o ID do grupo desejado:\n\n${names}`);
+        if (chosen) setForm({ ...form, whatsapp: chosen.trim() });
+      } else {
+        alert("Nenhum JID encontrado na resposta da API.");
+      }
+    } catch {
+      alert("Erro de conexão ao resolver grupo.");
+    } finally {
+      setResolving(false);
+    }
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -227,13 +257,28 @@ export default function ClientsPage() {
                 <label className="block text-sm text-gray-400 mb-1.5">
                   ID do Grupo WhatsApp <span className="text-gray-600">(opcional)</span>
                 </label>
-                <input
-                  type="text"
-                  value={form.whatsapp}
-                  onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
-                  placeholder="Ex: 120363XXXXXXXXXX@g.us"
-                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={form.whatsapp}
+                    onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
+                    placeholder="Cole o link do grupo ou o JID (120363...@g.us)"
+                    className="flex-1 bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
+                  />
+                  {form.whatsapp.includes("chat.whatsapp.com") && (
+                    <button
+                      type="button"
+                      onClick={handleResolveGroup}
+                      disabled={resolving}
+                      className="shrink-0 bg-violet-600 hover:bg-violet-500 disabled:opacity-60 text-white text-xs px-3 py-2 rounded-lg transition-colors font-medium"
+                    >
+                      {resolving ? "..." : "Resolver"}
+                    </button>
+                  )}
+                </div>
+                <p className="text-gray-600 text-xs mt-1">
+                  Cole o link de convite e clique em &ldquo;Resolver&rdquo; para converter para JID automaticamente.
+                </p>
               </div>
               <div className="flex gap-3 pt-1">
                 <button
