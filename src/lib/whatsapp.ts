@@ -1,5 +1,8 @@
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
+function resolveRecipient(to: string): string {
+  // Group JIDs (e.g. "120363XXXXXXXXXX@g.us") are passed as-is
+  if (to.includes("@")) return to;
+  // Phone numbers: normalize to Brazilian international format
+  const digits = to.replace(/\D/g, "");
   if (!digits) return "";
   if (digits.startsWith("55") && digits.length >= 12) return digits;
   if (digits.length === 11 || digits.length === 10) return "55" + digits;
@@ -15,8 +18,8 @@ export async function sendWhatsApp(to: string, text: string): Promise<void> {
     throw new Error("WhatsApp não configurado (UAZAPI_URL, UAZAPI_TOKEN ou UAZAPI_INSTANCE ausentes)");
   }
 
-  const number = normalizePhone(to);
-  if (!number) throw new Error("Número de WhatsApp inválido: " + to);
+  const number = resolveRecipient(to);
+  if (!number) throw new Error("Destinatário WhatsApp inválido: " + to);
 
   const res = await fetch(`${url}/message/sendText/${instance}`, {
     method: "POST",

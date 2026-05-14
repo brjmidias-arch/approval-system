@@ -225,13 +225,13 @@ export default function ClientsPage() {
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-1.5">
-                  WhatsApp <span className="text-gray-600">(opcional)</span>
+                  ID do Grupo WhatsApp <span className="text-gray-600">(opcional)</span>
                 </label>
                 <input
                   type="text"
                   value={form.whatsapp}
                   onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
-                  placeholder="(11) 99999-9999"
+                  placeholder="Ex: 120363XXXXXXXXXX@g.us"
                   className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -268,7 +268,7 @@ export default function ClientsPage() {
               <tr className="border-b border-white/10 text-xs text-gray-400 uppercase tracking-wider">
                 <th className="text-left px-5 py-3">Cliente</th>
                 <th className="text-left px-5 py-3">E-mail</th>
-                <th className="text-left px-5 py-3">WhatsApp</th>
+                <th className="text-left px-5 py-3">Grupo WA</th>
                 <th className="text-left px-5 py-3">Campanhas</th>
                 <th className="text-right px-5 py-3">Ações</th>
               </tr>
