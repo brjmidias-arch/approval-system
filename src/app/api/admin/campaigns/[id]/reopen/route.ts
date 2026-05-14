@@ -14,8 +14,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   });
 
   if (!campaign) return NextResponse.json({ error: "Campanha não encontrada" }, { status: 404 });
+  if (campaign.status === "PUBLISHED") {
+    return NextResponse.json({ error: "Campanhas publicadas não podem ser reabertas" }, { status: 403 });
+  }
 
-  // Reset all ADJUSTMENT/REJECTED approval items back to PENDING
+  // Reset all ADJUSTMENT/REJECTED approval items back to PENDING (Opção A)
   await prisma.approvalItem.updateMany({
     where: {
       campaignId: params.id,
@@ -58,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
               Ou acesse: <a href="${approvalUrl}">${approvalUrl}</a>
             </p>
             <p style="color:#666;font-size:14px;">
-              Prazo de aprovação: ${new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}.
+              Prazo de aprovação: ${oneDayFromNow.toLocaleDateString("pt-BR")}.
             </p>
             <hr/>
             <p style="color:#999;font-size:12px;">BRJ Mídias — brjmidias.com.br</p>

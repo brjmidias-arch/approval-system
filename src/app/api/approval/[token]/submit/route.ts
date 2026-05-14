@@ -8,7 +8,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     include: {
       client: true,
       contentItems: {
-        include: { approvalItem: true },
+        include: { approvalItem: true, internalReviewItem: true },
       },
     },
   });
@@ -18,7 +18,15 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     return NextResponse.json({ error: "Campanha já encerrada" }, { status: 403 });
   }
 
-  const approvalItems = campaign.contentItems.map((item) => item.approvalItem);
+  // Only consider items visible to the client (no internal review, or internal review approved)
+  const visibleItems = campaign.contentItems.filter(
+    (i) => !i.internalReviewItem || i.internalReviewItem.status === "APPROVED"
+  );
+  if (visibleItems.length === 0) {
+    return NextResponse.json({ error: "Nenhum item disponível para revisão" }, { status: 400 });
+  }
+
+  const approvalItems = visibleItems.map((item) => item.approvalItem);
   const allReviewed = approvalItems.every((a) => a && a.status !== "PENDING");
 
   if (!allReviewed) {
@@ -43,7 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
       approved,
       adjustment,
       rejected,
-      items: campaign.contentItems.map((item) => ({
+      items: visibleItems.map((item) => ({
         caption: item.caption,
         contentType: item.contentType,
         status: item.approvalItem?.status || "PENDING",

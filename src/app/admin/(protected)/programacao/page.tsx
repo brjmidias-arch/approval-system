@@ -31,6 +31,7 @@ export default async function ProgramacaoPage({
           driveUrl: true,
           scheduledDate: true,
           postedAt: true,
+          internalReviewItem: { select: { status: true } },
         },
       },
     },
@@ -45,6 +46,8 @@ export default async function ProgramacaoPage({
 
     for (const item of campaign.contentItems) {
       if (item.contentType === "TEXTO") continue;
+      // Exclude items hidden from client by internal review
+      if (item.internalReviewItem && item.internalReviewItem.status !== "APPROVED") continue;
       const approval = campaign.approvalItems.find((a) => a.contentItemId === item.id);
       if (approval?.status !== "APPROVED") continue;
 
