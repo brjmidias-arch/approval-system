@@ -553,9 +553,9 @@ export default function CampaignPage() {
                 <button onClick={copyInternalLink} className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors">
                   {copyFeedback ? "Copiado!" : "Copiar Link Interno"}
                 </button>
-                {allInternalApproved && (
+                {internalApproved > 0 && (
                   <button onClick={handleSendClient} className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
-                    Enviar para Cliente
+                    Enviar para Cliente ({internalApproved} {internalApproved === 1 ? "post" : "posts"})
                   </button>
                 )}
               </>
@@ -684,8 +684,8 @@ export default function CampaignPage() {
         <div className={`border rounded-xl px-5 py-4 space-y-3 ${
           campaign.status === "INTERNAL_DONE" && (internalAdjustment + internalRejected) > 0
             ? "bg-amber-900/20 border-amber-500/30"
-            : campaign.status === "INTERNAL_DONE" && allInternalApproved
-            ? "bg-emerald-900/20 border-emerald-500/30"
+            : (campaign.status === "INTERNAL_DONE" && allInternalApproved) || (campaign.status === "INTERNAL_REVIEW" && internalApproved > 0)
+            ? "bg-emerald-900/10 border-emerald-500/20"
             : "bg-violet-900/20 border-violet-500/30"
         }`}>
           <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -693,19 +693,23 @@ export default function CampaignPage() {
               <p className={`font-medium text-sm ${
                 campaign.status === "INTERNAL_DONE" && (internalAdjustment + internalRejected) > 0
                   ? "text-amber-400"
-                  : campaign.status === "INTERNAL_DONE" && allInternalApproved
+                  : (campaign.status === "INTERNAL_DONE" && allInternalApproved) || (campaign.status === "INTERNAL_REVIEW" && internalApproved > 0)
                   ? "text-emerald-400"
                   : "text-violet-400"
               }`}>
-                {campaign.status === "INTERNAL_REVIEW"
+                {campaign.status === "INTERNAL_REVIEW" && internalApproved === 0
                   ? "Aguardando revisão interna"
+                  : campaign.status === "INTERNAL_REVIEW" && internalApproved > 0
+                  ? `${internalApproved} ${internalApproved === 1 ? "post aprovado" : "posts aprovados"} — pode enviar ao cliente agora`
                   : allInternalApproved
                   ? "Revisão interna concluída — tudo aprovado"
                   : "Revisão interna concluída — ajustes necessários"}
               </p>
               <p className="text-gray-400/70 text-xs mt-0.5">
-                {campaign.status === "INTERNAL_REVIEW"
+                {campaign.status === "INTERNAL_REVIEW" && internalApproved === 0
                   ? `${internalPending} ${internalPending === 1 ? "post pendente" : "posts pendentes"} de revisão`
+                  : campaign.status === "INTERNAL_REVIEW" && internalApproved > 0
+                  ? `${internalPending} ${internalPending === 1 ? "post ainda pendente" : "posts ainda pendentes"} — o cliente verá apenas os aprovados`
                   : allInternalApproved
                   ? "Todos os posts aprovados. Você já pode enviar para o cliente."
                   : `${internalAdjustment + internalRejected} ${internalAdjustment + internalRejected === 1 ? "post precisa" : "posts precisam"} de correção antes de enviar ao cliente.`
@@ -719,9 +723,9 @@ export default function CampaignPage() {
                 {internalRejected > 0 && <span className="text-red-400">{internalRejected} reprovados</span>}
                 {internalPending > 0 && <span className="text-gray-400">{internalPending} pendentes</span>}
               </div>
-              {campaign.status === "INTERNAL_DONE" && allInternalApproved && (
+              {internalApproved > 0 && (
                 <button onClick={handleSendClient} className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm px-4 py-2 rounded-lg transition-colors">
-                  Enviar para Cliente
+                  Enviar {internalApproved} {internalApproved === 1 ? "post" : "posts"} ao Cliente
                 </button>
               )}
               {campaign.status === "INTERNAL_DONE" && !allInternalApproved && (
