@@ -61,6 +61,14 @@ export default function CampaignPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [copiedLinkItemId, setCopiedLinkItemId] = useState<string | null>(null);
+
+  function copyDesignerLink(itemId: string) {
+    const url = `${window.location.origin}/post/${itemId}`;
+    navigator.clipboard.writeText(url);
+    setCopiedLinkItemId(itemId);
+    setTimeout(() => setCopiedLinkItemId(null), 2000);
+  }
   const [liveStatus, setLiveStatus] = useState<{ reviewed: number; total: number } | null>(null);
   const [markingDoneItemId, setMarkingDoneItemId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
@@ -454,6 +462,8 @@ export default function CampaignPage() {
   const internalRejected = grouped.filter((g) => getInternalStatus(g) === "REJECTED").length;
   const internalPending = internalTotal - internalApproved - internalAdjustment - internalRejected;
   const allInternalApproved = internalTotal > 0 && internalApproved === internalTotal;
+  // True when the campaign actively uses internal review (at least one item has been reviewed internally)
+  const usesInternalReviewMode = internalApproved > 0 || internalAdjustment > 0 || internalRejected > 0;
 
   return (
     <div className="space-y-6">
@@ -679,13 +689,16 @@ export default function CampaignPage() {
         ))}
       </div>
 
-      {/* Internal review banner */}
-      {(campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE") && (
+      {/* Internal review banner — shown during review phases, and for OPEN campaigns still awaiting internal reviews */}
+      {(campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ||
+        (campaign.status === "OPEN" && internalPending > 0 && usesInternalReviewMode)) && (
         <div className={`border rounded-xl px-5 py-4 space-y-3 ${
           campaign.status === "INTERNAL_DONE" && (internalAdjustment + internalRejected) > 0
             ? "bg-amber-900/20 border-amber-500/30"
             : (campaign.status === "INTERNAL_DONE" && allInternalApproved) || (campaign.status === "INTERNAL_REVIEW" && internalApproved > 0)
             ? "bg-emerald-900/10 border-emerald-500/20"
+            : campaign.status === "OPEN"
+            ? "bg-violet-900/10 border-violet-500/20"
             : "bg-violet-900/20 border-violet-500/30"
         }`}>
           <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -697,7 +710,9 @@ export default function CampaignPage() {
                   ? "text-emerald-400"
                   : "text-violet-400"
               }`}>
-                {campaign.status === "INTERNAL_REVIEW" && internalApproved === 0
+                {campaign.status === "OPEN"
+                  ? `Revisão interna em andamento — ${internalPending} ${internalPending === 1 ? "post pendente" : "posts pendentes"}`
+                  : campaign.status === "INTERNAL_REVIEW" && internalApproved === 0
                   ? "Aguardando revisão interna"
                   : campaign.status === "INTERNAL_REVIEW" && internalApproved > 0
                   ? `${internalApproved} ${internalApproved === 1 ? "post aprovado" : "posts aprovados"} — pode enviar ao cliente agora`
@@ -706,7 +721,9 @@ export default function CampaignPage() {
                   : "Revisão interna concluída — ajustes necessários"}
               </p>
               <p className="text-gray-400/70 text-xs mt-0.5">
-                {campaign.status === "INTERNAL_REVIEW" && internalApproved === 0
+                {campaign.status === "OPEN"
+                  ? `${internalApproved} ${internalApproved === 1 ? "post aprovado" : "posts aprovados"} já visíveis para o cliente — aguardando revisão dos demais`
+                  : campaign.status === "INTERNAL_REVIEW" && internalApproved === 0
                   ? `${internalPending} ${internalPending === 1 ? "post pendente" : "posts pendentes"} de revisão`
                   : campaign.status === "INTERNAL_REVIEW" && internalApproved > 0
                   ? `${internalPending} ${internalPending === 1 ? "post ainda pendente" : "posts ainda pendentes"} — o cliente verá apenas os aprovados`
@@ -723,7 +740,7 @@ export default function CampaignPage() {
                 {internalRejected > 0 && <span className="text-red-400">{internalRejected} reprovados</span>}
                 {internalPending > 0 && <span className="text-gray-400">{internalPending} pendentes</span>}
               </div>
-              {internalApproved > 0 && (
+              {internalApproved > 0 && campaign.status !== "OPEN" && (
                 <button onClick={handleSendClient} className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm px-4 py-2 rounded-lg transition-colors">
                   Enviar {internalApproved} {internalApproved === 1 ? "post" : "posts"} ao Cliente
                 </button>
@@ -1057,6 +1074,12 @@ export default function CampaignPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                      <button
+                        onClick={() => copyDesignerLink(item.id)}
+                        className="text-xs px-2.5 py-1 bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 border border-blue-500/30 rounded-lg transition-colors"
+                      >
+                        {copiedLinkItemId === item.id ? "Copiado!" : "🔗 Link p/ designer"}
+                      </button>
                       {item.internalReviewItem && (
                         <>
                           <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
