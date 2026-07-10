@@ -84,8 +84,20 @@ export default function PostPage() {
                   className="w-full h-full object-cover cursor-zoom-in"
                   onClick={() => setLightboxUrl(slide.fileUrl)}
                 />
-              ) : (
+              ) : slide.fileType === "VIDEO" ? (
                 <div className="w-full h-full flex items-center justify-center text-2xl">🎬</div>
+              ) : slide.fileType === "DOCUMENT" ? (
+                <a
+                  href={slide.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full h-full flex items-center justify-center text-2xl hover:bg-white/5 transition-colors"
+                  title="Abrir documento"
+                >
+                  📝
+                </a>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-2xl">📄</div>
               )}
               <span className="absolute bottom-1 left-1 text-xs bg-black/60 text-white px-1 rounded">{i + 1}</span>
             </div>
