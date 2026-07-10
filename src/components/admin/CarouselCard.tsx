@@ -262,6 +262,14 @@ export default function CarouselCard({
   }
 
   const [markingDone, setMarkingDone] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  function copyDesignerLink() {
+    const url = `${window.location.origin}/post/${slides[0].id}`;
+    navigator.clipboard.writeText(url);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  }
 
   const hasAdjustments = slides.some((s) => {
     const st = s.approvalItem?.status;
@@ -383,6 +391,12 @@ export default function CarouselCard({
           className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors"
         >
           Editar / Adicionar slides
+        </button>
+        <button
+          onClick={copyDesignerLink}
+          className="text-xs px-3 py-1.5 bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 border border-blue-500/30 rounded-lg transition-colors"
+        >
+          {linkCopied ? "Copiado!" : "🔗 Link p/ designer"}
         </button>
         {hasAdjustments && (
           <button
