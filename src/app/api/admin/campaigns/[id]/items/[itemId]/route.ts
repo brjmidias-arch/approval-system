@@ -7,7 +7,7 @@ export async function PATCH(
 ) {
 
   const body = await req.json();
-  const { title, caption, scheduledDate, fileUrl, fileType, driveUrl, coverUrl, coverDriveUrl, resetApproval, resetInternalReview, postedAt } = body;
+  const { title, caption, scheduledDate, fileUrl, fileType, driveUrl, coverUrl, coverDriveUrl, resetApproval, resetInternalReview, postedAt, sentToProgramacao } = body;
 
   try {
     const item = await prisma.contentItem.update({
@@ -24,6 +24,9 @@ export async function PATCH(
         ...(coverUrl !== undefined && { coverUrl: coverUrl || null }),
         ...(coverDriveUrl !== undefined && { coverDriveUrl: coverDriveUrl || null }),
         ...(postedAt !== undefined && { postedAt: postedAt ? new Date(postedAt) : null }),
+        ...(sentToProgramacao !== undefined && {
+          sentToProgramacaoAt: sentToProgramacao ? new Date() : null,
+        }),
       },
     });
 
@@ -34,11 +37,29 @@ export async function PATCH(
       });
     }
 
+    if (sentToProgramacao !== undefined && item.groupId && item.contentType === "CARROSSEL") {
+      await prisma.contentItem.updateMany({
+        where: { campaignId: params.id, groupId: item.groupId, id: { not: params.itemId } },
+        data: { sentToProgramacaoAt: sentToProgramacao ? new Date() : null },
+      });
+    }
+
     if (resetApproval) {
       await prisma.approvalItem.updateMany({
         where: { contentItemId: params.itemId },
         data: { status: "PENDING", clientCommentResolved: true, reviewedAt: null },
       });
+      if (item.groupId && item.contentType === "CARROSSEL") {
+        await prisma.contentItem.updateMany({
+          where: { campaignId: params.id, groupId: item.groupId },
+          data: { sentToProgramacaoAt: null },
+        });
+      } else {
+        await prisma.contentItem.update({
+          where: { id: params.itemId },
+          data: { sentToProgramacaoAt: null },
+        });
+      }
     }
 
     if (resetInternalReview) {
