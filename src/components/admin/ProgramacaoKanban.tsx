@@ -215,6 +215,24 @@ function ProgPostRow({
   );
 }
 
+function SocialMediaLinkButton({ clientId }: { clientId: string }) {
+  const [copied, setCopied] = useState(false);
+  function copy(e: React.MouseEvent) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(`${window.location.origin}/programar/${clientId}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+  return (
+    <button
+      onClick={copy}
+      className="text-xs px-2.5 py-1 rounded-lg bg-sky-900/30 hover:bg-sky-900/50 text-sky-400 border border-sky-500/30 transition-colors"
+    >
+      {copied ? "Copiado!" : "🔗 Link social media"}
+    </button>
+  );
+}
+
 // ── collapsible client card ───────────────────────────────────────────────────
 function ClientCard({
   clientName,
@@ -222,6 +240,7 @@ function ClientCard({
   urgency,
   isOpen,
   onToggle,
+  linkButton,
   plannerButton,
   children,
 }: {
@@ -230,6 +249,7 @@ function ClientCard({
   urgency?: "red" | "amber" | "yellow" | null;
   isOpen: boolean;
   onToggle: () => void;
+  linkButton?: React.ReactNode;
   plannerButton?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -253,6 +273,7 @@ function ClientCard({
           <p className="text-gray-500 text-xs mt-0.5">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0 ml-3">
+          {linkButton}
           {plannerButton}
           <span
             className={`text-gray-400 text-lg transition-transform duration-200 ${
@@ -449,6 +470,7 @@ export default function ProgramacaoKanban({
                   onToggle={() =>
                     setOpenPlanner(openPlanner === camp.campaignId ? null : camp.campaignId)
                   }
+                  linkButton={<SocialMediaLinkButton clientId={camp.clientId} />}
                   plannerButton={
                     <button
                       onClick={(e) => {
@@ -521,6 +543,7 @@ export default function ProgramacaoKanban({
                   onToggle={() =>
                     setOpenProg(openProg === camp.campaignId ? null : camp.campaignId)
                   }
+                  linkButton={<SocialMediaLinkButton clientId={camp.clientId} />}
                 >
                   {camp.scheduled.map((post) => (
                     <ProgPostRow
