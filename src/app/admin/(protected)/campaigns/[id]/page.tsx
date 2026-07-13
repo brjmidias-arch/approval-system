@@ -1125,7 +1125,7 @@ export default function CampaignPage() {
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${APPROVAL_STATUS_COLORS[statusKey]}`}>
                         {APPROVAL_STATUS_LABELS[statusKey]}
                       </span>
-                      {statusKey === "APPROVED" && (
+                      {statusKey === "APPROVED" && item.contentType !== "TEXTO" && (
                         item.sentToProgramacaoAt ? (
                           <>
                             <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-sky-900/30 text-sky-400">
