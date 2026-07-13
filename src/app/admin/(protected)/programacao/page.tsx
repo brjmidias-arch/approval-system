@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import ProgramacaoKanban, { type CampaignData, type Post } from "@/components/admin/ProgramacaoKanban";
+import ProgramacaoKanban, { type CampaignData } from "@/components/admin/ProgramacaoKanban";
+import { getSchedulablePosts } from "@/lib/programacao";
 
 export default async function ProgramacaoPage({
   searchParams,
@@ -44,72 +45,12 @@ export default async function ProgramacaoPage({
     orderBy: { createdAt: "desc" },
   });
 
-  type CampaignWithItems = (typeof campaigns)[0];
-
-  function getApprovedPosts(campaign: CampaignWithItems): Post[] {
-    const seen = new Set<string>();
-    const posts: Post[] = [];
-
-    for (const item of campaign.contentItems) {
-      if (item.contentType === "TEXTO") continue;
-      // Exclude items hidden from client by internal review
-      if (item.internalReviewItem && item.internalReviewItem.status !== "APPROVED") continue;
-      const approval = campaign.approvalItems.find((a) => a.contentItemId === item.id);
-      if (approval?.status !== "APPROVED") continue;
-      // Só entra na Programação se a campanha está fechada/publicada
-      // OU o post foi explicitamente enviado à programação.
-      const campaignReleased = campaign.status === "CLOSED" || campaign.status === "PUBLISHED";
-      if (!campaignReleased && !item.sentToProgramacaoAt) continue;
-
-      const base = {
-        campaignId: campaign.id,
-        campaignName: campaign.name,
-        approvedAt: approval.reviewedAt?.toISOString() ?? null,
-        postedAt: item.postedAt?.toISOString() ?? null,
-        scheduledDate: item.scheduledDate?.toISOString() ?? null,
-      };
-
-      if (item.contentType === "CARROSSEL" && item.groupId) {
-        if (seen.has(item.groupId)) continue;
-        seen.add(item.groupId);
-        posts.push({
-          id: item.id,
-          groupId: item.groupId,
-          title: item.title,
-          caption: item.caption,
-          driveUrl: item.driveUrl,
-          coverUrl: item.coverUrl,
-          coverDriveUrl: item.coverDriveUrl,
-          contentType: item.contentType,
-          fileType: item.fileType,
-          fileUrl: item.fileUrl,
-          ...base,
-        });
-      } else if (item.contentType !== "CARROSSEL") {
-        posts.push({
-          id: item.id,
-          groupId: null,
-          title: item.title,
-          caption: item.caption,
-          driveUrl: item.driveUrl,
-          coverUrl: item.coverUrl,
-          coverDriveUrl: item.coverDriveUrl,
-          contentType: item.contentType,
-          fileType: item.fileType,
-          fileUrl: item.fileUrl,
-          ...base,
-        });
-      }
-    }
-    return posts;
-  }
-
   const now = new Date();
 
   // One entry per campaign (matches dashboard structure)
   const allCampaignData: CampaignData[] = campaigns
     .map((campaign) => {
-      const posts = getApprovedPosts(campaign);
+      const posts = getSchedulablePosts(campaign);
       if (posts.length === 0) return null;
       const unscheduled = posts.filter((p) => !p.scheduledDate && !p.postedAt);
       const maxDaysWaiting = unscheduled.reduce((max, p) => {

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import PlannerCalendar from "./PlannerCalendar";
 import CopyButton from "./CopyButton";
+import { type SchedulablePost } from "@/lib/programacao";
 
 const CONTENT_TYPE_LABELS: Record<string, string> = {
   CARROSSEL: "Carrossel",
@@ -12,23 +13,7 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
   STORIES: "Stories",
 };
 
-export interface Post {
-  id: string;
-  campaignId: string;
-  campaignName: string;
-  title: string | null;
-  contentType: string;
-  fileType: string;
-  fileUrl: string;
-  coverUrl: string | null;
-  coverDriveUrl: string | null;
-  caption: string | null;
-  driveUrl: string | null;
-  groupId: string | null;
-  scheduledDate: string | null;
-  postedAt: string | null;
-  approvedAt: string | null;
-}
+export type Post = SchedulablePost;
 
 export interface CampaignData {
   campaignId: string;
