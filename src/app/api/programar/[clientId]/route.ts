@@ -69,13 +69,46 @@ export async function PATCH(req: NextRequest, { params }: { params: { clientId: 
       return NextResponse.json({ error: "Campo obrigatório faltando" }, { status: 400 });
     }
 
-    // Guarda IDOR: o item precisa pertencer a uma campanha deste cliente.
-    const item = await prisma.contentItem.findFirst({
-      where: { id: contentItemId, campaign: { clientId: params.clientId } },
-      select: { id: true, campaignId: true },
+    // Guarda IDOR + agendabilidade: o item precisa pertencer a este cliente E estar
+    // de fato liberado para agendamento (mesma regra da listagem, via getSchedulablePosts).
+    // Endurece este endpoint público de escrita contra marcar itens não-agendáveis.
+    const campaign = await prisma.campaign.findFirst({
+      where: {
+        clientId: params.clientId,
+        contentItems: { some: { id: contentItemId } },
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        approvalItems: { select: { contentItemId: true, status: true, reviewedAt: true } },
+        contentItems: {
+          orderBy: { order: "asc" },
+          select: {
+            id: true,
+            contentType: true,
+            groupId: true,
+            title: true,
+            caption: true,
+            fileUrl: true,
+            fileType: true,
+            coverUrl: true,
+            coverDriveUrl: true,
+            driveUrl: true,
+            scheduledDate: true,
+            postedAt: true,
+            sentToProgramacaoAt: true,
+            internalReviewItem: { select: { status: true } },
+          },
+        },
+      },
     });
-    if (!item) {
+    if (!campaign) {
       return NextResponse.json({ error: "Item não encontrado" }, { status: 404 });
+    }
+    const schedulable = getSchedulablePosts(campaign).filter((p) => !p.postedAt);
+    if (!schedulable.some((p) => p.id === contentItemId)) {
+      return NextResponse.json({ error: "Item não disponível para agendamento" }, { status: 404 });
     }
 
     await prisma.contentItem.update({
@@ -85,13 +118,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { clientId: 
 
     // Auto-publish: se todos os itens APPROVED da campanha já foram postados, publica.
     const campaignItems = await prisma.contentItem.findMany({
-      where: { campaignId: item.campaignId },
+      where: { campaignId: campaign.id },
       include: { approvalItem: true },
     });
     const approvedItems = campaignItems.filter((i) => i.approvalItem?.status === "APPROVED");
     if (approvedItems.length > 0 && approvedItems.every((i) => i.postedAt)) {
       await prisma.campaign.update({
-        where: { id: item.campaignId },
+        where: { id: campaign.id },
         data: { status: "PUBLISHED" },
       });
     }
