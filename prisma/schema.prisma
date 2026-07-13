@@ -60,6 +60,7 @@ model ContentItem {
   coverDriveUrl      String?
   order              Int                 @default(0)
   postedAt           DateTime?
+  sentToProgramacaoAt DateTime?
   createdAt          DateTime            @default(now())
   approvalItem       ApprovalItem?
   internalReviewItem InternalReviewItem?
