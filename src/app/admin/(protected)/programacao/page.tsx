@@ -12,7 +12,12 @@ export default async function ProgramacaoPage({
   const tab = searchParams.tab === "concluidos" ? "concluidos" : "pendentes";
 
   const campaigns = await prisma.campaign.findMany({
-    where: { status: { in: ["CLOSED", "PUBLISHED"] } },
+    where: {
+      OR: [
+        { status: { in: ["CLOSED", "PUBLISHED"] } },
+        { contentItems: { some: { sentToProgramacaoAt: { not: null } } } },
+      ],
+    },
     include: {
       client: true,
       approvalItems: true,
@@ -31,6 +36,7 @@ export default async function ProgramacaoPage({
           driveUrl: true,
           scheduledDate: true,
           postedAt: true,
+          sentToProgramacaoAt: true,
           internalReviewItem: { select: { status: true } },
         },
       },
@@ -50,6 +56,10 @@ export default async function ProgramacaoPage({
       if (item.internalReviewItem && item.internalReviewItem.status !== "APPROVED") continue;
       const approval = campaign.approvalItems.find((a) => a.contentItemId === item.id);
       if (approval?.status !== "APPROVED") continue;
+      // Só entra na Programação se a campanha está fechada/publicada
+      // OU o post foi explicitamente enviado à programação.
+      const campaignReleased = campaign.status === "CLOSED" || campaign.status === "PUBLISHED";
+      if (!campaignReleased && !item.sentToProgramacaoAt) continue;
 
       const base = {
         campaignId: campaign.id,
