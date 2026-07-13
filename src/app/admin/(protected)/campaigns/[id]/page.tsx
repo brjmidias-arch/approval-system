@@ -36,6 +36,7 @@ interface ContentItem {
   coverUrl: string | null;
   coverDriveUrl: string | null;
   order: number;
+  sentToProgramacaoAt: string | null;
   approvalItem: ApprovalItem | null;
   internalReviewItem: InternalReviewItem | null;
 }
@@ -71,6 +72,7 @@ export default function CampaignPage() {
   }
   const [liveStatus, setLiveStatus] = useState<{ reviewed: number; total: number } | null>(null);
   const [markingDoneItemId, setMarkingDoneItemId] = useState<string | null>(null);
+  const [togglingProgItemId, setTogglingProgItemId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
 
@@ -299,6 +301,23 @@ export default function CampaignPage() {
       alert("Erro ao marcar ajuste. Tente novamente.");
     } finally {
       setMarkingDoneItemId(null);
+    }
+  }
+
+  async function handleToggleProgramacao(itemId: string, next: boolean) {
+    setTogglingProgItemId(itemId);
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}/items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sentToProgramacao: next }),
+      });
+      if (!res.ok) throw new Error();
+      fetchCampaign();
+    } catch {
+      alert("Erro ao atualizar a programação. Tente novamente.");
+    } finally {
+      setTogglingProgItemId(null);
     }
   }
 
@@ -1106,6 +1125,30 @@ export default function CampaignPage() {
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${APPROVAL_STATUS_COLORS[statusKey]}`}>
                         {APPROVAL_STATUS_LABELS[statusKey]}
                       </span>
+                      {statusKey === "APPROVED" && (
+                        item.sentToProgramacaoAt ? (
+                          <>
+                            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-sky-900/30 text-sky-400">
+                              ✓ Na Programação
+                            </span>
+                            <button
+                              onClick={() => handleToggleProgramacao(item.id, false)}
+                              disabled={togglingProgItemId === item.id}
+                              className="text-xs px-2.5 py-1 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              {togglingProgItemId === item.id ? "..." : "Remover da Programação"}
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleToggleProgramacao(item.id, true)}
+                            disabled={togglingProgItemId === item.id}
+                            className="text-xs px-2.5 py-1 bg-sky-900/40 hover:bg-sky-900/60 text-sky-400 border border-sky-500/30 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {togglingProgItemId === item.id ? "..." : "→ Programação"}
+                          </button>
+                        )
+                      )}
                       {(statusKey === "ADJUSTMENT" || statusKey === "REJECTED") && (
                         <button
                           onClick={() => handleMarkItemDone(item.id)}
