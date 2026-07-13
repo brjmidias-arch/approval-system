@@ -24,6 +24,7 @@ interface SlideItem {
   fileUrl: string;
   fileType: string;
   order: number;
+  sentToProgramacaoAt: string | null;
   approvalItem: { status: ApprovalStatus; clientComment: string | null } | null;
 }
 
@@ -263,6 +264,27 @@ export default function CarouselCard({
 
   const [markingDone, setMarkingDone] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [togglingProg, setTogglingProg] = useState(false);
+
+  const inProgramacao = slides[0]?.sentToProgramacaoAt != null;
+  const carouselApproved = slides[0]?.approvalItem?.status === "APPROVED";
+
+  async function handleToggleProgramacao(next: boolean) {
+    setTogglingProg(true);
+    try {
+      const res = await fetch(`/api/admin/campaigns/${campaignId}/items/${slides[0].id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sentToProgramacao: next }),
+      });
+      if (!res.ok) throw new Error();
+      setSlides((prev) => prev.map((s) => ({ ...s, sentToProgramacaoAt: next ? new Date().toISOString() : null })));
+    } catch {
+      alert("Erro ao atualizar a programação. Tente novamente.");
+    } finally {
+      setTogglingProg(false);
+    }
+  }
 
   function copyDesignerLink() {
     const url = `${window.location.origin}/post/${slides[0].id}`;
@@ -398,6 +420,30 @@ export default function CarouselCard({
         >
           {linkCopied ? "Copiado!" : "🔗 Link p/ designer"}
         </button>
+        {carouselApproved && (
+          inProgramacao ? (
+            <>
+              <span className="text-xs px-3 py-1.5 rounded-lg font-medium bg-sky-900/30 text-sky-400 self-center">
+                ✓ Na Programação
+              </span>
+              <button
+                onClick={() => handleToggleProgramacao(false)}
+                disabled={togglingProg}
+                className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {togglingProg ? "..." : "Remover da Programação"}
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => handleToggleProgramacao(true)}
+              disabled={togglingProg}
+              className="text-xs px-3 py-1.5 bg-sky-900/40 hover:bg-sky-900/60 text-sky-400 border border-sky-500/30 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {togglingProg ? "..." : "→ Programação"}
+            </button>
+          )
+        )}
         {hasAdjustments && (
           <button
             onClick={handleMarkAllDone}
