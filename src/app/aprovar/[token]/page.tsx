@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { CONTENT_TYPE_LABELS } from "@/types";
 import type { ContentType } from "@/types";
 
@@ -58,6 +58,7 @@ function buildGroups(items: ContentItem[]): Group[] {
 
 export default function ApprovalPage() {
   const { token } = useParams<{ token: string }>();
+  const router = useRouter();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [error, setError] = useState<"closed" | "not_found" | null>(null);
@@ -70,8 +71,8 @@ export default function ApprovalPage() {
   const fetchCampaign = useCallback(async () => {
     const res = await fetch(`/api/approval/${token}`);
     if (res.status === 404) { setError("not_found"); setLoading(false); return; }
-    const data: Campaign = await res.json();
-    if (data.status === "CLOSED") { setError("closed"); setLoading(false); return; }
+    const data: Campaign & { redirect?: string } = await res.json();
+    if (data.redirect) { router.replace(`/aprovar/${data.redirect}`); return; }
     setCampaign(data);
 
     const built = buildGroups(data.contentItems);
@@ -175,6 +176,17 @@ export default function ApprovalPage() {
   }
 
   if (!campaign) return null;
+
+  if (campaign && groups.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#0f0f0f] text-white flex items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-3xl mb-2">✅</p>
+          <p className="text-gray-300">Tudo aprovado! Nenhum post pendente no momento.</p>
+        </div>
+      </div>
+    );
+  }
 
   const alreadyApproved = alreadyApprovedGroups;
   const needsReview = needsReviewGroups;
