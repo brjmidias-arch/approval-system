@@ -17,12 +17,15 @@ model User {
 }
 
 model Client {
-  id        String     @id @default(cuid())
-  name      String
-  email     String?
-  whatsapp  String?
-  createdAt DateTime   @default(now())
-  campaigns Campaign[]
+  id            String        @id @default(cuid())
+  name          String
+  email         String?
+  whatsapp      String?
+  createdAt     DateTime      @default(now())
+  token         String?       @unique @default(uuid())
+  internalToken String?       @unique @default(dbgenerated("gen_random_uuid()"))
+  campaigns     Campaign[]
+  contentItems  ContentItem[]
 }
 
 model Campaign {
@@ -61,6 +64,9 @@ model ContentItem {
   order              Int                 @default(0)
   postedAt           DateTime?
   sentToProgramacaoAt DateTime?
+  clientId           String?
+  client             Client?             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  status             String              @default("DRAFT")
   createdAt          DateTime            @default(now())
   approvalItem       ApprovalItem?
   internalReviewItem InternalReviewItem?
