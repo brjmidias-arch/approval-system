@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { CONTENT_TYPE_LABELS } from "@/types";
 import type { ContentType } from "@/types";
 
@@ -61,6 +61,7 @@ function buildGroups(items: ContentItem[]): Group[] {
 
 export default function InternalReviewPage() {
   const { token } = useParams<{ token: string }>();
+  const router = useRouter();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,17 +70,12 @@ export default function InternalReviewPage() {
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [carouselSlide, setCarouselSlide] = useState<Record<string, number>>({});
   const [savingGroup, setSavingGroup] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [submitResult, setSubmitResult] = useState<{ approved: number; adjustment: number; rejected: number } | null>(null);
-  const [sendingToClient, setSendingToClient] = useState(false);
-  const [sentToClient, setSentToClient] = useState(false);
 
   const fetchCampaign = useCallback(async () => {
     const res = await fetch(`/api/internal/${token}`);
     if (!res.ok) { setNotFound(true); setLoading(false); return; }
-    const data: Campaign = await res.json();
+    const data: Campaign & { redirect?: string } = await res.json();
+    if (data.redirect) { router.replace(`/revisar/${data.redirect}`); return; }
     setCampaign(data);
     const built = buildGroups(data.contentItems);
     setGroups(built);
@@ -153,20 +149,6 @@ export default function InternalReviewPage() {
     return firstItem.internalReviewItem?.status !== "APPROVED";
   });
 
-  async function handleSubmit() {
-    const allDone = needsReviewGroups.every((g) => {
-      const r = reviews[g.groupKey];
-      return r && r.status !== "PENDING";
-    });
-    if (!allDone) { alert("Por favor, revise todos os itens antes de enviar."); return; }
-    setSubmitting(true);
-    const res = await fetch(`/api/internal/${token}/submit`, { method: "POST" });
-    const data = await res.json();
-    if (res.ok) { setSubmitted(true); setSubmitResult(data); }
-    else alert(data.error || "Erro ao enviar revisão.");
-    setSubmitting(false);
-  }
-
   if (loading) return (
     <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
       <p className="text-gray-400">Carregando...</p>
@@ -184,66 +166,12 @@ export default function InternalReviewPage() {
     </div>
   );
 
-  if (submitted && submitResult && campaign) {
-    const allApproved = submitResult.adjustment === 0 && submitResult.rejected === 0 && submitResult.approved > 0;
-    const approvalUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/aprovar/${campaign.token}`;
-    const prazo = new Date(campaign.expiresAt).toLocaleDateString("pt-BR");
-    const whatsappMsg = `Olá, ${campaign.client.name}! 👋\n\nSeu conteúdo de *${campaign.name}* está pronto para aprovação.\n\nAcesse o link abaixo, revise cada post e aprove ou solicite ajustes:\n${approvalUrl}\n\n_Prazo de aprovação: ${prazo}_`;
-
+  if (campaign && groups.length === 0) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
-        <div className="w-full max-w-sm space-y-4">
-          <div className="text-center">
-            <div className="text-5xl mb-4">{allApproved ? "🚀" : "✅"}</div>
-            <h1 className="text-xl font-semibold text-white mb-2">Revisão Interna Concluída!</h1>
-            <p className="text-gray-400 text-sm">
-              {allApproved ? "Tudo aprovado! Já pode enviar para o cliente." : "Revisão enviada. Aguarde os ajustes."}
-            </p>
-          </div>
-
-          <div className="bg-[#1a1a24] border border-white/10 rounded-xl p-4 text-sm space-y-2">
-            <div className="flex justify-between text-gray-300">
-              <span>Aprovados</span><span className="text-emerald-400 font-medium">{submitResult.approved}</span>
-            </div>
-            {submitResult.adjustment > 0 && (
-              <div className="flex justify-between text-gray-300">
-                <span>Com ajuste</span><span className="text-amber-400 font-medium">{submitResult.adjustment}</span>
-              </div>
-            )}
-            {submitResult.rejected > 0 && (
-              <div className="flex justify-between text-gray-300">
-                <span>Reprovados</span><span className="text-red-400 font-medium">{submitResult.rejected}</span>
-              </div>
-            )}
-          </div>
-
-          {allApproved && (
-            <div className="bg-[#1a1a24] border border-emerald-500/20 rounded-xl p-4 space-y-3">
-              <p className="text-xs text-emerald-400 font-semibold uppercase tracking-wider">Mensagem para o cliente</p>
-              <p className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed bg-black/30 rounded-lg p-3">
-                {whatsappMsg}
-              </p>
-              <button
-                onClick={async () => {
-                  navigator.clipboard.writeText(whatsappMsg);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 3000);
-                  if (!sentToClient) {
-                    setSendingToClient(true);
-                    const res = await fetch(`/api/internal/${campaign.internalToken}/send-client`, { method: "POST" });
-                    if (res.ok) setSentToClient(true);
-                    setSendingToClient(false);
-                  }
-                }}
-                disabled={sendingToClient}
-                className="w-full py-3 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-60"
-              >
-                {sendingToClient ? "Enviando..." : copied ? "✅ Mensagem copiada — enviado para o cliente!" : "📋 Copiar mensagem e enviar para o cliente"}
-              </button>
-            </div>
-          )}
-
-          <p className="text-center text-gray-600 text-xs">BRJ Mídias · Revisão Interna</p>
+      <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-3xl mb-2">✅</p>
+          <p className="text-gray-300">Nenhum post aguardando revisão interna.</p>
         </div>
       </div>
     );
@@ -257,7 +185,6 @@ export default function InternalReviewPage() {
   }).length;
   const total = needsReviewGroups.length;
   const progress = total > 0 ? Math.round((reviewedCount / total) * 100) : 0;
-  const allDone = (reviewedCount === total && total > 0) || (total === 0 && alreadyApprovedGroups.length > 0);
 
   return (
     <div className="min-h-screen bg-[#0a0a0f]">
@@ -605,19 +532,6 @@ export default function InternalReviewPage() {
           </div>
         )}
 
-        {/* Submit */}
-        <div className="sticky bottom-4 pt-2">
-          <button
-            onClick={handleSubmit}
-            disabled={!allDone || submitting || savingGroup !== null}
-            className={`w-full py-4 rounded-xl text-base font-semibold transition-all ${
-              allDone ? "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/40"
-              : "bg-white/5 text-gray-500 cursor-not-allowed"
-            }`}
-          >
-            {submitting ? "Enviando..." : savingGroup !== null ? "Salvando..." : allDone ? "Finalizar Revisão Interna" : `Revise todos os itens (${reviewedCount}/${total})`}
-          </button>
-        </div>
       </main>
 
       <footer className="text-center py-8 text-gray-700 text-xs">
