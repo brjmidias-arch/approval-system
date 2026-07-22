@@ -931,8 +931,8 @@ export default function CampaignPage() {
                 <textarea
                   value={editForm.caption}
                   onChange={(e) => setEditForm({ ...editForm, caption: e.target.value })}
-                  rows={3}
-                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 resize-none"
+                  rows={6}
+                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 resize-y min-h-[6rem] max-h-[60vh]"
                 />
               </div>
               <div>
