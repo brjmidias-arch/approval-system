@@ -143,13 +143,23 @@ import { randomUUID } from "crypto";
 
 const prisma = new PrismaClient();
 
-function deriveStatus(item) {
+// IMPORTANTE: todo item ganha um ApprovalItem na criação, então a mera existência dele NÃO
+// significa "enviado ao cliente". O sinal real da etapa é o status da CAMPANHA.
+function deriveStatus(item, campaignStatus) {
   if (item.postedAt) return "PUBLISHED";
   if (item.approvalItem?.status === "APPROVED") return "APPROVED";
-  if (item.approvalItem) return "CLIENT_REVIEW";
-  if (item.internalReviewItem?.status === "APPROVED") return "INTERNAL_DONE";
-  if (item.internalReviewItem) return "INTERNAL_REVIEW";
-  return "DRAFT";
+  switch (campaignStatus) {
+    case "DRAFT": return "DRAFT";
+    case "INTERNAL_REVIEW": return "INTERNAL_REVIEW";
+    case "INTERNAL_DONE":
+      return item.internalReviewItem?.status === "APPROVED" ? "INTERNAL_DONE" : "INTERNAL_REVIEW";
+    case "OPEN":
+    case "CLOSED":
+    case "PUBLISHED":
+      if (item.internalReviewItem && item.internalReviewItem.status !== "APPROVED") return "INTERNAL_REVIEW";
+      return "CLIENT_REVIEW";
+    default: return "DRAFT";
+  }
 }
 
 async function main() {
@@ -167,7 +177,7 @@ async function main() {
   // 2) clientId + status por post (carrossel uniforme por grupo)
   const campaigns = await prisma.campaign.findMany({
     select: {
-      id: true, clientId: true,
+      id: true, clientId: true, status: true,
       contentItems: {
         select: {
           id: true, groupId: true, contentType: true, order: true, postedAt: true,
@@ -185,7 +195,7 @@ async function main() {
     const statusByKey = new Map();
     for (const it of sorted) {
       const key = it.contentType === "CARROSSEL" && it.groupId ? `g:${it.groupId}` : `i:${it.id}`;
-      if (!statusByKey.has(key)) statusByKey.set(key, deriveStatus(it)); // primeiro (menor order) = representante
+      if (!statusByKey.has(key)) statusByKey.set(key, deriveStatus(it, camp.status)); // primeiro (menor order) = representante
     }
     for (const it of camp.contentItems) {
       const key = it.contentType === "CARROSSEL" && it.groupId ? `g:${it.groupId}` : `i:${it.id}`;

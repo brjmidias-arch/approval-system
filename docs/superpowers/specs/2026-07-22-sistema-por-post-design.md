@@ -119,14 +119,16 @@ direto — o histórico de migração não é confiável; ver `local-dev-gotchas
 
 1. Aplicar as mudanças de schema (colunas novas: `Client.token`, `Client.internalToken`,
    `ContentItem.clientId`, `ContentItem.status`) via `db push`/`ALTER TABLE` — todas aditivas.
-2. Para cada `ContentItem`: preencher `clientId = campaign.clientId` e **deduzir `status`** do
-   estado atual do próprio item:
+2. Para cada `ContentItem`: preencher `clientId = campaign.clientId` e **deduzir `status`**.
+   ⚠️ Como todo item ganha um `ApprovalItem` na criação, a existência dele não indica etapa;
+   o sinal real é o **status da campanha** (corrigido durante a execução):
    - `postedAt` setado → `PUBLISHED`
    - senão `ApprovalItem.status = APPROVED` → `APPROVED`
-   - senão tem `ApprovalItem` (pendente/ajuste/reprovado) → `CLIENT_REVIEW`
-   - senão `InternalReviewItem.status = APPROVED` → `INTERNAL_DONE`
-   - senão tem `InternalReviewItem` → `INTERNAL_REVIEW`
-   - senão → `DRAFT`
+   - senão, pelo `campaign.status`: `DRAFT`→`DRAFT`; `INTERNAL_REVIEW`→`INTERNAL_REVIEW`;
+     `INTERNAL_DONE`→`INTERNAL_DONE` (ou `INTERNAL_REVIEW` se a revisão interna do item não
+     estiver aprovada); `OPEN`/`CLOSED`/`PUBLISHED`→`CLIENT_REVIEW` (mas `INTERNAL_REVIEW` se o
+     item ainda tem revisão interna não-aprovada — caso "revisão interna parcial").
+   - Carrossel: status deduzido pelo primeiro slide (menor `order`) e aplicado a todos.
 3. Gerar `token`/`internalToken` para cada `Client` que não tiver.
 4. Não apagar `Campaign`. Manter `campaignId` nos itens para redirecionar links legados.
 
