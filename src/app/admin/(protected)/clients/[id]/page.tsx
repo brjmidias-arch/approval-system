@@ -3,18 +3,39 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { CONTENT_TYPE_LABELS, APPROVAL_STATUS_LABELS, APPROVAL_STATUS_COLORS } from "@/types";
+import type { ContentType, ApprovalStatus } from "@/types";
+import FolderUploadModal from "@/components/admin/FolderUploadModal";
 
-interface Campaign {
+type PostStageStatus = "DRAFT" | "INTERNAL_REVIEW" | "INTERNAL_DONE" | "CLIENT_REVIEW" | "APPROVED" | "PUBLISHED";
+
+interface ApprovalItem {
+  status: ApprovalStatus;
+  clientComment: string | null;
+}
+
+interface InternalReviewItem {
+  status: ApprovalStatus;
+  comment: string | null;
+}
+
+interface ContentItem {
   id: string;
-  name: string;
-  month: number;
-  year: number;
-  token: string;
-  expiresAt: string;
-  status: string;
-  createdAt: string;
-  approvalItems: { status: string }[];
-  contentItems: { id: string }[];
+  fileUrl: string;
+  fileType: string;
+  title: string | null;
+  caption: string | null;
+  scheduledDate: string | null;
+  contentType: ContentType;
+  groupId: string | null;
+  driveUrl: string | null;
+  coverUrl: string | null;
+  coverDriveUrl: string | null;
+  order: number;
+  status: PostStageStatus;
+  sentToProgramacaoAt: string | null;
+  approvalItem: ApprovalItem | null;
+  internalReviewItem: InternalReviewItem | null;
 }
 
 interface Client {
@@ -22,88 +43,228 @@ interface Client {
   name: string;
   email: string;
   whatsapp: string | null;
-  campaigns: Campaign[];
+  token: string;
+  internalToken: string;
+  contentItems: ContentItem[];
 }
 
-const MONTHS = [
-  "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
-  "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"
+interface GroupedPost {
+  items: ContentItem[];
+  rep: ContentItem;
+  isCarousel: boolean;
+}
+
+const STATUS_SECTIONS: { key: PostStageStatus; label: string }[] = [
+  { key: "DRAFT", label: "Rascunho" },
+  { key: "INTERNAL_REVIEW", label: "Revisão interna" },
+  { key: "INTERNAL_DONE", label: "Revisão interna concluída" },
+  { key: "CLIENT_REVIEW", label: "Aguardando cliente" },
+  { key: "APPROVED", label: "Aprovado" },
+  { key: "PUBLISHED", label: "Publicado" },
 ];
 
-export default function ClientDetailPage() {
+const REVIEW_STATUS_BADGE: Record<ApprovalStatus, { label: string; color: string }> = {
+  PENDING: { label: "⏳ Pendente", color: "bg-violet-900/30 text-violet-400" },
+  APPROVED: { label: "✅ Aprovado", color: "bg-emerald-900/30 text-emerald-400" },
+  ADJUSTMENT: { label: "✏️ Ajuste", color: "bg-amber-900/30 text-amber-400" },
+  REJECTED: { label: "❌ Reprovado", color: "bg-red-900/30 text-red-400" },
+};
+
+function buildGroups(items: ContentItem[]): GroupedPost[] {
+  const groups: GroupedPost[] = [];
+  const seenGroupIds = new Set<string>();
+
+  for (const item of items) {
+    if (item.contentType === "CARROSSEL" && item.groupId) {
+      if (seenGroupIds.has(item.groupId)) continue;
+      seenGroupIds.add(item.groupId);
+      const slides = items
+        .filter((c) => c.groupId === item.groupId)
+        .sort((a, b) => a.order - b.order);
+      groups.push({ items: slides, rep: slides[0], isCarousel: true });
+    } else {
+      groups.push({ items: [item], rep: item, isCarousel: false });
+    }
+  }
+
+  return groups;
+}
+
+export default function ClientWorkspacePage() {
   const { id } = useParams<{ id: string }>();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showCampaignForm, setShowCampaignForm] = useState(false);
-  const [campaignForm, setCampaignForm] = useState({
-    name: "",
-    month: new Date().getMonth() + 1,
-    year: new Date().getFullYear(),
-    expiresAt: "",
-  });
-  const [saving, setSaving] = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+
+  const [showFolderUpload, setShowFolderUpload] = useState(false);
+  const [copiedWhich, setCopiedWhich] = useState<"client" | "internal" | null>(null);
+  const [copiedLinkItemId, setCopiedLinkItemId] = useState<string | null>(null);
+
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  const [editingPost, setEditingPost] = useState<GroupedPost | null>(null);
+  const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "", driveUrl: "", coverDriveUrl: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const fetchClient = useCallback(async () => {
-    const res = await fetch(`/api/admin/clients/${id}`);
-    const data = await res.json();
-    setClient(data);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/admin/clients/${id}`, { cache: "no-store" });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setClient(data);
+    } catch {
+      // keep current state on refresh failure
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
+  useEffect(() => { fetchClient(); }, [fetchClient]);
+
   useEffect(() => {
-    fetchClient();
+    const interval = setInterval(() => fetchClient(), 60000);
+    return () => clearInterval(interval);
   }, [fetchClient]);
 
-  async function handleCreateCampaign(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setLightboxUrl(null);
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
 
-    const expires = campaignForm.expiresAt
-      ? campaignForm.expiresAt
-      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  function copyClientLink() {
+    if (!client) return;
+    navigator.clipboard.writeText(`${window.location.origin}/aprovar/${client.token}`);
+    setCopiedWhich("client");
+    setTimeout(() => setCopiedWhich(null), 2000);
+  }
 
-    await fetch("/api/admin/campaigns", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...campaignForm, clientId: id, expiresAt: expires }),
+  function copyInternalLink() {
+    if (!client) return;
+    navigator.clipboard.writeText(`${window.location.origin}/revisar/${client.internalToken}`);
+    setCopiedWhich("internal");
+    setTimeout(() => setCopiedWhich(null), 2000);
+  }
+
+  function copyDesignerLink(itemId: string) {
+    navigator.clipboard.writeText(`${window.location.origin}/post/${itemId}`);
+    setCopiedLinkItemId(itemId);
+    setTimeout(() => setCopiedLinkItemId(null), 2000);
+  }
+
+  async function handleAction(repId: string, action: "send-internal" | "send-client" | "mark-published") {
+    setBusyId(repId);
+    try {
+      const res = await fetch(`/api/admin/posts/${repId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) throw new Error();
+      await fetchClient();
+    } catch {
+      alert("Erro ao mover o post. Tente novamente.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleToggleProgramacao(repId: string, next: boolean) {
+    setBusyId(repId);
+    try {
+      const res = await fetch(`/api/admin/posts/${repId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sentToProgramacao: next }),
+      });
+      if (!res.ok) throw new Error();
+      await fetchClient();
+    } catch {
+      alert("Erro ao atualizar a programação. Tente novamente.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleDelete(group: GroupedPost) {
+    const count = group.items.length;
+    if (!confirm(`Excluir este post${count > 1 ? ` (${count} slides)` : ""}? Esta ação não pode ser desfeita.`)) return;
+    setBusyId(group.rep.id);
+    try {
+      const res = await fetch(`/api/admin/posts/${group.rep.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      await fetchClient();
+    } catch {
+      alert("Erro ao excluir. Tente novamente.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function openEdit(group: GroupedPost) {
+    setEditingPost(group);
+    setEditForm({
+      title: group.rep.title || "",
+      caption: group.rep.caption || "",
+      scheduledDate: group.rep.scheduledDate ? group.rep.scheduledDate.split("T")[0] : "",
+      driveUrl: group.rep.driveUrl || "",
+      coverDriveUrl: group.rep.coverDriveUrl || "",
     });
-
-    setSaving(false);
-    setShowCampaignForm(false);
-    setCampaignForm({ name: "", month: new Date().getMonth() + 1, year: new Date().getFullYear(), expiresAt: "" });
-    fetchClient();
   }
 
-  async function handleResend(campaignId: string) {
-    await fetch(`/api/admin/campaigns/${campaignId}/resend`, { method: "POST" });
-    alert("E-mail reenviado!");
-  }
+  async function handleEditSave() {
+    if (!editingPost) return;
+    setSavingEdit(true);
 
-  async function handleToggleStatus(campaign: Campaign) {
-    const newStatus = campaign.status === "OPEN" ? "CLOSED" : "OPEN";
-    await fetch(`/api/admin/campaigns/${campaign.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus }),
-    });
-    fetchClient();
-  }
+    let coverUrl: string | null = null;
+    if (editForm.coverDriveUrl.trim()) {
+      const m = editForm.coverDriveUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (m) coverUrl = `https://drive.google.com/thumbnail?id=${m[1]}&sz=w800`;
+    }
 
-  function copyLink(token: string) {
-    const url = `${window.location.origin}/aprovar/${token}`;
-    navigator.clipboard.writeText(url);
-    setCopyFeedback(token);
-    setTimeout(() => setCopyFeedback(null), 2000);
+    try {
+      for (const item of editingPost.items) {
+        const res = await fetch(`/api/admin/posts/${item.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: editForm.title || null,
+            caption: editForm.caption || null,
+            scheduledDate: editForm.scheduledDate || null,
+            driveUrl: editForm.driveUrl || null,
+            ...(editForm.coverDriveUrl.trim() !== "" && {
+              coverUrl,
+              coverDriveUrl: editForm.coverDriveUrl.trim() || null,
+            }),
+          }),
+        });
+        if (!res.ok) throw new Error("Erro ao salvar post.");
+      }
+
+      setEditingPost(null);
+      await fetchClient();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   if (loading) return <div className="text-gray-400 p-8">Carregando...</div>;
   if (!client) return <div className="text-red-400 p-8">Cliente não encontrado.</div>;
 
+  const groups = buildGroups(client.contentItems);
+  const sections = STATUS_SECTIONS.map((section) => ({
+    ...section,
+    groups: groups.filter((g) => g.rep.status === section.key),
+  })).filter((section) => section.groups.length > 0);
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2 text-sm text-gray-400 mb-1">
             <Link href="/admin/clients" className="hover:text-white transition-colors">
@@ -113,201 +274,354 @@ export default function ClientDetailPage() {
             <span className="text-white">{client.name}</span>
           </div>
           <h1 className="text-xl font-semibold text-white">{client.name}</h1>
-          <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
+          <div className="flex items-center gap-3 mt-1 text-sm text-gray-400 flex-wrap">
             <span>{client.email}</span>
-            {client.whatsapp && <span>{client.whatsapp}</span>}
+            {client.whatsapp && (
+              <>
+                <span className="text-gray-600">·</span>
+                <span>{client.whatsapp}</span>
+              </>
+            )}
           </div>
         </div>
-        <button
-          onClick={() => setShowCampaignForm(true)}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm px-4 py-2 rounded-lg transition-colors"
-        >
-          + Nova Campanha
-        </button>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowFolderUpload(true)}
+            className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
+          >
+            + Adicionar posts
+          </button>
+          <button
+            onClick={copyClientLink}
+            className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors"
+          >
+            {copiedWhich === "client" ? "Copiado!" : "Copiar link do cliente"}
+          </button>
+          <button
+            onClick={copyInternalLink}
+            className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors"
+          >
+            {copiedWhich === "internal" ? "Copiado!" : "Copiar link revisão interna"}
+          </button>
+        </div>
       </div>
 
-      {/* Campaign Form Modal */}
-      {showCampaignForm && (
+      {/* Folder Upload Modal */}
+      {showFolderUpload && (
+        <FolderUploadModal
+          clientId={id}
+          existingItemCount={client.contentItems.length}
+          onDone={() => { fetchClient(); }}
+          onClose={() => setShowFolderUpload(false)}
+        />
+      )}
+
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <div className="relative max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setLightboxUrl(null)} className="absolute -top-10 right-0 text-white/60 hover:text-white text-sm">
+              ✕ Fechar (Esc)
+            </button>
+            <img src={lightboxUrl} alt="" className="w-full rounded-xl object-contain max-h-[85vh]" />
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingPost && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 w-full max-w-md">
-            <h2 className="text-white font-medium mb-4">Nova Campanha</h2>
-            <form onSubmit={handleCreateCampaign} className="space-y-4">
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h2 className="text-white font-medium mb-4">Editar Post</h2>
+            <div className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5">Nome da campanha</label>
+                <label className="block text-sm text-gray-400 mb-1.5">Nome do post</label>
                 <input
                   type="text"
-                  value={campaignForm.name}
-                  onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })}
-                  required
-                  placeholder="Ex: Abril 2025"
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  placeholder="Ex: Post motivacional semana 1"
                   className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">Mês</label>
-                  <select
-                    value={campaignForm.month}
-                    onChange={(e) => setCampaignForm({ ...campaignForm, month: Number(e.target.value) })}
-                    className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
-                  >
-                    {MONTHS.map((m, i) => (
-                      <option key={i} value={i + 1}>{m}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">Ano</label>
-                  <input
-                    type="number"
-                    value={campaignForm.year}
-                    onChange={(e) => setCampaignForm({ ...campaignForm, year: Number(e.target.value) })}
-                    min={2024}
-                    max={2030}
-                    className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5">
-                  Prazo de aprovação <span className="text-gray-600">(padrão: 7 dias)</span>
-                </label>
+                <label className="block text-sm text-gray-400 mb-1.5">Legenda</label>
+                <textarea
+                  value={editForm.caption}
+                  onChange={(e) => setEditForm({ ...editForm, caption: e.target.value })}
+                  rows={6}
+                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 resize-y min-h-[6rem] max-h-[60vh]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Data de publicação</label>
                 <input
-                  type="datetime-local"
-                  value={campaignForm.expiresAt}
-                  onChange={(e) => setCampaignForm({ ...campaignForm, expiresAt: e.target.value })}
+                  type="date"
+                  value={editForm.scheduledDate}
+                  onChange={(e) => setEditForm({ ...editForm, scheduledDate: e.target.value })}
                   className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
                 />
               </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Link do Drive</label>
+                <input
+                  type="url"
+                  value={editForm.driveUrl}
+                  onChange={(e) => setEditForm({ ...editForm, driveUrl: e.target.value })}
+                  placeholder="https://drive.google.com/..."
+                  className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 placeholder-gray-600"
+                />
+              </div>
+
+              {(editingPost.rep.fileType === "VIDEO" || editingPost.rep.contentType === "REELS") && (
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">
+                    Capa do vídeo
+                    <span className="text-gray-600 ml-1">(link do Drive)</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={editForm.coverDriveUrl}
+                    onChange={(e) => setEditForm({ ...editForm, coverDriveUrl: e.target.value })}
+                    placeholder="https://drive.google.com/file/d/..."
+                    className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 placeholder-gray-600"
+                  />
+                  {editForm.coverDriveUrl.trim() && !editForm.coverDriveUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) && (
+                    <p className="text-xs text-red-400 mt-1">Link do Drive não reconhecido</p>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-3 pt-1">
                 <button
-                  type="button"
-                  onClick={() => setShowCampaignForm(false)}
+                  onClick={() => setEditingPost(null)}
                   className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 py-2.5 rounded-lg text-sm transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
-                  type="submit"
-                  disabled={saving}
+                  onClick={handleEditSave}
+                  disabled={savingEdit}
                   className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm transition-colors font-medium"
                 >
-                  {saving ? "Criando..." : "Criar Campanha"}
+                  {savingEdit ? "Salvando..." : "Salvar"}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Campaigns */}
-      <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-white/10">
-          <h2 className="text-white font-medium text-sm">Campanhas ({client.campaigns.length})</h2>
+      {/* Posts by status */}
+      {client.contentItems.length === 0 ? (
+        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-8 text-center">
+          <p className="text-gray-400 text-sm">Nenhum post adicionado ainda.</p>
+          <button onClick={() => setShowFolderUpload(true)} className="mt-3 text-emerald-400 hover:text-emerald-300 text-sm transition-colors">
+            Adicionar posts via Drive →
+          </button>
         </div>
+      ) : (
+        sections.map((section) => (
+          <div key={section.key} className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-white/10">
+              <h2 className="text-white font-medium text-sm">
+                {section.label} ({section.groups.length})
+              </h2>
+            </div>
+            <div className="flex flex-col gap-3 p-3">
+              {section.groups.map((group) => {
+                const rep = group.rep;
+                const isBusy = busyId === rep.id;
 
-        {client.campaigns.length === 0 ? (
-          <div className="p-8 text-center text-gray-400 text-sm">
-            Nenhuma campanha criada ainda.
-          </div>
-        ) : (
-          <div className="divide-y divide-white/5">
-            {client.campaigns.map((campaign) => {
-              const total = campaign.contentItems.length;
-              const approved = campaign.approvalItems.filter((a) => a.status === "APPROVED").length;
-              const adjustment = campaign.approvalItems.filter((a) => a.status === "ADJUSTMENT").length;
-              const rejected = campaign.approvalItems.filter((a) => a.status === "REJECTED").length;
-              const pending = total - approved - adjustment - rejected;
-              const progress = total > 0 ? Math.round(((total - pending) / total) * 100) : 0;
-
-              return (
-                <div key={campaign.id} className="px-5 py-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/admin/campaigns/${campaign.id}`}
-                          className="text-white font-medium text-sm hover:text-emerald-400 transition-colors"
-                        >
-                          {campaign.name}
-                        </Link>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            campaign.status === "CLOSED"
-                              ? "bg-gray-800 text-gray-400"
-                              : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE"
-                              ? "bg-violet-900/30 text-violet-400"
-                              : campaign.status === "DRAFT"
-                              ? "bg-gray-800 text-gray-400"
-                              : "bg-emerald-900/30 text-emerald-400"
-                          }`}
-                        >
-                          {campaign.status === "CLOSED" ? "Fechado"
-                            : campaign.status === "DRAFT" ? "Rascunho"
-                            : campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ? "Revisão Interna"
-                            : "Aberto"}
-                        </span>
+                return (
+                  <div key={rep.id} className="bg-black/20 border border-white/[0.08] rounded-xl overflow-hidden">
+                    <div className="flex items-start gap-4 px-5 py-4">
+                      {/* Thumbnail */}
+                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-black/40 shrink-0 flex items-center justify-center relative">
+                        {rep.fileType === "IMAGE" ? (
+                          <img
+                            src={rep.fileUrl}
+                            alt=""
+                            className="w-full h-full object-cover cursor-zoom-in"
+                            onClick={() => setLightboxUrl(rep.fileUrl)}
+                          />
+                        ) : rep.fileType === "VIDEO" ? (
+                          <span className="text-2xl">🎬</span>
+                        ) : rep.fileType === "DOCUMENT" ? (
+                          <span className="text-2xl">📝</span>
+                        ) : (
+                          <span className="text-2xl">📄</span>
+                        )}
+                        {group.isCarousel && (
+                          <span className="absolute bottom-0 right-0 bg-black/70 text-white text-[10px] px-1 rounded-tl">
+                            {group.items.length}
+                          </span>
+                        )}
                       </div>
-                      <p className="text-gray-500 text-xs mt-0.5">
-                        {MONTHS[campaign.month - 1]} {campaign.year} · Prazo:{" "}
-                        {new Date(campaign.expiresAt).toLocaleDateString("pt-BR")}
-                      </p>
 
-                      {total > 0 && (
-                        <div className="mt-2">
-                          <div className="flex items-center gap-3 text-xs mb-1">
-                            <span className="text-gray-500">{total - pending}/{total} revisados</span>
-                            {approved > 0 && <span className="text-emerald-400">✅ {approved}</span>}
-                            {adjustment > 0 && <span className="text-amber-400">✏️ {adjustment}</span>}
-                            {rejected > 0 && <span className="text-red-400">❌ {rejected}</span>}
-                          </div>
-                          <div className="w-full bg-white/5 rounded-full h-1.5">
-                            <div
-                              className="bg-emerald-500 h-1.5 rounded-full transition-all"
-                              style={{ width: `${progress}%` }}
-                            />
-                          </div>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        {rep.title && <p className="text-white text-sm font-medium mb-0.5">{rep.title}</p>}
+                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                          <span className="text-xs font-medium text-gray-400 bg-white/5 px-2 py-0.5 rounded">
+                            {CONTENT_TYPE_LABELS[rep.contentType]}
+                          </span>
+                          {group.isCarousel && (
+                            <span className="text-xs font-medium text-purple-400 bg-purple-900/20 px-2 py-0.5 rounded">
+                              Carrossel — {group.items.length} slides
+                            </span>
+                          )}
+                          {rep.scheduledDate && (
+                            <span className="text-xs text-gray-500">
+                              {new Date(rep.scheduledDate).toLocaleDateString("pt-BR")}
+                            </span>
+                          )}
                         </div>
-                      )}
-                    </div>
+                        {rep.caption && <p className="text-sm text-gray-300 line-clamp-2">{rep.caption}</p>}
+                        {rep.driveUrl && (
+                          <a href={rep.driveUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                            🔗 Ver no Drive
+                          </a>
+                        )}
+                        {rep.internalReviewItem?.comment && (
+                          <div className="mt-1.5 text-xs rounded-lg px-2.5 py-1.5 text-violet-300 bg-violet-900/20 border border-violet-500/20">
+                            <span className="opacity-70">Revisão interna: </span>
+                            {rep.internalReviewItem.comment}
+                          </div>
+                        )}
+                        {rep.approvalItem?.clientComment && (
+                          <div className="mt-1.5 text-xs rounded-lg px-2.5 py-1.5 text-amber-400 bg-amber-900/20">
+                            <span className="opacity-70">Comentário do cliente: </span>
+                            {rep.approvalItem.clientComment}
+                          </div>
+                        )}
+                      </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => copyLink(campaign.token)}
-                        className="text-xs px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors"
-                      >
-                        {copyFeedback === campaign.token ? "Copiado!" : "Copiar Link"}
-                      </button>
-                      <button
-                        onClick={() => handleResend(campaign.id)}
-                        className="text-xs px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors"
-                      >
-                        Reenviar E-mail
-                      </button>
-                      <button
-                        onClick={() => handleToggleStatus(campaign)}
-                        className={`text-xs px-2.5 py-1.5 rounded-lg transition-colors ${
-                          campaign.status === "OPEN"
-                            ? "bg-red-900/20 hover:bg-red-900/30 text-red-400"
-                            : "bg-emerald-900/20 hover:bg-emerald-900/30 text-emerald-400"
-                        }`}
-                      >
-                        {campaign.status === "OPEN" ? "Fechar" : "Reabrir"}
-                      </button>
-                      <Link
-                        href={`/admin/campaigns/${campaign.id}`}
-                        className="text-xs px-2.5 py-1.5 bg-emerald-900/20 hover:bg-emerald-900/30 text-emerald-400 rounded-lg transition-colors"
-                      >
-                        Gerenciar →
-                      </Link>
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end max-w-xs">
+                        <button
+                          onClick={() => copyDesignerLink(rep.id)}
+                          className="text-xs px-2.5 py-1 bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 border border-blue-500/30 rounded-lg transition-colors"
+                        >
+                          {copiedLinkItemId === rep.id ? "Copiado!" : "🔗 Link p/ designer"}
+                        </button>
+
+                        {rep.internalReviewItem && (
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${REVIEW_STATUS_BADGE[rep.internalReviewItem.status].color}`}>
+                            {REVIEW_STATUS_BADGE[rep.internalReviewItem.status].label} (interno)
+                          </span>
+                        )}
+                        {rep.approvalItem && (
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${APPROVAL_STATUS_COLORS[rep.approvalItem.status]}`}>
+                            {APPROVAL_STATUS_LABELS[rep.approvalItem.status]}
+                          </span>
+                        )}
+
+                        {rep.status === "DRAFT" && (
+                          <button
+                            onClick={() => handleAction(rep.id, "send-internal")}
+                            disabled={isBusy}
+                            className="text-xs px-2.5 py-1 bg-violet-900/40 hover:bg-violet-900/60 text-violet-400 border border-violet-500/30 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {isBusy ? "..." : "Enviar p/ revisão interna"}
+                          </button>
+                        )}
+
+                        {rep.status === "INTERNAL_REVIEW" && (rep.internalReviewItem?.status === "ADJUSTMENT" || rep.internalReviewItem?.status === "REJECTED") && (
+                          <button
+                            onClick={() => handleAction(rep.id, "send-internal")}
+                            disabled={isBusy}
+                            className="text-xs px-2.5 py-1 bg-violet-900/40 hover:bg-violet-900/60 text-violet-400 border border-violet-500/30 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {isBusy ? "..." : "Ajuste feito"}
+                          </button>
+                        )}
+
+                        {rep.status === "INTERNAL_DONE" && (
+                          <button
+                            onClick={() => handleAction(rep.id, "send-client")}
+                            disabled={isBusy}
+                            className="text-xs px-2.5 py-1 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/30 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {isBusy ? "..." : "Enviar p/ cliente"}
+                          </button>
+                        )}
+
+                        {rep.status === "CLIENT_REVIEW" && (rep.approvalItem?.status === "ADJUSTMENT" || rep.approvalItem?.status === "REJECTED") && (
+                          <button
+                            onClick={() => handleAction(rep.id, "send-client")}
+                            disabled={isBusy}
+                            className="text-xs px-2.5 py-1 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/30 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {isBusy ? "..." : "Ajuste feito"}
+                          </button>
+                        )}
+
+                        {rep.status === "APPROVED" && (
+                          rep.sentToProgramacaoAt ? (
+                            <>
+                              <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-sky-900/30 text-sky-400">
+                                ✓ Na Programação
+                              </span>
+                              <button
+                                onClick={() => handleToggleProgramacao(rep.id, false)}
+                                disabled={isBusy}
+                                className="text-xs px-2.5 py-1 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                {isBusy ? "..." : "Remover da Programação"}
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => handleToggleProgramacao(rep.id, true)}
+                              disabled={isBusy}
+                              className="text-xs px-2.5 py-1 bg-sky-900/40 hover:bg-sky-900/60 text-sky-400 border border-sky-500/30 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              {isBusy ? "..." : "→ Programação"}
+                            </button>
+                          )
+                        )}
+                        {rep.status === "APPROVED" && (
+                          <button
+                            onClick={() => handleAction(rep.id, "mark-published")}
+                            disabled={isBusy}
+                            className="text-xs px-2.5 py-1 bg-teal-900/40 hover:bg-teal-900/60 text-teal-400 border border-teal-500/30 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {isBusy ? "..." : "Marcar publicado"}
+                          </button>
+                        )}
+
+                        {rep.status === "PUBLISHED" && (
+                          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-teal-900/30 text-teal-400">
+                            ✅ Publicado
+                          </span>
+                        )}
+
+                        {rep.status !== "PUBLISHED" && (
+                          <button onClick={() => openEdit(group)} className="text-gray-400 hover:text-white text-sm transition-colors">
+                            Editar
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(group)}
+                          disabled={isBusy}
+                          className="text-red-500 hover:text-red-400 text-sm transition-colors disabled:opacity-50"
+                        >
+                          Excluir
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        )}
-      </div>
+        ))
+      )}
     </div>
   );
 }
