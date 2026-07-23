@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSchedulablePosts } from "@/lib/programacao";
 
 export async function GET(_req: NextRequest, { params }: { params: { clientId: string } }) {
   try {
@@ -77,65 +76,31 @@ export async function PATCH(req: NextRequest, { params }: { params: { clientId: 
       return NextResponse.json({ error: "Campo obrigatório faltando" }, { status: 400 });
     }
 
-    // Guarda IDOR + agendabilidade: o item precisa pertencer a este cliente E estar
-    // de fato liberado para agendamento (mesma regra da listagem, via getSchedulablePosts).
-    // Endurece este endpoint público de escrita contra marcar itens não-agendáveis.
-    const campaign = await prisma.campaign.findFirst({
+    // Guarda IDOR + agendabilidade (direto no post — funciona para posts client-direct e legados):
+    // o item precisa ser do cliente E estar liberado para agendamento.
+    const item = await prisma.contentItem.findFirst({
       where: {
+        id: contentItemId,
         clientId: params.clientId,
-        contentItems: { some: { id: contentItemId } },
+        status: "APPROVED",
+        postedAt: null,
+        contentType: { not: "TEXTO" },
+        OR: [
+          { sentToProgramacaoAt: { not: null } },
+          { campaign: { status: { in: ["CLOSED", "PUBLISHED"] } } },
+        ],
       },
-      select: {
-        id: true,
-        name: true,
-        status: true,
-        approvalItems: { select: { contentItemId: true, status: true, reviewedAt: true } },
-        contentItems: {
-          orderBy: { order: "asc" },
-          select: {
-            id: true,
-            contentType: true,
-            groupId: true,
-            title: true,
-            caption: true,
-            fileUrl: true,
-            fileType: true,
-            coverUrl: true,
-            coverDriveUrl: true,
-            driveUrl: true,
-            scheduledDate: true,
-            postedAt: true,
-            sentToProgramacaoAt: true,
-            internalReviewItem: { select: { status: true } },
-          },
-        },
-      },
+      select: { id: true, groupId: true, contentType: true },
     });
-    if (!campaign) {
-      return NextResponse.json({ error: "Item não encontrado" }, { status: 404 });
-    }
-    const schedulable = getSchedulablePosts(campaign).filter((p) => !p.postedAt);
-    if (!schedulable.some((p) => p.id === contentItemId)) {
+    if (!item) {
       return NextResponse.json({ error: "Item não disponível para agendamento" }, { status: 404 });
     }
 
-    await prisma.contentItem.update({
-      where: { id: contentItemId },
-      data: { postedAt: new Date() },
-    });
-
-    // Auto-publish: se todos os itens APPROVED da campanha já foram postados, publica.
-    const campaignItems = await prisma.contentItem.findMany({
-      where: { campaignId: campaign.id },
-      include: { approvalItem: true },
-    });
-    const approvedItems = campaignItems.filter((i) => i.approvalItem?.status === "APPROVED");
-    if (approvedItems.length > 0 && approvedItems.every((i) => i.postedAt)) {
-      await prisma.campaign.update({
-        where: { id: campaign.id },
-        data: { status: "PUBLISHED" },
-      });
-    }
+    // Marca como publicado (carrossel = grupo inteiro)
+    const ids = item.contentType === "CARROSSEL" && item.groupId
+      ? (await prisma.contentItem.findMany({ where: { groupId: item.groupId }, select: { id: true } })).map((s) => s.id)
+      : [item.id];
+    await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "PUBLISHED", postedAt: new Date() } });
 
     return NextResponse.json({ success: true });
   } catch {
