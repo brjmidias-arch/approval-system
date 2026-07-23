@@ -97,13 +97,14 @@ function detectCoverAndType(files: DriveFile[]): {
 type Step = "input" | "loading" | "review" | "saving" | "done";
 
 interface Props {
-  campaignId: string;
+  campaignId?: string;
+  clientId?: string;
   existingItemCount: number;
   onDone: () => void;
   onClose: () => void;
 }
 
-export default function FolderUploadModal({ campaignId, existingItemCount, onDone, onClose }: Props) {
+export default function FolderUploadModal({ campaignId, clientId, existingItemCount, onDone, onClose }: Props) {
   const [step, setStep] = useState<Step>("input");
   const [linksText, setLinksText] = useState("");
   const [posts, setPosts] = useState<ParsedPost[]>([]);
@@ -229,6 +230,7 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
 
   async function handleSave() {
     setStep("saving");
+    const endpoint = campaignId ? `/api/admin/campaigns/${campaignId}/items` : `/api/admin/clients/${clientId}/items`;
     let baseOrder = existingItemCount + 1;
     let failedPosts = 0;
     let savedPosts = 0;
@@ -248,7 +250,7 @@ export default function FolderUploadModal({ campaignId, existingItemCount, onDon
         const coverDriveUrl = post.coverDriveUrl || (post.coverFileId ? driveFileViewUrl(post.coverFileId) : null);
 
         try {
-          const res = await fetch(`/api/admin/campaigns/${campaignId}/items`, {
+          const res = await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
