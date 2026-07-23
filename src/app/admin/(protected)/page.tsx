@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import AutoRefresh from "@/components/admin/AutoRefresh";
+import DashboardClientRow from "@/components/admin/DashboardClientRow";
 
 type Item = {
   id: string;
@@ -149,16 +150,14 @@ export default async function AdminDashboard() {
                   </div>
                   <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden divide-y divide-white/5">
                     {clientsInStage.map(({ client, counts }) => (
-                      <Link
+                      <DashboardClientRow
                         key={client.id}
-                        href={`/admin/clients/${client.id}`}
-                        className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.04] transition-colors"
-                      >
-                        <p className="text-white text-sm font-medium truncate">{client.name}</p>
-                        <span className={`text-xs font-semibold shrink-0 ml-3 ${stage.color}`}>
-                          {counts[stage.id]} {counts[stage.id] === 1 ? "post" : "posts"}
-                        </span>
-                      </Link>
+                        clientId={client.id}
+                        clientName={client.name}
+                        count={counts[stage.id]}
+                        stageId={stage.id}
+                        stageColor={stage.color}
+                      />
                     ))}
                   </div>
                 </div>
