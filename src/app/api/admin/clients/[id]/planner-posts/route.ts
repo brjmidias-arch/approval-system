@@ -9,25 +9,20 @@ export async function GET(
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  let campaigns;
+  let items;
   try {
-    campaigns = await prisma.campaign.findMany({
-      where: { clientId: params.id },
-      include: {
-        client: { select: { name: true } },
-        contentItems: {
-          where: {
-            approvalItem: { status: "APPROVED" },
-            contentType: { not: "TEXTO" },
-            OR: [
-              { scheduledDate: null },
-              { scheduledDate: { gte: startOfMonth } },
-            ],
-          },
-          orderBy: { order: "asc" },
-          include: { approvalItem: true },
-        },
+    items = await prisma.contentItem.findMany({
+      where: {
+        clientId: params.id,
+        approvalItem: { status: "APPROVED" },
+        contentType: { not: "TEXTO" },
+        OR: [
+          { scheduledDate: null },
+          { scheduledDate: { gte: startOfMonth } },
+        ],
       },
+      orderBy: { order: "asc" },
+      include: { client: { select: { name: true } } },
     });
   } catch {
     return NextResponse.json({ error: "Erro ao buscar posts" }, { status: 500 });
@@ -48,26 +43,24 @@ export async function GET(
     campaignId: string;
   }[] = [];
 
-  for (const campaign of campaigns) {
-    for (const item of campaign.contentItems) {
-      if (item.contentType === "CARROSSEL" && item.groupId) {
-        if (seenGroupIds.has(item.groupId)) continue;
-        seenGroupIds.add(item.groupId);
-      }
-      posts.push({
-        id: item.id,
-        title: item.title,
-        contentType: item.contentType,
-        fileUrl: item.fileUrl,
-        fileType: item.fileType,
-        coverUrl: item.coverUrl,
-        caption: item.caption,
-        scheduledDate: item.scheduledDate ? item.scheduledDate.toISOString() : null,
-        clientName: campaign.client.name,
-        campaignName: campaign.name,
-        campaignId: campaign.id,
-      });
+  for (const item of items) {
+    if (item.contentType === "CARROSSEL" && item.groupId) {
+      if (seenGroupIds.has(item.groupId)) continue;
+      seenGroupIds.add(item.groupId);
     }
+    posts.push({
+      id: item.id,
+      title: item.title,
+      contentType: item.contentType,
+      fileType: item.fileType,
+      fileUrl: item.fileUrl,
+      coverUrl: item.coverUrl,
+      caption: item.caption,
+      scheduledDate: item.scheduledDate ? item.scheduledDate.toISOString() : null,
+      clientName: item.client?.name ?? "",
+      campaignName: "",
+      campaignId: params.id,
+    });
   }
 
   return NextResponse.json(posts);

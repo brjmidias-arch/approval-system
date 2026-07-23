@@ -373,7 +373,7 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
       setPosts((prev) => prev.map((p) => p.id === activeId ? { ...p, scheduledDate: null } : p));
       onDateChange?.(activeId, null);
       try {
-        const res = await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
+        const res = await fetch(`/api/admin/posts/${post.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ scheduledDate: null }),
@@ -395,7 +395,7 @@ export default function PlannerCalendar({ initialPosts, clientId, onDateChange }
     setPosts((prev) => prev.map((p) => p.id === activeId ? { ...p, scheduledDate: localDate.toISOString() } : p));
     onDateChange?.(activeId, overId);
     try {
-      const res = await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
+      const res = await fetch(`/api/admin/posts/${post.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scheduledDate: overId }),
