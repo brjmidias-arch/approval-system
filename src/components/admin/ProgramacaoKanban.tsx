@@ -126,10 +126,10 @@ function ProgPostRow({
   async function handleMarkPosted() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/campaigns/${post.campaignId}/items/${post.id}`, {
+      const res = await fetch(`/api/admin/posts/${post.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postedAt: new Date().toISOString() }),
+        body: JSON.stringify({ action: "mark-published" }),
       });
       if (!res.ok) throw new Error();
       onMarkPosted(post.id);
