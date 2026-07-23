@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import ProgramacaoKanban, { type CampaignData } from "@/components/admin/ProgramacaoKanban";
-import { getSchedulablePosts } from "@/lib/programacao";
+import type { SchedulablePost } from "@/lib/programacao";
 
 export default async function ProgramacaoPage({
   searchParams,
@@ -12,46 +12,86 @@ export default async function ProgramacaoPage({
 }) {
   const tab = searchParams.tab === "concluidos" ? "concluidos" : "pendentes";
 
-  const campaigns = await prisma.campaign.findMany({
+  // Post-based query (client-direct posts have campaignId = null, so we can't
+  // start from Campaign anymore). Covers both legacy campaign-linked posts
+  // (backfilled with clientId in fase1) and new client-direct posts.
+  const items = await prisma.contentItem.findMany({
     where: {
+      status: "APPROVED",
+      postedAt: null,
+      contentType: { not: "TEXTO" },
       OR: [
-        { status: { in: ["CLOSED", "PUBLISHED"] } },
-        { contentItems: { some: { sentToProgramacaoAt: { not: null } } } },
+        { sentToProgramacaoAt: { not: null } },
+        { campaign: { status: { in: ["CLOSED", "PUBLISHED"] } } },
       ],
     },
-    include: {
-      client: true,
-      approvalItems: true,
-      contentItems: {
-        orderBy: { order: "asc" },
-        select: {
-          id: true,
-          contentType: true,
-          groupId: true,
-          title: true,
-          caption: true,
-          fileUrl: true,
-          fileType: true,
-          coverUrl: true,
-          coverDriveUrl: true,
-          driveUrl: true,
-          scheduledDate: true,
-          postedAt: true,
-          sentToProgramacaoAt: true,
-          internalReviewItem: { select: { status: true } },
-        },
-      },
+    orderBy: { order: "asc" },
+    select: {
+      id: true,
+      clientId: true,
+      groupId: true,
+      contentType: true,
+      title: true,
+      caption: true,
+      fileUrl: true,
+      fileType: true,
+      coverUrl: true,
+      coverDriveUrl: true,
+      driveUrl: true,
+      scheduledDate: true,
+      postedAt: true,
+      client: { select: { id: true, name: true } },
+      approvalItem: { select: { reviewedAt: true } },
     },
-    orderBy: { createdAt: "desc" },
   });
 
   const now = new Date();
 
-  // One entry per campaign (matches dashboard structure)
-  const allCampaignData: CampaignData[] = campaigns
-    .map((campaign) => {
-      const posts = getSchedulablePosts(campaign);
-      if (posts.length === 0) return null;
+  // Dedupe carousels (one post per groupId, representative = first by `order`
+  // since the query is already ordered), group posts by client.
+  const seen = new Set<string>();
+  const byClient = new Map<string, { clientId: string; clientName: string; posts: SchedulablePost[] }>();
+
+  for (const item of items) {
+    if (!item.client) continue; // safety net: every item should be backfilled with a client
+
+    const dedupeKey = item.contentType === "CARROSSEL" && item.groupId ? item.groupId : item.id;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    const post: SchedulablePost = {
+      id: item.id,
+      campaignId: item.client.id,
+      campaignName: item.client.name,
+      title: item.title,
+      contentType: item.contentType,
+      fileType: item.fileType,
+      fileUrl: item.fileUrl,
+      coverUrl: item.coverUrl,
+      coverDriveUrl: item.coverDriveUrl,
+      caption: item.caption,
+      driveUrl: item.driveUrl,
+      groupId: item.groupId,
+      scheduledDate: item.scheduledDate?.toISOString() ?? null,
+      postedAt: item.postedAt?.toISOString() ?? null,
+      approvedAt: item.approvalItem?.reviewedAt?.toISOString() ?? null,
+    };
+
+    const entry = byClient.get(item.client.id);
+    if (entry) {
+      entry.posts.push(post);
+    } else {
+      byClient.set(item.client.id, {
+        clientId: item.client.id,
+        clientName: item.client.name,
+        posts: [post],
+      });
+    }
+  }
+
+  // One entry per client
+  const allCampaignData: CampaignData[] = Array.from(byClient.values())
+    .map(({ clientId, clientName, posts }) => {
       const unscheduled = posts.filter((p) => !p.scheduledDate && !p.postedAt);
       const maxDaysWaiting = unscheduled.reduce((max, p) => {
         if (!p.approvedAt) return max;
@@ -61,15 +101,14 @@ export default async function ProgramacaoPage({
         );
       }, 0);
       return {
-        campaignId: campaign.id,
-        campaignName: campaign.name,
-        clientId: campaign.clientId,
-        clientName: campaign.client.name,
+        campaignId: clientId,
+        campaignName: clientName,
+        clientId,
+        clientName,
         posts,
         maxDaysWaiting,
       };
     })
-    .filter((c): c is CampaignData => c !== null)
     .sort((a, b) => b.maxDaysWaiting - a.maxDaysWaiting);
 
   const pendingCampaigns = allCampaignData.filter((c) => c.posts.some((p) => !p.postedAt));
@@ -81,7 +120,7 @@ export default async function ProgramacaoPage({
         <h1 className="text-xl font-semibold text-white">Programação</h1>
         <p className="text-gray-400 text-sm mt-0.5">
           {pendingCampaigns.length > 0
-            ? `${pendingCampaigns.length} ${pendingCampaigns.length === 1 ? "campanha" : "campanhas"} com posts para agendar`
+            ? `${pendingCampaigns.length} ${pendingCampaigns.length === 1 ? "cliente" : "clientes"} com posts para agendar`
             : "Nenhum post pendente de agendamento"}
         </p>
       </div>
@@ -119,7 +158,7 @@ export default async function ProgramacaoPage({
           {doneCampaigns.length === 0 ? (
             <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 text-center">
               <p className="text-gray-400 text-sm">
-                Nenhuma campanha com todos os posts publicados ainda.
+                Nenhum cliente com todos os posts publicados ainda.
               </p>
             </div>
           ) : (
@@ -131,7 +170,7 @@ export default async function ProgramacaoPage({
                 <div>
                   <p className="text-white font-semibold">{c.clientName}</p>
                   <p className="text-gray-500 text-xs">
-                    {c.campaignName} · {c.posts.filter((p) => p.postedAt).length} posts publicados
+                    {c.posts.filter((p) => p.postedAt).length} posts publicados
                   </p>
                 </div>
                 <span className="text-xs text-emerald-400 bg-emerald-900/20 px-3 py-1 rounded-full">
