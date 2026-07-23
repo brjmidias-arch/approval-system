@@ -3,17 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 
-interface Post {
+interface DashPost {
   id: string;
-  fileUrl: string;
-  fileType: string;
   title: string | null;
   caption: string | null;
   contentType: string;
-  groupId: string | null;
-  status: string;
-  sentToProgramacaoAt: string | null;
-  driveUrl: string | null;
+  fileType: string;
+  fileUrl: string;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -24,71 +20,32 @@ const TYPE_LABELS: Record<string, string> = {
   TEXTO: "Texto",
 };
 
-function matchesStage(p: Post, stage: string): boolean {
-  switch (stage) {
-    case "internal": return p.status === "INTERNAL_REVIEW";
-    case "internalDone": return p.status === "INTERNAL_DONE";
-    case "clientReview": return p.status === "CLIENT_REVIEW";
-    case "readyToSchedule": return p.status === "APPROVED" && !p.sentToProgramacaoAt;
-    case "inProgramming": return p.status === "APPROVED" && !!p.sentToProgramacaoAt;
-    case "draft": return p.status === "DRAFT";
-    default: return false;
+function postLabel(p: DashPost): string {
+  if (p.title && p.title.trim()) return p.title;
+  if (p.caption && p.caption.trim()) {
+    const s = p.caption.trim().replace(/\s+/g, " ");
+    return s.length > 60 ? s.slice(0, 60) + "…" : s;
   }
-}
-
-/** Carousel slides (same groupId) collapse to one post (first = representative). */
-function groupPosts(posts: Post[]): Post[] {
-  const seen = new Set<string>();
-  const out: Post[] = [];
-  for (const p of posts) {
-    const key = p.contentType === "CARROSSEL" && p.groupId ? p.groupId : p.id;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(p);
-  }
-  return out;
+  return "(sem título)";
 }
 
 export default function DashboardClientRow({
   clientId,
   clientName,
-  count,
-  stageId,
+  posts,
   stageColor,
 }: {
   clientId: string;
   clientName: string;
-  count: number;
-  stageId: string;
+  posts: DashPost[];
   stageColor: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const [posts, setPosts] = useState<Post[] | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  async function toggle() {
-    const next = !open;
-    setOpen(next);
-    if (next && posts === null) {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/admin/clients/${clientId}`, { cache: "no-store" });
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        const filtered = (data.contentItems ?? []).filter((p: Post) => matchesStage(p, stageId));
-        setPosts(groupPosts(filtered));
-      } catch {
-        setPosts([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-  }
+  const [open, setOpen] = useState(true);
 
   return (
     <div>
       <button
-        onClick={toggle}
+        onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.04] transition-colors text-left"
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -98,49 +55,36 @@ export default function DashboardClientRow({
           <p className="text-white text-sm font-medium truncate">{clientName}</p>
         </div>
         <span className={`text-xs font-semibold shrink-0 ml-3 ${stageColor}`}>
-          {count} {count === 1 ? "post" : "posts"}
+          {posts.length} {posts.length === 1 ? "post" : "posts"}
         </span>
       </button>
 
       {open && (
-        <div className="border-t border-white/5 bg-black/20 px-4 py-3">
-          {loading ? (
-            <p className="text-gray-500 text-xs">Carregando...</p>
-          ) : posts && posts.length > 0 ? (
-            <div className="space-y-2">
-              {posts.map((p) => (
-                <div key={p.id} className="flex items-center gap-3 bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-2">
-                  <div className="w-9 h-9 rounded-md overflow-hidden bg-black/40 shrink-0 flex items-center justify-center">
-                    {p.fileType === "IMAGE" ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.fileUrl} alt="" className="w-full h-full object-cover" />
-                    ) : p.fileType === "VIDEO" ? (
-                      <span className="text-sm">🎬</span>
-                    ) : (
-                      <span className="text-sm">📄</span>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    {p.title && <p className="text-white text-xs font-medium truncate">{p.title}</p>}
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-emerald-400 bg-emerald-900/20 px-1.5 py-0.5 rounded">
-                        {TYPE_LABELS[p.contentType] ?? p.contentType}
-                      </span>
-                      {p.caption && <span className="text-[11px] text-gray-500 truncate">{p.caption}</span>}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <Link
-                href={`/admin/clients/${clientId}`}
-                className="inline-block text-xs text-emerald-400 hover:text-emerald-300 transition-colors pt-1"
-              >
-                Abrir workspace do cliente →
-              </Link>
+        <div className="border-t border-white/5 bg-black/20 px-3 py-2.5 space-y-1.5">
+          {posts.map((p) => (
+            <div key={p.id} className="flex items-center gap-3 bg-[#0f0f0f] border border-white/[0.06] rounded-lg px-2.5 py-1.5">
+              <div className="w-8 h-8 rounded-md overflow-hidden bg-black/40 shrink-0 flex items-center justify-center">
+                {p.fileType === "IMAGE" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.fileUrl} alt="" className="w-full h-full object-cover" />
+                ) : p.fileType === "VIDEO" ? (
+                  <span className="text-sm">🎬</span>
+                ) : (
+                  <span className="text-sm">📄</span>
+                )}
+              </div>
+              <p className="text-white text-xs font-medium truncate flex-1 min-w-0">{postLabel(p)}</p>
+              <span className="text-[10px] text-emerald-400 bg-emerald-900/20 px-1.5 py-0.5 rounded shrink-0">
+                {TYPE_LABELS[p.contentType] ?? p.contentType}
+              </span>
             </div>
-          ) : (
-            <p className="text-gray-500 text-xs">Nenhum post nesta etapa.</p>
-          )}
+          ))}
+          <Link
+            href={`/admin/clients/${clientId}`}
+            className="inline-block text-xs text-emerald-400 hover:text-emerald-300 transition-colors pt-1"
+          >
+            Abrir workspace do cliente →
+          </Link>
         </div>
       )}
     </div>

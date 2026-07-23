@@ -11,23 +11,53 @@ type Item = {
   groupId: string | null;
   contentType: string;
   sentToProgramacaoAt: Date | null;
+  title: string | null;
+  caption: string | null;
+  fileType: string;
+  fileUrl: string;
 };
 
-/** Counts distinct POSTS matching a predicate — carousel slides (same groupId) count as one post. */
-function countDistinctPosts(items: Item[], predicate: (item: Item) => boolean): number {
+/** A post for display (carousel = its representative slide). */
+type DashPost = {
+  id: string;
+  title: string | null;
+  caption: string | null;
+  contentType: string;
+  fileType: string;
+  fileUrl: string;
+};
+
+type StageId = "internal" | "internalDone" | "clientReview" | "readyToSchedule" | "inProgramming" | "draft";
+
+const STAGE_PREDICATES: Record<StageId, (i: Item) => boolean> = {
+  internal: (i) => i.status === "INTERNAL_REVIEW",
+  internalDone: (i) => i.status === "INTERNAL_DONE",
+  clientReview: (i) => i.status === "CLIENT_REVIEW",
+  readyToSchedule: (i) => i.status === "APPROVED" && !i.sentToProgramacaoAt,
+  inProgramming: (i) => i.status === "APPROVED" && !!i.sentToProgramacaoAt,
+  draft: (i) => i.status === "DRAFT",
+};
+
+/** Distinct POSTS matching a predicate — carousel slides (same groupId) collapse to one post. */
+function distinctPosts(items: Item[], predicate: (item: Item) => boolean): DashPost[] {
   const seen = new Set<string>();
-  let count = 0;
+  const out: DashPost[] = [];
   for (const item of items) {
     if (!predicate(item)) continue;
     const key = item.contentType === "CARROSSEL" && item.groupId ? item.groupId : item.id;
     if (seen.has(key)) continue;
     seen.add(key);
-    count++;
+    out.push({
+      id: item.id,
+      title: item.title,
+      caption: item.caption,
+      contentType: item.contentType,
+      fileType: item.fileType,
+      fileUrl: item.fileUrl,
+    });
   }
-  return count;
+  return out;
 }
-
-type StageId = "internal" | "internalDone" | "clientReview" | "readyToSchedule" | "inProgramming" | "draft";
 
 const STAGES: { id: StageId; label: string; icon: string; color: string; dot: string; bg: string }[] = [
   { id: "internal", label: "Revisão interna", icon: "🔍", color: "text-violet-400", dot: "bg-violet-500", bg: "bg-violet-900/20 border-violet-500/30" },
@@ -38,14 +68,14 @@ const STAGES: { id: StageId; label: string; icon: string; color: string; dot: st
   { id: "draft", label: "Rascunho", icon: "📝", color: "text-gray-400", dot: "bg-gray-500", bg: "bg-[#1a1a1a] border-white/10" },
 ];
 
-function computeStageCounts(items: Item[]): Record<StageId, number> {
+function computeStagePosts(items: Item[]): Record<StageId, DashPost[]> {
   return {
-    internal: countDistinctPosts(items, (i) => i.status === "INTERNAL_REVIEW"),
-    internalDone: countDistinctPosts(items, (i) => i.status === "INTERNAL_DONE"),
-    clientReview: countDistinctPosts(items, (i) => i.status === "CLIENT_REVIEW"),
-    readyToSchedule: countDistinctPosts(items, (i) => i.status === "APPROVED" && !i.sentToProgramacaoAt),
-    inProgramming: countDistinctPosts(items, (i) => i.status === "APPROVED" && !!i.sentToProgramacaoAt),
-    draft: countDistinctPosts(items, (i) => i.status === "DRAFT"),
+    internal: distinctPosts(items, STAGE_PREDICATES.internal),
+    internalDone: distinctPosts(items, STAGE_PREDICATES.internalDone),
+    clientReview: distinctPosts(items, STAGE_PREDICATES.clientReview),
+    readyToSchedule: distinctPosts(items, STAGE_PREDICATES.readyToSchedule),
+    inProgramming: distinctPosts(items, STAGE_PREDICATES.inProgramming),
+    draft: distinctPosts(items, STAGE_PREDICATES.draft),
   };
 }
 
@@ -56,12 +86,17 @@ export default async function AdminDashboard() {
       id: true,
       name: true,
       contentItems: {
+        orderBy: { order: "asc" },
         select: {
           id: true,
           status: true,
           groupId: true,
           contentType: true,
           sentToProgramacaoAt: true,
+          title: true,
+          caption: true,
+          fileType: true,
+          fileUrl: true,
         },
       },
     },
@@ -70,7 +105,7 @@ export default async function AdminDashboard() {
 
   const clientStages = clients.map((client) => ({
     client,
-    counts: computeStageCounts(client.contentItems),
+    stagePosts: computeStagePosts(client.contentItems),
   }));
 
   const totals: Record<StageId, number> = {
@@ -81,9 +116,9 @@ export default async function AdminDashboard() {
     inProgramming: 0,
     draft: 0,
   };
-  for (const { counts } of clientStages) {
+  for (const { stagePosts } of clientStages) {
     for (const stage of STAGES) {
-      totals[stage.id] += counts[stage.id];
+      totals[stage.id] += stagePosts[stage.id].length;
     }
   }
 
@@ -138,8 +173,8 @@ export default async function AdminDashboard() {
           <div className="space-y-5">
             {STAGES.filter((stage) => totals[stage.id] > 0).map((stage) => {
               const clientsInStage = clientStages
-                .filter(({ counts }) => counts[stage.id] > 0)
-                .sort((a, b) => b.counts[stage.id] - a.counts[stage.id]);
+                .filter(({ stagePosts }) => stagePosts[stage.id].length > 0)
+                .sort((a, b) => b.stagePosts[stage.id].length - a.stagePosts[stage.id].length);
 
               return (
                 <div key={stage.id} className="space-y-2">
@@ -149,13 +184,12 @@ export default async function AdminDashboard() {
                     <span className="text-xs text-gray-600">{totals[stage.id]}</span>
                   </div>
                   <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden divide-y divide-white/5">
-                    {clientsInStage.map(({ client, counts }) => (
+                    {clientsInStage.map(({ client, stagePosts }) => (
                       <DashboardClientRow
                         key={client.id}
                         clientId={client.id}
                         clientName={client.name}
-                        count={counts[stage.id]}
-                        stageId={stage.id}
+                        posts={stagePosts[stage.id]}
                         stageColor={stage.color}
                       />
                     ))}
