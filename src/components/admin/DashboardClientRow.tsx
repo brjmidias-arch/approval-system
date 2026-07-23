@@ -63,8 +63,11 @@ export default function DashboardClientRow({
     if (confirmMsg && !confirm(confirmMsg)) return;
     setBusy(true);
     try {
-      const results = await Promise.all(Array.from(selected).map(makeReq));
-      if (results.some((r) => !r.ok)) throw new Error();
+      // Sequencial (uma de cada vez) — evita estourar o limite de conexões do banco.
+      for (const id of Array.from(selected)) {
+        const res = await makeReq(id);
+        if (!res.ok) throw new Error();
+      }
       setSelected(new Set());
       router.refresh();
     } catch {
