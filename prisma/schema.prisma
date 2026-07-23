@@ -49,8 +49,8 @@ model Campaign {
 
 model ContentItem {
   id                 String              @id @default(cuid())
-  campaignId         String
-  campaign           Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId         String?
+  campaign           Campaign?           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   fileUrl            String
   fileType           String
   title              String?

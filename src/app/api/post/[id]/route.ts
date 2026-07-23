@@ -17,6 +17,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         driveUrl: true,
         order: true,
         campaign: { select: { name: true, client: { select: { name: true } } } },
+        client: { select: { name: true } },
         approvalItem: { select: { clientComment: true, clientCommentResolved: true } },
         internalReviewItem: { select: { comment: true, commentResolved: true } },
       },
@@ -37,8 +38,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         : [{ id: item.id, fileUrl: item.fileUrl, fileType: item.fileType, order: item.order }];
 
     return NextResponse.json({
-      campaignName: item.campaign.name,
-      clientName: item.campaign.client.name,
+      campaignName: item.campaign?.name ?? null,
+      clientName: item.client?.name ?? item.campaign?.client?.name ?? "",
       title: item.title,
       caption: item.caption,
       scheduledDate: item.scheduledDate,
