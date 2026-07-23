@@ -41,9 +41,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     return NextResponse.json({ error: "Campos obrigatórios faltando ou inválidos" }, { status: 400 });
   }
 
-  // IDOR: item precisa ser do cliente do token
-  const item = await prisma.contentItem.findFirst({ where: { id: contentItemId, clientId: client.id }, select: { id: true } });
-  if (!item) return NextResponse.json({ error: "Item não encontrado" }, { status: 404 });
+  // IDOR + gate de etapa: item precisa ser do cliente E estar na etapa do cliente
+  // (CLIENT_REVIEW, ou APPROVED para permitir mudar a decisão). Impede que um link
+  // evergreen aprove um post que já voltou para revisão interna / rascunho / publicado.
+  const item = await prisma.contentItem.findFirst({
+    where: { id: contentItemId, clientId: client.id, status: { in: ["CLIENT_REVIEW", "APPROVED"] } },
+    select: { id: true },
+  });
+  if (!item) return NextResponse.json({ error: "Item não disponível para aprovação" }, { status: 404 });
 
   try {
     await prisma.approvalItem.upsert({

@@ -39,8 +39,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     return NextResponse.json({ error: "Campos obrigatórios faltando ou inválidos" }, { status: 400 });
   }
 
-  const item = await prisma.contentItem.findFirst({ where: { id: contentItemId, clientId: client.id }, select: { id: true } });
-  if (!item) return NextResponse.json({ error: "Item não encontrado" }, { status: 404 });
+  // IDOR + gate de etapa: item precisa ser do cliente E estar na etapa interna
+  // (INTERNAL_REVIEW, ou INTERNAL_DONE para permitir reabrir a decisão interna).
+  const item = await prisma.contentItem.findFirst({
+    where: { id: contentItemId, clientId: client.id, status: { in: ["INTERNAL_REVIEW", "INTERNAL_DONE"] } },
+    select: { id: true },
+  });
+  if (!item) return NextResponse.json({ error: "Item não disponível para revisão" }, { status: 404 });
 
   try {
     await prisma.internalReviewItem.upsert({
