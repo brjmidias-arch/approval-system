@@ -12,49 +12,57 @@ export async function GET(_req: NextRequest, { params }: { params: { clientId: s
       return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
     }
 
-    const campaigns = await prisma.campaign.findMany({
+    // Posts agendáveis do cliente (inclui posts criados direto no cliente, sem campanha):
+    // aprovados, não postados, não-TEXTO, e (enviados à programação OU de campanha legada fechada).
+    const items = await prisma.contentItem.findMany({
       where: {
         clientId: params.clientId,
+        status: "APPROVED",
+        postedAt: null,
+        contentType: { not: "TEXTO" },
         OR: [
-          { status: { in: ["CLOSED", "PUBLISHED"] } },
-          { contentItems: { some: { sentToProgramacaoAt: { not: null } } } },
+          { sentToProgramacaoAt: { not: null } },
+          { campaign: { status: { in: ["CLOSED", "PUBLISHED"] } } },
         ],
       },
+      orderBy: { order: "asc" },
       select: {
-        id: true,
-        name: true,
-        status: true,
-        approvalItems: { select: { contentItemId: true, status: true, reviewedAt: true } },
-        contentItems: {
-          orderBy: { order: "asc" },
-          select: {
-            id: true,
-            contentType: true,
-            groupId: true,
-            title: true,
-            caption: true,
-            fileUrl: true,
-            fileType: true,
-            coverUrl: true,
-            coverDriveUrl: true,
-            driveUrl: true,
-            scheduledDate: true,
-            postedAt: true,
-            sentToProgramacaoAt: true,
-            internalReviewItem: { select: { status: true } },
-          },
-        },
+        id: true, contentType: true, groupId: true, title: true, caption: true,
+        fileUrl: true, fileType: true, coverUrl: true, coverDriveUrl: true, driveUrl: true,
+        scheduledDate: true,
+        approvalItem: { select: { reviewedAt: true } },
       },
-      orderBy: { createdAt: "desc" },
     });
 
-    const result = campaigns
-      .map((c) => ({
-        campaignId: c.id,
-        campaignName: c.name,
-        posts: getSchedulablePosts(c).filter((p) => !p.postedAt),
-      }))
-      .filter((c) => c.posts.length > 0);
+    // Carrossel = 1 post (representado pelo primeiro slide por order)
+    const seen = new Set<string>();
+    const posts = [];
+    for (const it of items) {
+      const key = it.contentType === "CARROSSEL" && it.groupId ? `g:${it.groupId}` : `i:${it.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      posts.push({
+        id: it.id,
+        campaignId: params.clientId,
+        campaignName: "",
+        title: it.title,
+        contentType: it.contentType,
+        fileType: it.fileType,
+        fileUrl: it.fileUrl,
+        coverUrl: it.coverUrl,
+        coverDriveUrl: it.coverDriveUrl,
+        caption: it.caption,
+        driveUrl: it.driveUrl,
+        groupId: it.groupId,
+        scheduledDate: it.scheduledDate ? it.scheduledDate.toISOString() : null,
+        postedAt: null,
+        approvedAt: it.approvalItem?.reviewedAt ? it.approvalItem.reviewedAt.toISOString() : null,
+      });
+    }
+
+    const result = posts.length > 0
+      ? [{ campaignId: params.clientId, campaignName: client.name, posts }]
+      : [];
 
     return NextResponse.json({ clientName: client.name, campaigns: result });
   } catch {
