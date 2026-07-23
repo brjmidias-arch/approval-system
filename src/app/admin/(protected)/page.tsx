@@ -2,243 +2,91 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import ChargeButton from "@/components/admin/ChargeButton";
-import SentToProductionButton from "@/components/admin/SentToProductionButton";
 import AutoRefresh from "@/components/admin/AutoRefresh";
 
-function getStatusCounts(campaign: {
+type Item = {
+  id: string;
   status: string;
-  approvalItems: { status: string; contentItemId: string }[];
-  contentItems: { id: string; groupId: string | null; contentType: string; scheduledDate: Date | null; internalReviewItem: { status: string } | null }[];
-}) {
-  const seenGroupIds = new Set<string>();
-  const posts: { id: string; groupId: string | null }[] = [];
-  for (const item of campaign.contentItems) {
-    if (item.contentType === "CARROSSEL" && item.groupId) {
-      if (seenGroupIds.has(item.groupId)) continue;
-      seenGroupIds.add(item.groupId);
-      posts.push({ id: item.id, groupId: item.groupId });
-    } else {
-      posts.push({ id: item.id, groupId: null });
-    }
-  }
+  groupId: string | null;
+  contentType: string;
+  sentToProgramacaoAt: Date | null;
+};
 
-  const getPostStatus = (post: { id: string; groupId: string | null }) => {
-    if (post.groupId) {
-      const groupItems = campaign.contentItems.filter((c) => c.groupId === post.groupId);
-      const approval = campaign.approvalItems.find((a) => a.contentItemId === groupItems[0]?.id);
-      return approval?.status || "PENDING";
-    }
-    const approval = campaign.approvalItems.find((a) => a.contentItemId === post.id);
-    return approval?.status || "PENDING";
-  };
-
-  const total = posts.length;
-  const approved = posts.filter((p) => getPostStatus(p) === "APPROVED").length;
-  const adjustment = posts.filter((p) => getPostStatus(p) === "ADJUSTMENT").length;
-  const rejected = posts.filter((p) => getPostStatus(p) === "REJECTED").length;
-  const pending = total - approved - adjustment - rejected;
-  const clientFinished = campaign.status === "CLOSED" && total > 0;
-  const allReviewed = total > 0 && pending === 0;
-  const hasApprovedTexto = campaign.contentItems.some(
-    (item) =>
-      item.contentType === "TEXTO" &&
-      campaign.approvalItems.some((a) => a.contentItemId === item.id && a.status === "APPROVED")
-  );
-
-  const approvedUnscheduledNonTexto = posts.filter((p) => {
-    const item = campaign.contentItems.find((c) => c.id === p.id);
-    if (!item || item.contentType === "TEXTO") return false;
-    if (getPostStatus(p) !== "APPROVED") return false;
-    return !item.scheduledDate;
-  }).length;
-
-  const approvedScheduledNonTexto = posts.filter((p) => {
-    const item = campaign.contentItems.find((c) => c.id === p.id);
-    if (!item || item.contentType === "TEXTO") return false;
-    if (getPostStatus(p) !== "APPROVED") return false;
-    return !!item.scheduledDate;
-  }).length;
-
-  // Count by grouped posts (carousel = 1 post), not individual items
-  const pendingInternalPosts = posts.filter((p) => {
-    const item = campaign.contentItems.find((c) => c.id === p.id);
-    return !item?.internalReviewItem || item.internalReviewItem.status === "PENDING";
-  }).length;
-
-  const adjInternalPosts = posts.filter((p) => {
-    const item = campaign.contentItems.find((c) => c.id === p.id);
-    return item?.internalReviewItem?.status === "ADJUSTMENT" || item?.internalReviewItem?.status === "REJECTED";
-  }).length;
-
-  return { total, approved, adjustment, rejected, pending, clientFinished, allReviewed, hasApprovedTexto, approvedUnscheduledNonTexto, approvedScheduledNonTexto, pendingInternalPosts, adjInternalPosts };
-}
-
-type KanbanCol = "draft" | "internal" | "internalAdj" | "waiting" | "adjustments" | "planner" | "production" | "publish";
-
-const COLUMNS: { id: KanbanCol; label: string; color: string; dot: string }[] = [
-  { id: "draft",       label: "Rascunho",           color: "text-gray-400",    dot: "bg-gray-500"    },
-  { id: "internal",    label: "Revisão Interna",     color: "text-violet-400",  dot: "bg-violet-500"  },
-  { id: "internalAdj", label: "Ajuste Interno",      color: "text-amber-400",   dot: "bg-amber-500"   },
-  { id: "waiting",     label: "Aguard. Cliente",     color: "text-emerald-400", dot: "bg-emerald-500" },
-  { id: "adjustments", label: "Ajustes",             color: "text-amber-400",   dot: "bg-amber-500"   },
-  { id: "planner",     label: "Preencher Planner",   color: "text-sky-400",     dot: "bg-sky-500"     },
-  { id: "production",  label: "Enviar p/ Produção",  color: "text-orange-400",  dot: "bg-orange-500"  },
-  { id: "publish",     label: "Publicar",            color: "text-teal-400",    dot: "bg-teal-500"    },
-];
-
-function unscheduledNonTextoCount(
-  contentItems: { postedAt: Date | null; contentType: string; groupId: string | null; scheduledDate: Date | null }[]
-) {
+/** Counts distinct POSTS matching a predicate — carousel slides (same groupId) count as one post. */
+function countDistinctPosts(items: Item[], predicate: (item: Item) => boolean): number {
   const seen = new Set<string>();
   let count = 0;
-  for (const item of contentItems) {
-    if (item.postedAt) continue;
-    if (item.contentType === "TEXTO") continue;
-    if (item.contentType === "CARROSSEL" && item.groupId) {
-      if (seen.has(item.groupId)) continue;
-      seen.add(item.groupId);
-    }
-    if (!item.scheduledDate) count++;
+  for (const item of items) {
+    if (!predicate(item)) continue;
+    const key = item.contentType === "CARROSSEL" && item.groupId ? item.groupId : item.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    count++;
   }
   return count;
 }
 
-function classifyCampaign(
-  campaign: {
-    status: string;
-    sentToProduction: boolean;
-    contentItems: { postedAt: Date | null; contentType: string; groupId: string | null; scheduledDate: Date | null; internalReviewItem: { status: string } | null }[];
-  },
-  counts: { adjustment: number; rejected: number; hasApprovedTexto: boolean; approvedUnscheduledNonTexto: number; approvedScheduledNonTexto: number }
-): KanbanCol[] {
-  if (campaign.status === "DRAFT") return ["draft"];
-  if (campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE") {
-    const hasAdj = campaign.contentItems.some(
-      (i) => i.internalReviewItem?.status === "ADJUSTMENT" || i.internalReviewItem?.status === "REJECTED"
-    );
-    return [hasAdj ? "internalAdj" : "internal"];
-  }
-  if (campaign.status === "OPEN") {
-    const cols: KanbanCol[] = ["waiting"];
-    const hasInternalAdj = campaign.contentItems.some(
-      (i) => i.internalReviewItem?.status === "ADJUSTMENT" || i.internalReviewItem?.status === "REJECTED"
-    );
-    const hasInternalPending = campaign.contentItems.some(
-      (i) => !i.internalReviewItem || i.internalReviewItem.status === "PENDING"
-    );
-    if (hasInternalAdj) cols.push("internalAdj");
-    else if (hasInternalPending) cols.push("internal");
-    return cols;
-  }
-  if (campaign.status === "CLOSED") {
-    const cols: KanbanCol[] = [];
-    if (counts.adjustment > 0 || counts.rejected > 0) cols.push("adjustments");
-    if (counts.hasApprovedTexto && !campaign.sentToProduction) cols.push("production");
-    // Mutually exclusive: planner takes priority while any post is still unscheduled
-    if (counts.approvedUnscheduledNonTexto > 0) {
-      cols.push("planner");
-    } else if (counts.approvedScheduledNonTexto > 0) {
-      cols.push("publish");
-    }
-    return cols.length > 0 ? cols : ["adjustments"];
-  }
-  return ["draft"];
+type StageId = "internal" | "internalDone" | "clientReview" | "readyToSchedule" | "inProgramming" | "draft";
+
+const STAGES: { id: StageId; label: string; icon: string; color: string; dot: string; bg: string }[] = [
+  { id: "internal", label: "Revisão interna", icon: "🔍", color: "text-violet-400", dot: "bg-violet-500", bg: "bg-violet-900/20 border-violet-500/30" },
+  { id: "internalDone", label: "Revisão interna concluída", icon: "✅", color: "text-violet-300", dot: "bg-violet-400", bg: "bg-violet-900/10 border-violet-500/20" },
+  { id: "clientReview", label: "Aguardando cliente", icon: "👤", color: "text-emerald-400", dot: "bg-emerald-500", bg: "bg-emerald-900/20 border-emerald-500/30" },
+  { id: "readyToSchedule", label: "Prontos p/ programar", icon: "📅", color: "text-sky-400", dot: "bg-sky-500", bg: "bg-sky-900/20 border-sky-500/30" },
+  { id: "inProgramming", label: "Na programação", icon: "🗓️", color: "text-teal-400", dot: "bg-teal-500", bg: "bg-teal-900/20 border-teal-500/30" },
+  { id: "draft", label: "Rascunho", icon: "📝", color: "text-gray-400", dot: "bg-gray-500", bg: "bg-[#1a1a1a] border-white/10" },
+];
+
+function computeStageCounts(items: Item[]): Record<StageId, number> {
+  return {
+    internal: countDistinctPosts(items, (i) => i.status === "INTERNAL_REVIEW"),
+    internalDone: countDistinctPosts(items, (i) => i.status === "INTERNAL_DONE"),
+    clientReview: countDistinctPosts(items, (i) => i.status === "CLIENT_REVIEW"),
+    readyToSchedule: countDistinctPosts(items, (i) => i.status === "APPROVED" && !i.sentToProgramacaoAt),
+    inProgramming: countDistinctPosts(items, (i) => i.status === "APPROVED" && !!i.sentToProgramacaoAt),
+    draft: countDistinctPosts(items, (i) => i.status === "DRAFT"),
+  };
 }
 
-export default async function AdminDashboard({ searchParams }: { searchParams: { tab?: string } }) {
-  const tab = searchParams.tab === "concluidas" ? "concluidas" : "ativas";
-
+export default async function AdminDashboard() {
   const clients = await prisma.client.findMany({
-    include: {
-      campaigns: {
-        include: {
-          approvalItems: true,
-          contentItems: {
-            select: {
-              id: true,
-              groupId: true,
-              contentType: true,
-              scheduledDate: true,
-              postedAt: true,
-              internalReviewItem: { select: { status: true } },
-            },
-          },
+    where: { contentItems: { some: {} } },
+    select: {
+      id: true,
+      name: true,
+      contentItems: {
+        select: {
+          id: true,
+          status: true,
+          groupId: true,
+          contentType: true,
+          sentToProgramacaoAt: true,
         },
-        orderBy: { createdAt: "desc" },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { name: "asc" },
   });
 
-  const totalClients = clients.length;
-  const openCampaigns = clients.reduce(
-    (acc, c) => acc + c.campaigns.filter((cam) => cam.status === "OPEN").length,
-    0
-  );
-  const internalReviewCampaigns = clients.reduce(
-    (acc, c) =>
-      acc + c.campaigns.filter((cam) => cam.status === "INTERNAL_REVIEW" || cam.status === "INTERNAL_DONE").length,
-    0
-  );
-  const awaitingAction = clients.reduce(
-    (acc, c) =>
-      acc +
-      c.campaigns.filter((cam) => {
-        const counts = getStatusCounts(cam);
-        return cam.status === "CLOSED" && counts.total > 0;
-      }).length,
-    0
-  );
+  const clientStages = clients.map((client) => ({
+    client,
+    counts: computeStageCounts(client.contentItems),
+  }));
 
-  const allCampaigns = clients.flatMap((client) =>
-    client.campaigns.map((campaign) => ({ campaign, client }))
-  );
-
-  const activeCampaigns = allCampaigns.filter(({ campaign }) => {
-    if (campaign.status === "PUBLISHED") return false;
-    // Texto-only campaigns already sent to production are done — exclude from active kanban
-    if (
-      (campaign as { sentToProduction?: boolean }).sentToProduction &&
-      !campaign.contentItems.some((i) => i.contentType !== "TEXTO")
-    ) return false;
-    return true;
-  });
-  const publishedCampaigns = allCampaigns
-    .filter(({ campaign }) => campaign.status === "PUBLISHED")
-    .sort((a, b) => new Date(b.campaign.createdAt).getTime() - new Date(a.campaign.createdAt).getTime());
-
-  // Classify active campaigns into Kanban buckets
-  type BucketEntry = {
-    campaign: (typeof allCampaigns)[0]["campaign"];
-    client: (typeof allCampaigns)[0]["client"];
-    counts: ReturnType<typeof getStatusCounts>;
+  const totals: Record<StageId, number> = {
+    internal: 0,
+    internalDone: 0,
+    clientReview: 0,
+    readyToSchedule: 0,
+    inProgramming: 0,
+    draft: 0,
   };
-  const buckets: Record<KanbanCol, BucketEntry[]> = {
-    draft: [], internal: [], internalAdj: [], waiting: [], adjustments: [], planner: [], production: [], publish: [],
-  };
-  for (const { campaign, client } of activeCampaigns) {
-    const counts = getStatusCounts(campaign);
-    const cols = classifyCampaign(campaign, counts);
-    for (const col of cols) {
-      buckets[col].push({ campaign, client, counts });
+  for (const { counts } of clientStages) {
+    for (const stage of STAGES) {
+      totals[stage.id] += counts[stage.id];
     }
   }
 
-  // Notification bar data
-  const internalAdjustItems = buckets.internalAdj;
-  const internalAdjustCount = internalAdjustItems.length;
-  const adjustmentCount = buckets.adjustments.length;
-  const longWaitItems = buckets.waiting.filter(({ campaign }) => {
-    const days = Math.floor((Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-    return days >= 7;
-  });
-  const longWaitCount = longWaitItems.length;
-  const plannerPostCount = buckets.planner.reduce(
-    (sum, { counts }) => sum + counts.approvedUnscheduledNonTexto,
-    0
-  );
-  const hasAlerts = internalAdjustCount > 0 || adjustmentCount > 0 || longWaitCount > 0 || buckets.planner.length > 0;
+  const grandTotal = STAGES.reduce((sum, stage) => sum + totals[stage.id], 0);
 
   return (
     <div className="space-y-5">
@@ -254,447 +102,71 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
         </Link>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
-        {/* Ativas */}
-        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4 flex flex-col justify-between gap-3">
-          <div className="flex items-center justify-between">
-            <p className="text-gray-500 text-xs uppercase tracking-wider font-medium">Ativas</p>
-            <span className="text-lg">📋</span>
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-white">{activeCampaigns.length}</p>
-            <p className="text-xs text-gray-600 mt-1">
-              {publishedCampaigns.length > 0
-                ? `${publishedCampaigns.length} publicada${publishedCampaigns.length > 1 ? "s" : ""}`
-                : "nenhuma publicada"}
-            </p>
-          </div>
+      {grandTotal === 0 ? (
+        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-8 text-center">
+          <p className="text-gray-400">Nenhum post em andamento.</p>
+          <Link href="/admin/clients" className="inline-block mt-3 text-emerald-400 hover:text-emerald-300 text-sm">
+            Ver clientes →
+          </Link>
         </div>
-
-        {/* Revisão Interna */}
-        <div className={`border rounded-xl p-4 flex flex-col justify-between gap-3 ${
-          internalReviewCampaigns > 0 ? "bg-violet-900/20 border-violet-500/30" : "bg-[#1a1a1a] border-white/10"
-        }`}>
-          <div className="flex items-center justify-between">
-            <p className="text-gray-500 text-xs uppercase tracking-wider font-medium">Revisão Interna</p>
-            <span className="text-lg">🔍</span>
+      ) : (
+        <>
+          {/* Stat tiles */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {STAGES.map((stage) => (
+              <div
+                key={stage.id}
+                className={`border rounded-xl p-4 flex flex-col justify-between gap-3 ${
+                  totals[stage.id] > 0 ? stage.bg : "bg-[#1a1a1a] border-white/10"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-gray-500 text-[10px] uppercase tracking-wider font-medium leading-tight">
+                    {stage.label}
+                  </p>
+                  <span className="text-lg shrink-0">{stage.icon}</span>
+                </div>
+                <p className={`text-3xl font-bold ${totals[stage.id] > 0 ? stage.color : "text-white"}`}>
+                  {totals[stage.id]}
+                </p>
+              </div>
+            ))}
           </div>
-          <div>
-            <p className={`text-3xl font-bold ${internalReviewCampaigns > 0 ? "text-violet-400" : "text-white"}`}>
-              {internalReviewCampaigns}
-            </p>
-            <p className="text-xs mt-1">
-              {internalAdjustCount > 0
-                ? <span className="text-amber-400">{internalAdjustCount} com ajuste pendente</span>
-                : <span className="text-gray-600">sem ajustes pendentes</span>}
-            </p>
-          </div>
-        </div>
 
-        {/* Com Cliente */}
-        <div className={`border rounded-xl p-4 flex flex-col justify-between gap-3 ${
-          longWaitCount > 0 ? "bg-orange-900/10 border-orange-500/20"
-          : openCampaigns > 0 ? "bg-emerald-900/10 border-emerald-500/20"
-          : "bg-[#1a1a1a] border-white/10"
-        }`}>
-          <div className="flex items-center justify-between">
-            <p className="text-gray-500 text-xs uppercase tracking-wider font-medium">Com Cliente</p>
-            <span className="text-lg">👤</span>
-          </div>
-          <div>
-            <p className={`text-3xl font-bold ${
-              longWaitCount > 0 ? "text-orange-400"
-              : openCampaigns > 0 ? "text-emerald-400"
-              : "text-white"
-            }`}>
-              {openCampaigns}
-            </p>
-            <p className="text-xs mt-1">
-              {longWaitCount > 0
-                ? <span className="text-orange-400">⚠ {longWaitCount} aguardam 7+ dias</span>
-                : openCampaigns > 0
-                ? <span className="text-gray-500">dentro do prazo</span>
-                : <span className="text-gray-600">nenhuma enviada</span>}
-            </p>
-          </div>
-        </div>
-
-        {/* Pós-aprovação */}
-        <div className={`border rounded-xl p-4 flex flex-col justify-between gap-3 ${
-          awaitingAction > 0 ? "bg-amber-900/20 border-amber-500/30" : "bg-[#1a1a1a] border-white/10"
-        }`}>
-          <div className="flex items-center justify-between">
-            <p className="text-gray-500 text-xs uppercase tracking-wider font-medium">Pós-aprovação</p>
-            <span className="text-lg">✅</span>
-          </div>
-          <div>
-            <p className={`text-3xl font-bold ${awaitingAction > 0 ? "text-amber-400" : "text-white"}`}>
-              {awaitingAction}
-            </p>
-            <p className="text-xs text-gray-600 mt-1 flex flex-wrap gap-x-2">
-              {adjustmentCount > 0 && <span className="text-amber-500">{adjustmentCount} ajuste{adjustmentCount > 1 ? "s" : ""}</span>}
-              {buckets.planner.length > 0 && <span className="text-sky-500">{buckets.planner.length} p/ agendar</span>}
-              {buckets.production.length > 0 && <span className="text-orange-500">{buckets.production.length} produção</span>}
-              {buckets.publish.length > 0 && <span className="text-teal-500">{buckets.publish.length} p/ publicar</span>}
-              {awaitingAction === 0 && <span>nenhuma pendente</span>}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Notification bar */}
-      {hasAlerts && (
-        <div className="flex flex-wrap gap-2 px-3 py-2.5 bg-white/[0.02] border border-white/10 rounded-xl">
-          {internalAdjustCount > 0 && (
-            <Link
-              href={internalAdjustCount === 1 ? `/admin/campaigns/${internalAdjustItems[0].campaign.id}` : "#kanban-col-internalAdj"}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-300 bg-violet-900/40 border border-violet-500/40 px-3 py-1.5 rounded-full animate-pulse hover:bg-violet-900/60 transition-colors"
-            >
-              🔍 {internalAdjustCount} {internalAdjustCount === 1 ? "campanha" : "campanhas"} com ajuste interno
-            </Link>
-          )}
-          {adjustmentCount > 0 && (
-            <Link
-              href={adjustmentCount === 1 ? `/admin/campaigns/${buckets.adjustments[0].campaign.id}` : "#kanban-col-adjustments"}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-300 bg-amber-900/40 border border-amber-500/40 px-3 py-1.5 rounded-full animate-pulse hover:bg-amber-900/60 transition-colors"
-            >
-              ⚠️ {adjustmentCount} {adjustmentCount === 1 ? "campanha aguarda" : "campanhas aguardam"} revisão do cliente
-            </Link>
-          )}
-          {longWaitCount > 0 && (
-            <Link
-              href={longWaitCount === 1 ? `/admin/campaigns/${longWaitItems[0].campaign.id}` : "#kanban-col-waiting"}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-300 bg-orange-900/40 border border-orange-500/40 px-3 py-1.5 rounded-full hover:bg-orange-900/60 transition-colors"
-            >
-              ⏰ {longWaitCount} {longWaitCount === 1 ? "campanha aguarda" : "campanhas aguardam"} cliente há 7+ dias
-            </Link>
-          )}
-          {buckets.planner.length > 0 && (
-            <Link
-              href="/admin/programacao"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-300 bg-sky-900/40 border border-sky-500/40 px-3 py-1.5 rounded-full hover:bg-sky-900/60 transition-colors"
-            >
-              📅 {plannerPostCount} {plannerPostCount === 1 ? "post" : "posts"} sem agendar — Ir para Programação →
-            </Link>
-          )}
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div className="flex gap-1 bg-white/5 rounded-lg p-1 w-fit">
-        <Link
-          href="/admin"
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            tab === "ativas" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"
-          }`}
-        >
-          Ativas{activeCampaigns.length > 0 && <span className="ml-1 text-xs opacity-60">{activeCampaigns.length}</span>}
-        </Link>
-        <Link
-          href="/admin?tab=concluidas"
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            tab === "concluidas" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"
-          }`}
-        >
-          Concluídas{publishedCampaigns.length > 0 && <span className="ml-1 text-xs opacity-60">{publishedCampaigns.length}</span>}
-        </Link>
-      </div>
-
-      {tab === "ativas" ? (
-        activeCampaigns.length === 0 ? (
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-8 text-center">
-            <p className="text-gray-400">Nenhuma campanha ativa.</p>
-            <Link href="/admin/clients" className="inline-block mt-3 text-emerald-400 hover:text-emerald-300 text-sm">
-              Cadastrar primeiro cliente →
-            </Link>
-          </div>
-        ) : (
-          /* Kanban board */
-          <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
-            {COLUMNS.map((col) => {
-              const colItems = buckets[col.id];
-
-              /* Collapsed empty column */
-              if (colItems.length === 0) {
-                return (
-                  <div
-                    key={col.id}
-                    id={`kanban-col-${col.id}`}
-                    className="flex-none w-9 border border-white/10 rounded-xl flex flex-col items-center justify-start py-3 gap-1.5 bg-[#1a1a1a]"
-                    title={col.label}
-                  >
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${col.dot} opacity-40`} />
-                    <span
-                      className={`text-[9px] font-bold uppercase tracking-wider ${col.color} opacity-40 [writing-mode:vertical-lr] rotate-180`}
-                    >
-                      {col.label}
-                    </span>
-                  </div>
-                );
-              }
+          {/* Sections by stage */}
+          <div className="space-y-5">
+            {STAGES.filter((stage) => totals[stage.id] > 0).map((stage) => {
+              const clientsInStage = clientStages
+                .filter(({ counts }) => counts[stage.id] > 0)
+                .sort((a, b) => b.counts[stage.id] - a.counts[stage.id]);
 
               return (
-                <div key={col.id} id={`kanban-col-${col.id}`} className="flex-none w-[218px]">
-                  {/* Column header */}
-                  <div className="bg-[#1a1a1a] border border-white/10 rounded-t-xl px-3 py-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${col.dot}`} />
-                      <span className={`text-[10px] font-bold uppercase tracking-wider truncate ${col.color}`}>
-                        {col.label}
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-bold text-gray-600 shrink-0 ml-1">{colItems.length}</span>
+                <div key={stage.id} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${stage.dot}`} />
+                    <h2 className={`text-sm font-semibold ${stage.color}`}>{stage.label}</h2>
+                    <span className="text-xs text-gray-600">{totals[stage.id]}</span>
                   </div>
-
-                  {/* Cards */}
-                  <div className="border border-t-0 border-white/10 rounded-b-xl overflow-hidden divide-y divide-white/5 min-h-[60px]">
-                    {(
-                      colItems.map(({ campaign, client, counts }) => {
-                        const daysSince = Math.floor(
-                          (Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24)
-                        );
-                        const daysSinceOpen = Math.floor(
-                          (Date.now() - new Date(campaign.expiresAt).getTime() + 24 * 60 * 60 * 1000) /
-                            (1000 * 60 * 60 * 24)
-                        );
-                        const hasInternalAdj = campaign.contentItems.some(
-                          (i) =>
-                            i.internalReviewItem?.status === "ADJUSTMENT" ||
-                            i.internalReviewItem?.status === "REJECTED"
-                        );
-                        const unscheduled =
-                          col.id === "planner" ? counts.approvedUnscheduledNonTexto : 0;
-                        const hasTexto = campaign.contentItems.some((i) => i.contentType === "TEXTO");
-
-                        return (
-                          <Link
-                            key={campaign.id}
-                            href={`/admin/campaigns/${campaign.id}`}
-                            className="block px-3 py-2.5 hover:bg-white/[0.04] transition-colors"
-                          >
-                            <p className="text-white text-[12px] font-semibold truncate leading-tight">{client.name}</p>
-                            <p className="text-gray-500 text-[11px] truncate leading-tight mt-0.5">{campaign.name}</p>
-
-                            <div className="mt-1.5 flex flex-wrap gap-1 items-center">
-                              <span className="text-[10px] text-gray-600">
-                                {counts.total} {counts.total === 1 ? "post" : "posts"}
-                              </span>
-                              {hasTexto && <span className="text-[10px] text-blue-400">· 📝</span>}
-
-                              {col.id === "draft" && daysSince > 0 && (
-                                <span className="text-[10px] text-gray-600">· {daysSince}d</span>
-                              )}
-
-                              {col.id === "internal" &&
-                                (campaign.status === "INTERNAL_DONE" ? (
-                                  <span className="text-[10px] font-medium text-emerald-400 bg-emerald-900/30 px-1.5 py-0.5 rounded">
-                                    ✅ Pronto
-                                  </span>
-                                ) : counts.pendingInternalPosts > 0 ? (
-                                  <span className="text-[10px] font-medium text-violet-400 bg-violet-900/30 px-1.5 py-0.5 rounded">
-                                    🔍 {counts.pendingInternalPosts} {counts.pendingInternalPosts === 1 ? "post pend." : "posts pend."}
-                                  </span>
-                                ) : null)}
-
-                              {col.id === "internalAdj" && (
-                                <span className="text-[10px] font-medium text-amber-400 bg-amber-900/30 px-1.5 py-0.5 rounded">
-                                  ⚠️ {counts.adjInternalPosts} {counts.adjInternalPosts === 1 ? "post c/ ajuste" : "posts c/ ajuste"}
-                                </span>
-                              )}
-
-                              {col.id === "waiting" && (
-                                <>
-                                  {counts.pending > 0 && (
-                                    <span className="text-[10px] font-medium text-gray-500">
-                                      · {counts.pending} pend.
-                                    </span>
-                                  )}
-                                  <span className={`text-[10px] font-medium ${
-                                    daysSince >= 7 ? "text-red-400" : daysSince >= 3 ? "text-amber-400" : "text-gray-500"
-                                  }`}>
-                                    · {daysSince === 0 ? "hoje" : `${daysSince}d`}
-                                  </span>
-                                </>
-                              )}
-
-                              {col.id === "adjustments" && (
-                                <>
-                                  {counts.adjustment > 0 && (
-                                    <span className="text-[10px] text-amber-400">✏️ {counts.adjustment}</span>
-                                  )}
-                                  {counts.rejected > 0 && (
-                                    <span className="text-[10px] text-red-400">❌ {counts.rejected}</span>
-                                  )}
-                                </>
-                              )}
-
-                              {col.id === "planner" && (
-                                <span className="text-[10px] font-medium text-sky-400 bg-sky-900/30 px-1.5 py-0.5 rounded">
-                                  📅 {unscheduled} p/ agendar
-                                </span>
-                              )}
-
-                              {col.id === "production" && (
-                                <span className="text-[10px] font-medium text-orange-400 bg-orange-900/30 px-1.5 py-0.5 rounded">
-                                  📝 Texto aprovado
-                                </span>
-                              )}
-
-
-                              {col.id === "publish" && (
-                                <span className="text-[10px] font-medium text-teal-400 bg-teal-900/30 px-1.5 py-0.5 rounded">
-                                  📅 {counts.approvedScheduledNonTexto} agendado{counts.approvedScheduledNonTexto !== 1 ? "s" : ""}
-                                </span>
-                              )}
-                            </div>
-
-                            {(col.id === "waiting" || col.id === "adjustments") && counts.total > 0 && (
-                              <div className="mt-1.5 flex items-center gap-1.5">
-                                <div className="flex-1 bg-white/10 rounded-full h-1">
-                                  <div
-                                    className="bg-emerald-500 h-1 rounded-full transition-all"
-                                    style={{ width: `${Math.round((counts.approved / counts.total) * 100)}%` }}
-                                  />
-                                </div>
-                                <span className="text-[9px] text-gray-600 shrink-0">{counts.approved}/{counts.total}</span>
-                              </div>
-                            )}
-
-                            {col.id === "waiting" && (
-                              <div className="mt-1.5">
-                                <ChargeButton
-                                  campaignId={campaign.id}
-                                  lastChargedAt={
-                                    (campaign as { lastChargedAt?: Date | null }).lastChargedAt?.toISOString() ?? null
-                                  }
-                                  daysSinceOpen={Math.max(0, daysSinceOpen)}
-                                />
-                              </div>
-                            )}
-
-                            {col.id === "production" && (
-                              <div className="mt-1.5">
-                                <SentToProductionButton
-                                  campaignId={campaign.id}
-                                  alreadySent={(campaign as { sentToProduction?: boolean }).sentToProduction ?? false}
-                                  isTextoOnly={!campaign.contentItems.some((i) => i.contentType !== "TEXTO")}
-                                />
-                              </div>
-                            )}
-                          </Link>
-                        );
-                      })
-                    )}
+                  <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden divide-y divide-white/5">
+                    {clientsInStage.map(({ client, counts }) => (
+                      <Link
+                        key={client.id}
+                        href={`/admin/clients/${client.id}`}
+                        className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.04] transition-colors"
+                      >
+                        <p className="text-white text-sm font-medium truncate">{client.name}</p>
+                        <span className={`text-xs font-semibold shrink-0 ml-3 ${stage.color}`}>
+                          {counts[stage.id]} {counts[stage.id] === 1 ? "post" : "posts"}
+                        </span>
+                      </Link>
+                    ))}
                   </div>
                 </div>
               );
             })}
           </div>
-        )
-      ) : (
-        /* Concluídas — flat list */
-        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden">
-          {publishedCampaigns.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-gray-400">Nenhuma campanha concluída ainda.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-white/5">
-              {publishedCampaigns.map(({ campaign, client }) => {
-                const counts = getStatusCounts(campaign);
-                return (
-                  <Link
-                    key={campaign.id}
-                    href={`/admin/campaigns/${campaign.id}`}
-                    className="pl-4 pr-5 py-3.5 flex items-center gap-4 hover:bg-white/[0.03] transition-colors border-l-2 border-l-teal-500"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-bold truncate">{client.name}</p>
-                      <p className="text-gray-400 text-xs mt-0.5 truncate">
-                        {campaign.name} · {counts.total} {counts.total === 1 ? "post" : "posts"}
-                      </p>
-                    </div>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-teal-900/30 text-teal-400 font-medium shrink-0">
-                      Publicado
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        </>
       )}
-
-      {/* Clients with active campaigns */}
-      {(() => {
-        const activeClients = clients
-          .map((client) => {
-            const active = client.campaigns.filter((c) => c.status !== "PUBLISHED");
-            return { client, active };
-          })
-          .filter(({ active }) => active.length > 0);
-
-        if (activeClients.length === 0) return null;
-
-        return (
-          <div className="space-y-2">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">
-              Clientes com campanha ativa
-            </p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {activeClients.map(({ client, active }) => {
-                const hasAdj = active.some((c) => {
-                  const counts = getStatusCounts(c);
-                  return counts.adjustment > 0 || counts.rejected > 0;
-                });
-                const hasInternalAdj = active.some((c) =>
-                  c.contentItems.some(
-                    (i) => i.internalReviewItem?.status === "ADJUSTMENT" || i.internalReviewItem?.status === "REJECTED"
-                  )
-                );
-                const hasOpen = active.some((c) => c.status === "OPEN");
-                const hasInternal = active.some(
-                  (c) => c.status === "INTERNAL_REVIEW" || c.status === "INTERNAL_DONE"
-                );
-
-                const statusDots: { color: string; label: string }[] = [];
-                if (hasAdj) statusDots.push({ color: "bg-amber-400", label: "Ajuste cliente" });
-                if (hasInternalAdj) statusDots.push({ color: "bg-violet-400", label: "Ajuste interno" });
-                if (hasOpen) statusDots.push({ color: "bg-emerald-400", label: "Com cliente" });
-                if (hasInternal && !hasInternalAdj) statusDots.push({ color: "bg-violet-400", label: "Revisão interna" });
-
-                return (
-                  <Link
-                    key={client.id}
-                    href={`/admin/clients/${client.id}`}
-                    className="bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 hover:bg-white/[0.05] transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-white text-sm font-medium truncate">{client.name}</p>
-                      <span className="text-[10px] text-gray-500 shrink-0 mt-0.5">
-                        {active.length} ativa{active.length > 1 ? "s" : ""}
-                      </span>
-                    </div>
-                    {statusDots.length > 0 ? (
-                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                        {statusDots.map((dot, i) => (
-                          <span key={i} className="flex items-center gap-1 text-[10px] text-gray-400">
-                            <span className={`w-1.5 h-1.5 rounded-full ${dot.color}`} />
-                            {dot.label}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-gray-600 text-xs mt-1">em andamento</p>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }
