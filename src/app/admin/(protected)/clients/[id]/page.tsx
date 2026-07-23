@@ -105,6 +105,7 @@ export default function ClientWorkspacePage() {
   const [editingPost, setEditingPost] = useState<GroupedPost | null>(null);
   const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "", driveUrl: "", coverDriveUrl: "" });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [notifying, setNotifying] = useState(false);
 
   const fetchClient = useCallback(async () => {
     try {
@@ -146,6 +147,21 @@ export default function ClientWorkspacePage() {
     navigator.clipboard.writeText(`${window.location.origin}/revisar/${client.internalToken}`);
     setCopiedWhich("internal");
     setTimeout(() => setCopiedWhich(null), 2000);
+  }
+
+  async function notifyClient() {
+    setNotifying(true);
+    try {
+      const res = await fetch(`/api/admin/clients/${id}/notify`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const canais = [data.sent?.whatsapp && "WhatsApp", data.sent?.email && "e-mail"].filter(Boolean);
+      alert(canais.length ? `Cliente notificado por ${canais.join(" e ")} (${data.pending} para aprovar).` : "Cliente não tem WhatsApp/e-mail cadastrado.");
+    } catch {
+      alert("Erro ao notificar o cliente. Tente novamente.");
+    } finally {
+      setNotifying(false);
+    }
   }
 
   function copyDesignerLink(itemId: string) {
@@ -297,6 +313,13 @@ export default function ClientWorkspacePage() {
             className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors"
           >
             {copiedWhich === "client" ? "Copiado!" : "Copiar link do cliente"}
+          </button>
+          <button
+            onClick={notifyClient}
+            disabled={notifying}
+            className="text-sm px-3 py-2 bg-blue-700 hover:bg-blue-600 disabled:opacity-60 text-white rounded-lg transition-colors"
+          >
+            {notifying ? "Enviando..." : "📨 Notificar cliente"}
           </button>
           <button
             onClick={copyInternalLink}
