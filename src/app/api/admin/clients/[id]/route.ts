@@ -13,6 +13,27 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
           },
           orderBy: { createdAt: "desc" },
         },
+        contentItems: {
+          orderBy: { order: "asc" },
+          select: {
+            id: true,
+            fileUrl: true,
+            fileType: true,
+            title: true,
+            caption: true,
+            scheduledDate: true,
+            contentType: true,
+            groupId: true,
+            driveUrl: true,
+            coverUrl: true,
+            coverDriveUrl: true,
+            order: true,
+            status: true,
+            sentToProgramacaoAt: true,
+            approvalItem: { select: { status: true, clientComment: true } },
+            internalReviewItem: { select: { status: true, comment: true } },
+          },
+        },
       },
     });
     if (!client) return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
