@@ -12,6 +12,7 @@ interface DashPost {
   contentType: string;
   fileType: string;
   fileUrl: string;
+  scheduledLabel?: string | null;
   adjustmentSource?: "cliente" | "interno" | null;
   adjustmentComment?: string | null;
 }
@@ -153,6 +154,9 @@ export default function DashboardClientRow({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-xs font-medium truncate">{postLabel(p)}</p>
+                    {p.scheduledLabel && (
+                      <p className="text-[11px] text-sky-400 truncate">📅 Programado para {p.scheduledLabel}</p>
+                    )}
                     {p.adjustmentComment && (
                       <p className="text-[11px] text-amber-400 truncate">
                         ✏️ {p.adjustmentSource === "cliente" ? "Cliente" : "Interno"}: {p.adjustmentComment}

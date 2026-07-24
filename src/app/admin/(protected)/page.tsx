@@ -12,6 +12,7 @@ type Item = {
   groupId: string | null;
   contentType: string;
   sentToProgramacaoAt: Date | null;
+  scheduledDate: Date | null;
   title: string | null;
   caption: string | null;
   fileType: string;
@@ -28,11 +29,20 @@ type DashPost = {
   contentType: string;
   fileType: string;
   fileUrl: string;
+  scheduledLabel: string | null;
   adjustmentSource: "cliente" | "interno" | null;
   adjustmentComment: string | null;
 };
 
-type StageId = "adjustment" | "internal" | "clientReview" | "readyToSchedule" | "inProgramming" | "draft";
+type StageId = "adjustment" | "internal" | "clientReview" | "readyToSchedule" | "published" | "draft";
+
+/** Formata a data agendada como DD/MM (UTC, pois é gravada em T12:00:00Z). */
+function fmtScheduled(d: Date | null): string | null {
+  if (!d) return null;
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}`;
+}
 
 /** Post precisa de ajuste — o cliente OU a revisão interna pediu mudança/reprovou. */
 function needsAdjustment(i: Item): boolean {
@@ -47,8 +57,8 @@ const STAGE_PREDICATES: Record<StageId, (i: Item) => boolean> = {
   // por-post a aprovação interna já pula direto para CLIENT_REVIEW.
   internal: (i) => (i.status === "INTERNAL_REVIEW" || i.status === "INTERNAL_DONE") && !needsAdjustment(i),
   clientReview: (i) => i.status === "CLIENT_REVIEW" && !needsAdjustment(i),
-  readyToSchedule: (i) => i.status === "APPROVED" && !i.sentToProgramacaoAt,
-  inProgramming: (i) => i.status === "APPROVED" && !!i.sentToProgramacaoAt,
+  readyToSchedule: (i) => i.status === "APPROVED",
+  published: (i) => i.status === "PUBLISHED",
   draft: (i) => i.status === "DRAFT",
 };
 
@@ -80,6 +90,7 @@ function distinctPosts(items: Item[], predicate: (item: Item) => boolean): DashP
       contentType: item.contentType,
       fileType: item.fileType,
       fileUrl: item.fileUrl,
+      scheduledLabel: fmtScheduled(item.scheduledDate),
       adjustmentSource,
       adjustmentComment,
     });
@@ -92,7 +103,7 @@ const STAGES: { id: StageId; label: string; icon: string; color: string; dot: st
   { id: "internal", label: "Revisão interna", icon: "🔍", color: "text-violet-400", dot: "bg-violet-500", bg: "bg-violet-900/20 border-violet-500/30" },
   { id: "clientReview", label: "Aguardando cliente", icon: "👤", color: "text-emerald-400", dot: "bg-emerald-500", bg: "bg-emerald-900/20 border-emerald-500/30" },
   { id: "readyToSchedule", label: "Prontos p/ programar", icon: "📅", color: "text-sky-400", dot: "bg-sky-500", bg: "bg-sky-900/20 border-sky-500/30" },
-  { id: "inProgramming", label: "Na programação", icon: "🗓️", color: "text-teal-400", dot: "bg-teal-500", bg: "bg-teal-900/20 border-teal-500/30" },
+  { id: "published", label: "Publicado", icon: "🚀", color: "text-teal-400", dot: "bg-teal-500", bg: "bg-teal-900/20 border-teal-500/30" },
   { id: "draft", label: "Rascunho", icon: "📝", color: "text-gray-400", dot: "bg-gray-500", bg: "bg-[#1a1a1a] border-white/10" },
 ];
 
@@ -102,7 +113,7 @@ function computeStagePosts(items: Item[]): Record<StageId, DashPost[]> {
     internal: distinctPosts(items, STAGE_PREDICATES.internal),
     clientReview: distinctPosts(items, STAGE_PREDICATES.clientReview),
     readyToSchedule: distinctPosts(items, STAGE_PREDICATES.readyToSchedule),
-    inProgramming: distinctPosts(items, STAGE_PREDICATES.inProgramming),
+    published: distinctPosts(items, STAGE_PREDICATES.published),
     draft: distinctPosts(items, STAGE_PREDICATES.draft),
   };
 }
@@ -122,6 +133,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           groupId: true,
           contentType: true,
           sentToProgramacaoAt: true,
+          scheduledDate: true,
           title: true,
           caption: true,
           fileType: true,
@@ -144,7 +156,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     internal: 0,
     clientReview: 0,
     readyToSchedule: 0,
-    inProgramming: 0,
+    published: 0,
     draft: 0,
   };
   for (const { stagePosts } of clientStages) {

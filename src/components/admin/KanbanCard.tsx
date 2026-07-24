@@ -13,6 +13,7 @@ export interface KanbanCardData {
   fileUrl: string;
   clientId: string;
   clientName: string;
+  scheduledLabel?: string | null;
   adjustmentSource?: "cliente" | "interno" | null;
   adjustmentComment?: string | null;
 }
@@ -51,6 +52,9 @@ export default function KanbanCard({ post }: { post: KanbanCardData }) {
             <p className="text-[10px] text-gray-500 truncate">{post.clientName}</p>
           </div>
         </div>
+        {post.scheduledLabel && (
+          <p className="text-[10px] text-sky-400 mt-1">📅 Programado para {post.scheduledLabel}</p>
+        )}
         {post.adjustmentComment && (
           <p className="text-[10px] text-amber-400 mt-1 line-clamp-2">
             ✏️ {post.adjustmentSource === "cliente" ? "Cliente" : "Interno"}: {post.adjustmentComment}
