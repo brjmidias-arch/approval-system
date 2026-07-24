@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PostActionsMenu from "@/components/admin/PostActionsMenu";
 import PostThumbnail from "@/components/admin/PostThumbnail";
@@ -30,8 +31,29 @@ function postLabel(p: { title: string | null; caption: string | null }): string 
   return "(sem título)";
 }
 
-export default function KanbanCard({ post }: { post: KanbanCardData }) {
+export default function KanbanCard({ post, showConclude }: { post: KanbanCardData; showConclude?: boolean }) {
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
+
+  async function conclude(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/posts/${post.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark-published" }),
+      });
+      if (!res.ok) throw new Error();
+      router.refresh();
+    } catch {
+      alert("Erro ao concluir o post. Tente novamente.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="relative">
@@ -46,8 +68,24 @@ export default function KanbanCard({ post }: { post: KanbanCardData }) {
             <p className="text-[10px] text-gray-500 truncate">{post.clientName}</p>
           </div>
         </div>
-        {post.scheduledLabel && (
-          <p className="text-[10px] text-sky-400 mt-1">📅 Programado para {post.scheduledLabel}</p>
+        {(post.scheduledLabel || showConclude) && (
+          <div className="flex items-center justify-between gap-2 mt-1">
+            {post.scheduledLabel ? (
+              <span className="text-[10px] text-sky-400 truncate">📅 Programado para {post.scheduledLabel}</span>
+            ) : (
+              <span />
+            )}
+            {showConclude && (
+              <button
+                type="button"
+                onClick={conclude}
+                disabled={busy}
+                className="text-[10px] px-2 py-0.5 rounded bg-teal-900/40 hover:bg-teal-900/60 text-teal-300 border border-teal-500/30 shrink-0 disabled:opacity-50 transition-colors"
+              >
+                ✓ Concluir
+              </button>
+            )}
+          </div>
         )}
         {post.adjustmentComment && (
           <p className="text-[10px] text-amber-400 mt-1 line-clamp-2">

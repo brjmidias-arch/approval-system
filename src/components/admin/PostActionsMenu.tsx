@@ -54,7 +54,7 @@ export default function PostActionsMenu({
     { label: "🔍 Enviar p/ revisão interna", onClick: () => run(patch({ action: "send-internal" })) },
     { label: "👤 Enviar p/ cliente", onClick: () => run(patch({ action: "send-client" })) },
     { label: "📅 Enviar p/ programação", onClick: () => run(patch({ sentToProgramacao: true })) },
-    { label: "✅ Marcar como publicado", onClick: () => run(patch({ action: "mark-published" }), "Marcar este post como publicado?") },
+    { label: "✅ Concluir (marcar publicado)", onClick: () => run(patch({ action: "mark-published" }), "Concluir este post? Ele vai para a aba Concluído.") },
     { label: "🗑 Excluir", onClick: () => run(del, "Excluir este post? Esta ação não pode ser desfeita."), danger: true },
   ];
 

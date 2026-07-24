@@ -5,6 +5,7 @@ import Link from "next/link";
 import AutoRefresh from "@/components/admin/AutoRefresh";
 import DashboardClientRow from "@/components/admin/DashboardClientRow";
 import KanbanCard from "@/components/admin/KanbanCard";
+import ConcluidoColumn from "@/components/admin/ConcluidoColumn";
 
 type Item = {
   id: string;
@@ -13,6 +14,7 @@ type Item = {
   contentType: string;
   sentToProgramacaoAt: Date | null;
   scheduledDate: Date | null;
+  postedAt: Date | null;
   title: string | null;
   caption: string | null;
   fileType: string;
@@ -106,11 +108,19 @@ const STAGES: { id: StageId; label: string; icon: string; color: string; dot: st
   { id: "internal", label: "Revisão interna", icon: "🔍", color: "text-violet-400", dot: "bg-violet-500", bg: "bg-violet-900/20 border-violet-500/30" },
   { id: "clientReview", label: "Aguardando cliente", icon: "👤", color: "text-emerald-400", dot: "bg-emerald-500", bg: "bg-emerald-900/20 border-emerald-500/30" },
   { id: "readyToSchedule", label: "Prontos p/ programar", icon: "📅", color: "text-sky-400", dot: "bg-sky-500", bg: "bg-sky-900/20 border-sky-500/30" },
-  { id: "published", label: "Publicado", icon: "🚀", color: "text-teal-400", dot: "bg-teal-500", bg: "bg-teal-900/20 border-teal-500/30" },
+  { id: "published", label: "Concluído", icon: "✅", color: "text-teal-400", dot: "bg-teal-500", bg: "bg-teal-900/20 border-teal-500/30" },
   { id: "draft", label: "Rascunho", icon: "📝", color: "text-gray-400", dot: "bg-gray-500", bg: "bg-[#1a1a1a] border-white/10" },
 ];
 
+const CONCLUIDO_TTL_MS = 10 * 24 * 60 * 60 * 1000; // 10 dias
+
 function computeStagePosts(items: Item[]): Record<StageId, DashPost[]> {
+  // Posts concluídos (PUBLISHED) há mais de 10 dias somem do dashboard.
+  // Os dados permanecem no banco / workspace do cliente — nada é apagado.
+  const cutoff = Date.now() - CONCLUIDO_TTL_MS;
+  items = items.filter(
+    (i) => !(i.status === "PUBLISHED" && i.postedAt != null && i.postedAt.getTime() < cutoff)
+  );
   return {
     adjustment: distinctPosts(items, STAGE_PREDICATES.adjustment),
     internal: distinctPosts(items, STAGE_PREDICATES.internal),
@@ -137,6 +147,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           contentType: true,
           sentToProgramacaoAt: true,
           scheduledDate: true,
+          postedAt: true,
           title: true,
           caption: true,
           fileType: true,
@@ -248,22 +259,28 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           {view === "kanban" ? (
             /* Kanban: colunas por etapa (scroll horizontal) */
             <div className="flex gap-3 overflow-x-auto pb-3">
-              {STAGES.map((stage) => (
-                <div key={stage.id} className="w-72 shrink-0 flex flex-col">
-                  <div className={`flex items-center gap-2 px-2 py-2 rounded-t-lg border-b-2 ${stage.bg}`}>
-                    <span className="text-sm">{stage.icon}</span>
-                    <h2 className={`text-xs font-semibold ${stage.color}`}>{stage.label}</h2>
-                    <span className="text-[11px] text-gray-500 ml-auto">{kanban[stage.id].length}</span>
+              {STAGES.map((stage) =>
+                stage.id === "published" ? (
+                  <ConcluidoColumn key={stage.id} stage={stage} posts={kanban[stage.id]} />
+                ) : (
+                  <div key={stage.id} className="w-72 shrink-0 flex flex-col">
+                    <div className={`flex items-center gap-2 px-2 py-2 rounded-t-lg border-b-2 ${stage.bg}`}>
+                      <span className="text-sm">{stage.icon}</span>
+                      <h2 className={`text-xs font-semibold ${stage.color}`}>{stage.label}</h2>
+                      <span className="text-[11px] text-gray-500 ml-auto">{kanban[stage.id].length}</span>
+                    </div>
+                    <div className="bg-[#141414] border border-white/[0.06] rounded-b-lg p-1.5 space-y-1.5 min-h-[80px] flex-1">
+                      {kanban[stage.id].length === 0 ? (
+                        <p className="text-[11px] text-gray-600 text-center py-4">—</p>
+                      ) : (
+                        kanban[stage.id].map((p) => (
+                          <KanbanCard key={p.id} post={p} showConclude={stage.id === "readyToSchedule"} />
+                        ))
+                      )}
+                    </div>
                   </div>
-                  <div className="bg-[#141414] border border-white/[0.06] rounded-b-lg p-1.5 space-y-1.5 min-h-[80px] flex-1">
-                    {kanban[stage.id].length === 0 ? (
-                      <p className="text-[11px] text-gray-600 text-center py-4">—</p>
-                    ) : (
-                      kanban[stage.id].map((p) => <KanbanCard key={p.id} post={p} />)
-                    )}
-                  </div>
-                </div>
-              ))}
+                )
+              )}
             </div>
           ) : (
           /* Lista: seções por etapa */
