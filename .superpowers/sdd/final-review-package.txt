@@ -1,0 +1,450 @@
+# Feature: link por post para designer — commits b12653b..HEAD
+
+## git log
+cb3ecac feat: add designer link button to single post card
+8d48179 feat: add designer link button to carousel card
+0c3d3c4 feat: add public read-only post page for designers
+ae46fea feat: add public GET /api/post/[id] for designer link
+
+## diff --stat
+ src/app/admin/(protected)/campaigns/[id]/page.tsx |  33 ++++-
+ src/app/api/post/[id]/route.ts                    |  56 +++++++++
+ src/app/post/[id]/page.tsx                        | 145 ++++++++++++++++++++++
+ src/components/admin/CarouselCard.tsx             |  14 +++
+ 4 files changed, 243 insertions(+), 5 deletions(-)
+
+## full diff
+diff --git a/src/app/admin/(protected)/campaigns/[id]/page.tsx b/src/app/admin/(protected)/campaigns/[id]/page.tsx
+index 8bf98f9..86788ff 100644
+--- a/src/app/admin/(protected)/campaigns/[id]/page.tsx
++++ b/src/app/admin/(protected)/campaigns/[id]/page.tsx
+@@ -54,20 +54,28 @@ interface Campaign {
+   contentItems: ContentItem[];
+ }
+ 
+ const CONTENT_TYPES: ContentType[] = ["CARROSSEL", "POST_FEED", "REELS", "STORIES"];
+ 
+ export default function CampaignPage() {
+   const { id } = useParams<{ id: string }>();
+   const [campaign, setCampaign] = useState<Campaign | null>(null);
+   const [loading, setLoading] = useState(true);
+   const [copyFeedback, setCopyFeedback] = useState(false);
++  const [copiedLinkItemId, setCopiedLinkItemId] = useState<string | null>(null);
++
++  function copyDesignerLink(itemId: string) {
++    const url = `${window.location.origin}/post/${itemId}`;
++    navigator.clipboard.writeText(url);
++    setCopiedLinkItemId(itemId);
++    setTimeout(() => setCopiedLinkItemId(null), 2000);
++  }
+   const [liveStatus, setLiveStatus] = useState<{ reviewed: number; total: number } | null>(null);
+   const [markingDoneItemId, setMarkingDoneItemId] = useState<string | null>(null);
+   const [editingName, setEditingName] = useState(false);
+   const [nameValue, setNameValue] = useState("");
+ 
+   const [showFolderUpload, setShowFolderUpload] = useState(false);
+   const [showTextModal, setShowTextModal] = useState(false);
+   const [textModalId, setTextModalId] = useState<string | null>(null);
+   const [textForm, setTextForm] = useState({ title: "", docUrl: "", caption: "" });
+   const [savingText, setSavingText] = useState(false);
+@@ -447,20 +455,22 @@ export default function CampaignPage() {
+   const internalTotal = grouped.length;
+   const getInternalStatus = (g: GroupedItem) => {
+     const firstItem = g.type === "single" ? g.item : g.items[0];
+     return firstItem.internalReviewItem?.status || "PENDING";
+   };
+   const internalApproved = grouped.filter((g) => getInternalStatus(g) === "APPROVED").length;
+   const internalAdjustment = grouped.filter((g) => getInternalStatus(g) === "ADJUSTMENT").length;
+   const internalRejected = grouped.filter((g) => getInternalStatus(g) === "REJECTED").length;
+   const internalPending = internalTotal - internalApproved - internalAdjustment - internalRejected;
+   const allInternalApproved = internalTotal > 0 && internalApproved === internalTotal;
++  // True when the campaign actively uses internal review (at least one item has been reviewed internally)
++  const usesInternalReviewMode = internalApproved > 0 || internalAdjustment > 0 || internalRejected > 0;
+ 
+   return (
+     <div className="space-y-6">
+       {/* Header */}
+       <div>
+         <div className="flex items-center gap-2 text-sm text-gray-400 mb-1">
+           <Link href="/admin" className="hover:text-white">Dashboard</Link>
+           <span>/</span>
+           <Link href={`/admin/clients/${campaign.client.id}`} className="hover:text-white">
+             {campaign.client.name}
+@@ -672,65 +682,72 @@ export default function CampaignPage() {
+           { label: "Reprovado", value: rejected, color: "text-red-400" },
+           { label: "Pendente", value: pending, color: "text-gray-400" },
+         ].map((stat) => (
+           <div key={stat.label} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3 text-center">
+             <p className="text-gray-500 text-xs">{stat.label}</p>
+             <p className={`text-2xl font-bold mt-0.5 ${stat.color}`}>{stat.value}</p>
+           </div>
+         ))}
+       </div>
+ 
+-      {/* Internal review banner */}
+-      {(campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE") && (
++      {/* Internal review banner — shown during review phases, and for OPEN campaigns still awaiting internal reviews */}
++      {(campaign.status === "INTERNAL_REVIEW" || campaign.status === "INTERNAL_DONE" ||
++        (campaign.status === "OPEN" && internalPending > 0 && usesInternalReviewMode)) && (
+         <div className={`border rounded-xl px-5 py-4 space-y-3 ${
+           campaign.status === "INTERNAL_DONE" && (internalAdjustment + internalRejected) > 0
+             ? "bg-amber-900/20 border-amber-500/30"
+             : (campaign.status === "INTERNAL_DONE" && allInternalApproved) || (campaign.status === "INTERNAL_REVIEW" && internalApproved > 0)
+             ? "bg-emerald-900/10 border-emerald-500/20"
++            : campaign.status === "OPEN"
++            ? "bg-violet-900/10 border-violet-500/20"
+             : "bg-violet-900/20 border-violet-500/30"
+         }`}>
+           <div className="flex items-center justify-between gap-4 flex-wrap">
+             <div>
+               <p className={`font-medium text-sm ${
+                 campaign.status === "INTERNAL_DONE" && (internalAdjustment + internalRejected) > 0
+                   ? "text-amber-400"
+                   : (campaign.status === "INTERNAL_DONE" && allInternalApproved) || (campaign.status === "INTERNAL_REVIEW" && internalApproved > 0)
+                   ? "text-emerald-400"
+                   : "text-violet-400"
+               }`}>
+-                {campaign.status === "INTERNAL_REVIEW" && internalApproved === 0
++                {campaign.status === "OPEN"
++                  ? `Revisão interna em andamento — ${internalPending} ${internalPending === 1 ? "post pendente" : "posts pendentes"}`
++                  : campaign.status === "INTERNAL_REVIEW" && internalApproved === 0
+                   ? "Aguardando revisão interna"
+                   : campaign.status === "INTERNAL_REVIEW" && internalApproved > 0
+                   ? `${internalApproved} ${internalApproved === 1 ? "post aprovado" : "posts aprovados"} — pode enviar ao cliente agora`
+                   : allInternalApproved
+                   ? "Revisão interna concluída — tudo aprovado"
+                   : "Revisão interna concluída — ajustes necessários"}
+               </p>
+               <p className="text-gray-400/70 text-xs mt-0.5">
+-                {campaign.status === "INTERNAL_REVIEW" && internalApproved === 0
++                {campaign.status === "OPEN"
++                  ? `${internalApproved} ${internalApproved === 1 ? "post aprovado" : "posts aprovados"} já visíveis para o cliente — aguardando revisão dos demais`
++                  : campaign.status === "INTERNAL_REVIEW" && internalApproved === 0
+                   ? `${internalPending} ${internalPending === 1 ? "post pendente" : "posts pendentes"} de revisão`
+                   : campaign.status === "INTERNAL_REVIEW" && internalApproved > 0
+                   ? `${internalPending} ${internalPending === 1 ? "post ainda pendente" : "posts ainda pendentes"} — o cliente verá apenas os aprovados`
+                   : allInternalApproved
+                   ? "Todos os posts aprovados. Você já pode enviar para o cliente."
+                   : `${internalAdjustment + internalRejected} ${internalAdjustment + internalRejected === 1 ? "post precisa" : "posts precisam"} de correção antes de enviar ao cliente.`
+                 }
+               </p>
+             </div>
+             <div className="flex items-center gap-2 flex-wrap">
+               <div className="flex gap-3 text-xs">
+                 <span className="text-emerald-400">{internalApproved} aprovados</span>
+                 {internalAdjustment > 0 && <span className="text-amber-400">{internalAdjustment} ajustes</span>}
+                 {internalRejected > 0 && <span className="text-red-400">{internalRejected} reprovados</span>}
+                 {internalPending > 0 && <span className="text-gray-400">{internalPending} pendentes</span>}
+               </div>
+-              {internalApproved > 0 && (
++              {internalApproved > 0 && campaign.status !== "OPEN" && (
+                 <button onClick={handleSendClient} className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm px-4 py-2 rounded-lg transition-colors">
+                   Enviar {internalApproved} {internalApproved === 1 ? "post" : "posts"} ao Cliente
+                 </button>
+               )}
+               {campaign.status === "INTERNAL_DONE" && !allInternalApproved && (
+                 <button onClick={handleSendInternal} className="bg-violet-600 hover:bg-violet-500 text-white font-semibold text-sm px-4 py-2 rounded-lg transition-colors">
+                   Reenviar para Revisão
+                 </button>
+               )}
+             </div>
+@@ -1050,20 +1067,26 @@ export default function CampaignPage() {
+                       )}
+                       {item.approvalItem?.clientComment && (
+                         <div className={`mt-1.5 text-xs rounded-lg px-2.5 py-1.5 ${item.approvalItem.clientCommentResolved ? "text-gray-500 bg-white/[0.03]" : "text-gray-400 bg-white/5"}`}>
+                           <span className="opacity-70">Comentário do cliente: </span>
+                           <span className={item.approvalItem.clientCommentResolved ? "line-through opacity-60" : ""}>{item.approvalItem.clientComment}</span>
+                           {item.approvalItem.clientCommentResolved && <span className="ml-1.5">✅</span>}
+                         </div>
+                       )}
+                     </div>
+                     <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
++                      <button
++                        onClick={() => copyDesignerLink(item.id)}
++                        className="text-xs px-2.5 py-1 bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 border border-blue-500/30 rounded-lg transition-colors"
++                      >
++                        {copiedLinkItemId === item.id ? "Copiado!" : "🔗 Link p/ designer"}
++                      </button>
+                       {item.internalReviewItem && (
+                         <>
+                           <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                             item.internalReviewItem.status === "APPROVED" ? "bg-emerald-900/30 text-emerald-400"
+                             : item.internalReviewItem.status === "ADJUSTMENT" ? "bg-amber-900/30 text-amber-400"
+                             : item.internalReviewItem.status === "REJECTED" ? "bg-red-900/30 text-red-400"
+                             : "bg-violet-900/30 text-violet-400"
+                           }`}>
+                             {item.internalReviewItem.status === "APPROVED" ? "✅ Int. Aprovado"
+                             : item.internalReviewItem.status === "ADJUSTMENT" ? "✏️ Int. Ajuste"
+diff --git a/src/app/api/post/[id]/route.ts b/src/app/api/post/[id]/route.ts
+new file mode 100644
+index 0000000..7a459ac
+--- /dev/null
++++ b/src/app/api/post/[id]/route.ts
+@@ -0,0 +1,56 @@
++import { NextRequest, NextResponse } from "next/server";
++import { prisma } from "@/lib/prisma";
++
++export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
++  try {
++    const item = await prisma.contentItem.findUnique({
++      where: { id: params.id },
++      select: {
++        id: true,
++        fileUrl: true,
++        fileType: true,
++        title: true,
++        caption: true,
++        scheduledDate: true,
++        contentType: true,
++        groupId: true,
++        driveUrl: true,
++        order: true,
++        campaign: { select: { name: true, client: { select: { name: true } } } },
++        approvalItem: { select: { clientComment: true, clientCommentResolved: true } },
++        internalReviewItem: { select: { comment: true, commentResolved: true } },
++      },
++    });
++
++    if (!item) {
++      return NextResponse.json({ error: "Post não encontrado" }, { status: 404 });
++    }
++
++    // Carrossel: agrega todos os slides do mesmo groupId. Único: só o item.
++    const slidesRaw =
++      item.contentType === "CARROSSEL" && item.groupId
++        ? await prisma.contentItem.findMany({
++            where: { groupId: item.groupId },
++            orderBy: { order: "asc" },
++            select: { id: true, fileUrl: true, fileType: true, order: true },
++          })
++        : [{ id: item.id, fileUrl: item.fileUrl, fileType: item.fileType, order: item.order }];
++
++    return NextResponse.json({
++      campaignName: item.campaign.name,
++      clientName: item.campaign.client.name,
++      title: item.title,
++      caption: item.caption,
++      scheduledDate: item.scheduledDate,
++      contentType: item.contentType,
++      driveUrl: item.driveUrl,
++      slides: slidesRaw,
++      clientComment: item.approvalItem?.clientComment ?? null,
++      clientCommentResolved: item.approvalItem?.clientCommentResolved ?? false,
++      internalComment: item.internalReviewItem?.comment ?? null,
++      internalCommentResolved: item.internalReviewItem?.commentResolved ?? false,
++    });
++  } catch {
++    return NextResponse.json({ error: "Erro ao buscar post" }, { status: 500 });
++  }
++}
+diff --git a/src/app/post/[id]/page.tsx b/src/app/post/[id]/page.tsx
+new file mode 100644
+index 0000000..f7a919f
+--- /dev/null
++++ b/src/app/post/[id]/page.tsx
+@@ -0,0 +1,145 @@
++"use client";
++
++import { useEffect, useState, useCallback } from "react";
++import { useParams } from "next/navigation";
++
++interface Slide {
++  id: string;
++  fileUrl: string;
++  fileType: string;
++  order: number;
++}
++
++interface PostData {
++  campaignName: string;
++  clientName: string;
++  title: string | null;
++  caption: string | null;
++  scheduledDate: string | null;
++  contentType: string;
++  driveUrl: string | null;
++  slides: Slide[];
++  clientComment: string | null;
++  clientCommentResolved: boolean;
++  internalComment: string | null;
++  internalCommentResolved: boolean;
++}
++
++export default function PostPage() {
++  const { id } = useParams<{ id: string }>();
++  const [data, setData] = useState<PostData | null>(null);
++  const [loading, setLoading] = useState(true);
++  const [notFound, setNotFound] = useState(false);
++  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
++
++  const fetchPost = useCallback(async () => {
++    try {
++      const res = await fetch(`/api/post/${id}`, { cache: "no-store" });
++      if (!res.ok) { setNotFound(true); return; }
++      setData(await res.json());
++    } catch {
++      setNotFound(true);
++    } finally {
++      setLoading(false);
++    }
++  }, [id]);
++
++  useEffect(() => { fetchPost(); }, [fetchPost]);
++
++  useEffect(() => {
++    function handleKey(e: KeyboardEvent) {
++      if (e.key === "Escape") setLightboxUrl(null);
++    }
++    window.addEventListener("keydown", handleKey);
++    return () => window.removeEventListener("keydown", handleKey);
++  }, []);
++
++  if (loading) return <div className="min-h-screen bg-[#0f0f0f] text-gray-400 p-8">Carregando...</div>;
++  if (notFound || !data) return <div className="min-h-screen bg-[#0f0f0f] text-red-400 p-8">Post não encontrado.</div>;
++
++  return (
++    <div className="min-h-screen bg-[#0f0f0f] text-white">
++      <div className="max-w-2xl mx-auto p-6 space-y-5">
++        {/* Cabeçalho */}
++        <div>
++          <p className="text-sm text-gray-400">
++            {data.clientName} <span className="text-gray-600">·</span> {data.campaignName}
++          </p>
++          {data.title && <h1 className="text-xl font-semibold mt-0.5">{data.title}</h1>}
++          {data.scheduledDate && (
++            <p className="text-xs text-gray-500 mt-0.5">
++              {new Date(data.scheduledDate).toLocaleDateString("pt-BR")}
++            </p>
++          )}
++        </div>
++
++        {/* Galeria */}
++        <div className="flex gap-2 flex-wrap">
++          {data.slides.map((slide, i) => (
++            <div key={slide.id} className="w-28 h-28 rounded-lg overflow-hidden bg-black/40 relative shrink-0">
++              {slide.fileType === "IMAGE" ? (
++                <img
++                  src={slide.fileUrl}
++                  alt=""
++                  className="w-full h-full object-cover cursor-zoom-in"
++                  onClick={() => setLightboxUrl(slide.fileUrl)}
++                />
++              ) : (
++                <div className="w-full h-full flex items-center justify-center text-2xl">🎬</div>
++              )}
++              <span className="absolute bottom-1 left-1 text-xs bg-black/60 text-white px-1 rounded">{i + 1}</span>
++            </div>
++          ))}
++        </div>
++
++        {/* Legenda */}
++        {data.caption && <p className="text-sm text-gray-300 whitespace-pre-line">{data.caption}</p>}
++
++        {/* Link do Drive */}
++        {data.driveUrl && (
++          <a
++            href={data.driveUrl}
++            target="_blank"
++            rel="noopener noreferrer"
++            className="inline-flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 bg-blue-900/20 border border-blue-500/20 px-3 py-2 rounded-lg transition-colors"
++          >
++            🔗 Abrir no Drive
++          </a>
++        )}
++
++        {/* Ajuste do cliente */}
++        {data.clientComment && (
++          <div className="text-sm rounded-lg px-3 py-2.5 text-amber-400 bg-amber-900/20 border border-amber-500/20">
++            <span className="opacity-70">Ajuste do cliente: </span>
++            <span className={data.clientCommentResolved ? "line-through opacity-60" : ""}>{data.clientComment}</span>
++            {data.clientCommentResolved && <span className="ml-1.5">✅</span>}
++          </div>
++        )}
++
++        {/* Revisão interna */}
++        {data.internalComment && (
++          <div className="text-sm rounded-lg px-3 py-2.5 text-violet-300 bg-violet-900/20 border border-violet-500/20">
++            <span className="opacity-70">Revisão interna: </span>
++            <span className={data.internalCommentResolved ? "line-through opacity-60" : ""}>{data.internalComment}</span>
++            {data.internalCommentResolved && <span className="ml-1.5">✅</span>}
++          </div>
++        )}
++      </div>
++
++      {/* Lightbox */}
++      {lightboxUrl && (
++        <div
++          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
++          onClick={() => setLightboxUrl(null)}
++        >
++          <div className="relative max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
++            <button onClick={() => setLightboxUrl(null)} className="absolute -top-10 right-0 text-white/60 hover:text-white text-sm">
++              ✕ Fechar (Esc)
++            </button>
++            <img src={lightboxUrl} alt="" className="w-full rounded-xl object-contain max-h-[85vh]" />
++          </div>
++        </div>
++      )}
++    </div>
++  );
++}
+diff --git a/src/components/admin/CarouselCard.tsx b/src/components/admin/CarouselCard.tsx
+index 0bae74c..c0bc1cd 100644
+--- a/src/components/admin/CarouselCard.tsx
++++ b/src/components/admin/CarouselCard.tsx
+@@ -255,20 +255,28 @@ export default function CarouselCard({
+ }: Props) {
+   const [slides, setSlides] = useState(initialSlides);
+   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+   const imageUrls = slides.filter((s) => s.fileType === "IMAGE").map((s) => s.fileUrl);
+ 
+   function handleReplaced(id: string, fileUrl: string, fileType: string) {
+     setSlides((prev) => prev.map((s) => s.id === id ? { ...s, fileUrl, fileType } : s));
+   }
+ 
+   const [markingDone, setMarkingDone] = useState(false);
++  const [linkCopied, setLinkCopied] = useState(false);
++
++  function copyDesignerLink() {
++    const url = `${window.location.origin}/post/${slides[0].id}`;
++    navigator.clipboard.writeText(url);
++    setLinkCopied(true);
++    setTimeout(() => setLinkCopied(false), 2000);
++  }
+ 
+   const hasAdjustments = slides.some((s) => {
+     const st = s.approvalItem?.status;
+     return st === "ADJUSTMENT" || st === "REJECTED";
+   });
+ 
+   async function handleMarkAllDone() {
+     setMarkingDone(true);
+     try {
+       const toReset = slides.filter((s) => {
+@@ -377,20 +385,26 @@ export default function CarouselCard({
+           {clientCommentResolved && <span className="ml-1.5">✅</span>}
+         </div>
+       )}
+       <div className="flex gap-2 mt-3">
+         <button
+           onClick={onEdit}
+           className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors"
+         >
+           Editar / Adicionar slides
+         </button>
++        <button
++          onClick={copyDesignerLink}
++          className="text-xs px-3 py-1.5 bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 border border-blue-500/30 rounded-lg transition-colors"
++        >
++          {linkCopied ? "Copiado!" : "🔗 Link p/ designer"}
++        </button>
+         {hasAdjustments && (
+           <button
+             onClick={handleMarkAllDone}
+             disabled={markingDone}
+             className="text-xs px-3 py-1.5 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/30 rounded-lg transition-colors disabled:opacity-50"
+           >
+             {markingDone ? "Salvando..." : "Ajuste feito"}
+           </button>
+         )}
+       </div>

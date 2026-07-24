@@ -18,15 +18,22 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // Retroactive fix: auto-close OPEN campaigns where all visible items are already approved.
     // Catches campaigns stuck due to the approval route count-mismatch bug.
     if (campaign.status === "OPEN") {
-      const visibleItems = campaign.contentItems.filter(
-        (i) => !i.internalReviewItem || i.internalReviewItem.status === "APPROVED"
+      const usesInternalReview = campaign.contentItems.some((i) => i.internalReviewItem !== null);
+      // Don't auto-close while any item is still pending internal review
+      const hasPendingInternal = usesInternalReview && campaign.contentItems.some(
+        (i) => !i.internalReviewItem || i.internalReviewItem.status !== "APPROVED"
       );
-      const allApproved =
-        visibleItems.length > 0 &&
-        visibleItems.every((i) => i.approvalItem && i.approvalItem.status !== "PENDING");
-      if (allApproved) {
-        await prisma.campaign.update({ where: { id: campaign.id }, data: { status: "CLOSED" } });
-        campaign.status = "CLOSED";
+      if (!hasPendingInternal) {
+        const visibleItems = usesInternalReview
+          ? campaign.contentItems.filter((i) => i.internalReviewItem?.status === "APPROVED")
+          : campaign.contentItems;
+        const allApproved =
+          visibleItems.length > 0 &&
+          visibleItems.every((i) => i.approvalItem && i.approvalItem.status !== "PENDING");
+        if (allApproved) {
+          await prisma.campaign.update({ where: { id: campaign.id }, data: { status: "CLOSED" } });
+          campaign.status = "CLOSED";
+        }
       }
     }
 

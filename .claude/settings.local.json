@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(npx vercel *)",
+      "Bash(rtk next *)",
+      "Bash(node --env-file=.env -e \"console.log\\(process.env.DATABASE_URL?.substring\\(0,30\\)\\)\")",
+      "Bash(rtk git *)",
+      "Bash(rtk gh *)"
     ]
   }
 }
