@@ -7,6 +7,7 @@ import PostActionsMenu from "@/components/admin/PostActionsMenu";
 import PostThumbnail from "@/components/admin/PostThumbnail";
 import PostNameEditor from "@/components/admin/PostNameEditor";
 import PostDatePicker from "@/components/admin/PostDatePicker";
+import CopyProgLinkButton from "@/components/admin/CopyProgLinkButton";
 
 export interface KanbanCardData {
   id: string;
@@ -72,11 +73,12 @@ export default function KanbanCard({ post, stageId }: { post: KanbanCardData; st
           </div>
         </div>
         {stageId === "readyToSchedule" && (
-          <div className="flex items-center justify-between gap-2 mt-1">
-            <PostDatePicker postId={post.id} value={post.scheduledInput ?? null} />
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <PostDatePicker postId={post.id} value={post.scheduledInput ?? null} label={post.scheduledLabel ?? null} />
+            <CopyProgLinkButton clientId={post.clientId} />
             {post.daysWaiting != null && post.daysWaiting > 0 && (
               <span
-                className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${
+                className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ml-auto ${
                   post.daysWaiting >= 7
                     ? "bg-red-900/30 text-red-400"
                     : post.daysWaiting >= 3
@@ -91,7 +93,7 @@ export default function KanbanCard({ post, stageId }: { post: KanbanCardData; st
         )}
         {stageId === "scheduled" && (
           <div className="flex items-center justify-between gap-2 mt-1">
-            <PostDatePicker postId={post.id} value={post.scheduledInput ?? null} />
+            <PostDatePicker postId={post.id} value={post.scheduledInput ?? null} label={post.scheduledLabel ?? null} />
             <button
               type="button"
               onClick={conclude}

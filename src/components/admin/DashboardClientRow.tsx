@@ -7,6 +7,7 @@ import PostActionsMenu from "@/components/admin/PostActionsMenu";
 import PostThumbnail from "@/components/admin/PostThumbnail";
 import PostNameEditor from "@/components/admin/PostNameEditor";
 import PostDatePicker from "@/components/admin/PostDatePicker";
+import CopyProgLinkButton from "@/components/admin/CopyProgLinkButton";
 
 interface DashPost {
   id: string;
@@ -165,7 +166,8 @@ export default function DashboardClientRow({
                 </label>
                 {(stageId === "readyToSchedule" || stageId === "scheduled") && (
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <PostDatePicker postId={p.id} value={p.scheduledInput ?? null} />
+                    <PostDatePicker postId={p.id} value={p.scheduledInput ?? null} label={p.scheduledLabel ?? null} />
+                    {stageId === "readyToSchedule" && <CopyProgLinkButton clientId={clientId} />}
                     {stageId === "readyToSchedule" && p.daysWaiting != null && p.daysWaiting > 0 && (
                       <span
                         className={`text-[10px] px-1.5 py-0.5 rounded-full ${
