@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PostActionsMenu from "@/components/admin/PostActionsMenu";
 import PostThumbnail from "@/components/admin/PostThumbnail";
+import PostNameEditor from "@/components/admin/PostNameEditor";
 
 interface DashPost {
   id: string;
@@ -146,7 +147,7 @@ export default function DashboardClientRow({
                   <input type="checkbox" checked={isSel} onChange={() => toggleSel(p.id)} className="accent-emerald-500 w-4 h-4 shrink-0" />
                   <PostThumbnail fileType={p.fileType} fileUrl={p.fileUrl} driveUrl={p.driveUrl} label={postLabel(p)} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-white text-xs font-medium truncate">{postLabel(p)}</p>
+                    <PostNameEditor postId={p.id} title={p.title} fallbackLabel={postLabel(p)} textClassName="text-white text-xs font-medium" />
                     {p.scheduledLabel && (
                       <p className="text-[11px] text-sky-400 truncate">📅 Programado para {p.scheduledLabel}</p>
                     )}

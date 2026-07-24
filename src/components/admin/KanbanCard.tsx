@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import PostActionsMenu from "@/components/admin/PostActionsMenu";
 import PostThumbnail from "@/components/admin/PostThumbnail";
+import PostNameEditor from "@/components/admin/PostNameEditor";
 
 export interface KanbanCardData {
   id: string;
@@ -41,7 +42,7 @@ export default function KanbanCard({ post }: { post: KanbanCardData }) {
         <div className="flex items-center gap-2 pr-6">
           <PostThumbnail fileType={post.fileType} fileUrl={post.fileUrl} driveUrl={post.driveUrl} label={postLabel(post)} />
           <div className="min-w-0 flex-1">
-            <p className="text-white text-[11px] font-medium truncate">{postLabel(post)}</p>
+            <PostNameEditor postId={post.id} title={post.title} fallbackLabel={postLabel(post)} textClassName="text-white text-[11px] font-medium" />
             <p className="text-[10px] text-gray-500 truncate">{post.clientName}</p>
           </div>
         </div>
