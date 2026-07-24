@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import PostActionsMenu from "@/components/admin/PostActionsMenu";
+import PostThumbnail from "@/components/admin/PostThumbnail";
 
 export interface KanbanCardData {
   id: string;
@@ -13,6 +14,7 @@ export interface KanbanCardData {
   fileUrl: string;
   clientId: string;
   clientName: string;
+  driveUrl?: string | null;
   scheduledLabel?: string | null;
   adjustmentSource?: "cliente" | "interno" | null;
   adjustmentComment?: string | null;
@@ -37,16 +39,7 @@ export default function KanbanCard({ post }: { post: KanbanCardData }) {
         className={`block bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-2 hover:border-white/20 transition-colors ${busy ? "opacity-50" : ""}`}
       >
         <div className="flex items-center gap-2 pr-6">
-          <div className="w-8 h-8 rounded-md overflow-hidden bg-black/40 shrink-0 flex items-center justify-center">
-            {post.fileType === "IMAGE" ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={post.fileUrl} alt="" className="w-full h-full object-cover" />
-            ) : post.fileType === "VIDEO" ? (
-              <span className="text-xs">🎬</span>
-            ) : (
-              <span className="text-xs">📄</span>
-            )}
-          </div>
+          <PostThumbnail fileType={post.fileType} fileUrl={post.fileUrl} driveUrl={post.driveUrl} label={postLabel(post)} />
           <div className="min-w-0 flex-1">
             <p className="text-white text-[11px] font-medium truncate">{postLabel(post)}</p>
             <p className="text-[10px] text-gray-500 truncate">{post.clientName}</p>

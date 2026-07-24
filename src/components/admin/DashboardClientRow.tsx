@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PostActionsMenu from "@/components/admin/PostActionsMenu";
+import PostThumbnail from "@/components/admin/PostThumbnail";
 
 interface DashPost {
   id: string;
@@ -12,6 +13,7 @@ interface DashPost {
   contentType: string;
   fileType: string;
   fileUrl: string;
+  driveUrl?: string | null;
   scheduledLabel?: string | null;
   adjustmentSource?: "cliente" | "interno" | null;
   adjustmentComment?: string | null;
@@ -142,16 +144,7 @@ export default function DashboardClientRow({
               >
                 <label className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
                   <input type="checkbox" checked={isSel} onChange={() => toggleSel(p.id)} className="accent-emerald-500 w-4 h-4 shrink-0" />
-                  <div className="w-8 h-8 rounded-md overflow-hidden bg-black/40 shrink-0 flex items-center justify-center">
-                    {p.fileType === "IMAGE" ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.fileUrl} alt="" className="w-full h-full object-cover" />
-                    ) : p.fileType === "VIDEO" ? (
-                      <span className="text-sm">🎬</span>
-                    ) : (
-                      <span className="text-sm">📄</span>
-                    )}
-                  </div>
+                  <PostThumbnail fileType={p.fileType} fileUrl={p.fileUrl} driveUrl={p.driveUrl} label={postLabel(p)} />
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-xs font-medium truncate">{postLabel(p)}</p>
                     {p.scheduledLabel && (

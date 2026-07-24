@@ -17,6 +17,7 @@ type Item = {
   caption: string | null;
   fileType: string;
   fileUrl: string;
+  driveUrl: string | null;
   approvalItem: { status: string; clientComment: string | null } | null;
   internalReviewItem: { status: string; comment: string | null } | null;
 };
@@ -29,6 +30,7 @@ type DashPost = {
   contentType: string;
   fileType: string;
   fileUrl: string;
+  driveUrl: string | null;
   scheduledLabel: string | null;
   adjustmentSource: "cliente" | "interno" | null;
   adjustmentComment: string | null;
@@ -90,6 +92,7 @@ function distinctPosts(items: Item[], predicate: (item: Item) => boolean): DashP
       contentType: item.contentType,
       fileType: item.fileType,
       fileUrl: item.fileUrl,
+      driveUrl: item.driveUrl,
       scheduledLabel: fmtScheduled(item.scheduledDate),
       adjustmentSource,
       adjustmentComment,
@@ -138,6 +141,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           caption: true,
           fileType: true,
           fileUrl: true,
+          driveUrl: true,
           approvalItem: { select: { status: true, clientComment: true } },
           internalReviewItem: { select: { status: true, comment: true } },
         },
