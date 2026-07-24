@@ -117,7 +117,7 @@ function postLabel(p: { title: string | null; caption: string | null }): string 
 }
 
 export default async function AdminDashboard({ searchParams }: { searchParams: { view?: string } }) {
-  const view = searchParams?.view === "kanban" ? "kanban" : "lista";
+  const view = searchParams?.view === "lista" ? "lista" : "kanban";
   const clients = await prisma.client.findMany({
     where: { contentItems: { some: {} } },
     select: {
