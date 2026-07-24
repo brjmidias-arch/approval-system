@@ -36,6 +36,11 @@ yarn-error.log*
 prisma/dev.db
 prisma/dev.db-journal
 
+# tooling (local only)
+.claude/
+.superpowers/
+drive-preview-demo.html
+
 # vercel
 .vercel
 
