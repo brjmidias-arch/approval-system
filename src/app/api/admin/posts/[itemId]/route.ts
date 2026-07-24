@@ -73,6 +73,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
           create: { contentItemId: id, status: "PENDING" },
         });
       }
+    } else if (action === "mark-scheduled") {
+      // Vai para "Posts programados". Limpa postedAt (caso volte de Concluído).
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "SCHEDULED", postedAt: null } });
     } else if (action === "mark-published") {
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "PUBLISHED", postedAt: new Date() } });
     }

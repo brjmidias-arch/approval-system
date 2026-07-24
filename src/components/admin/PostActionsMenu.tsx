@@ -60,7 +60,8 @@ export default function PostActionsMenu({
     { label: "🔍 Enviar p/ revisão interna", onClick: () => run(patch({ action: "send-internal" })) },
     { label: "👤 Enviar p/ cliente", onClick: () => run(patch({ action: "send-client" })) },
     { label: "🔗 Copiar link da programação", onClick: copyProgLink },
-    { label: "✅ Concluir (marcar publicado)", onClick: () => run(patch({ action: "mark-published" }), "Concluir este post? Ele vai para a aba Concluído.") },
+    { label: "🗓️ Marcar como programado", onClick: () => run(patch({ action: "mark-scheduled" })) },
+    { label: "✅ Concluído (foi ao ar)", onClick: () => run(patch({ action: "mark-published" }), "Marcar como concluído? Ele vai para a etapa Concluído e some em 10 dias.") },
     { label: "🗑 Excluir", onClick: () => run(del, "Excluir este post? Esta ação não pode ser desfeita."), danger: true },
   ];
 
