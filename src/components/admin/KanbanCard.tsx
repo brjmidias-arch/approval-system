@@ -83,7 +83,11 @@ export default function KanbanCard({
       <Link
         href={`/admin/clients/${post.clientId}`}
         draggable={false}
-        className={`block bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-2 hover:border-white/20 transition-colors ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${busy ? "opacity-50" : ""}`}
+        className={`block rounded-lg p-2 border transition-colors ${
+          stageId === "scheduled"
+            ? "bg-emerald-950/30 border-emerald-500/40 hover:border-emerald-400/60"
+            : "bg-[#0f0f0f] border-white/[0.06] hover:border-white/20"
+        } ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${busy ? "opacity-50" : ""}`}
       >
         <div className="flex items-center gap-2 pr-6">
           <PostThumbnail fileType={post.fileType} fileUrl={post.fileUrl} driveUrl={post.driveUrl} label={postLabel(post)} />
@@ -113,7 +117,7 @@ export default function KanbanCard({
         )}
         {stageId === "scheduled" && (
           <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <PostDatePicker postId={post.id} value={post.scheduledInput ?? null} label={post.scheduledLabel ?? null} />
+            <PostDatePicker postId={post.id} value={post.scheduledInput ?? null} label={post.scheduledLabel ?? null} done />
             <CopyProgLinkButton clientId={post.clientId} />
             <button
               type="button"

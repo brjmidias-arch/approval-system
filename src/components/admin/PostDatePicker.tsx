@@ -12,10 +12,12 @@ export default function PostDatePicker({
   postId,
   value,
   label,
+  done,
 }: {
   postId: string;
   value: string | null; // YYYY-MM-DD (valor do input)
   label: string | null; // DD/MM (texto exibido)
+  done?: boolean; // true = já agendado ("Programado para", verde); false = plano ("Programar para", azul)
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -79,11 +81,13 @@ export default function PostDatePicker({
       title="Clique para definir/alterar o dia"
       className={`text-[10px] transition-colors disabled:opacity-50 ${
         label
-          ? "text-sky-400 hover:text-sky-300"
+          ? done
+            ? "text-emerald-400 hover:text-emerald-300 font-medium"
+            : "text-sky-400 hover:text-sky-300"
           : "text-gray-400 border border-dashed border-white/20 rounded px-1.5 py-0.5 hover:text-white hover:border-white/40"
       }`}
     >
-      {busy ? "..." : label ? `📅 Programado para ${label}` : "📅 Definir data"}
+      {busy ? "..." : label ? `📅 ${done ? "Programado" : "Programar"} para ${label}` : "📅 Definir data"}
     </button>
   );
 }

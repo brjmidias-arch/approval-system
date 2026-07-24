@@ -146,7 +146,11 @@ export default function DashboardClientRow({
               <div
                 key={p.id}
                 className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 border transition-colors ${
-                  isSel ? "bg-emerald-900/15 border-emerald-500/40" : "bg-[#0f0f0f] border-white/[0.06] hover:border-white/15"
+                  isSel
+                    ? "bg-emerald-900/15 border-emerald-500/40"
+                    : stageId === "scheduled"
+                    ? "bg-emerald-950/25 border-emerald-500/30 hover:border-emerald-400/50"
+                    : "bg-[#0f0f0f] border-white/[0.06] hover:border-white/15"
                 }`}
               >
                 <label className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
@@ -166,7 +170,7 @@ export default function DashboardClientRow({
                 </label>
                 {(stageId === "readyToSchedule" || stageId === "scheduled") && (
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <PostDatePicker postId={p.id} value={p.scheduledInput ?? null} label={p.scheduledLabel ?? null} />
+                    <PostDatePicker postId={p.id} value={p.scheduledInput ?? null} label={p.scheduledLabel ?? null} done={stageId === "scheduled"} />
                     <CopyProgLinkButton clientId={clientId} />
                     {stageId === "readyToSchedule" && p.daysWaiting != null && p.daysWaiting > 0 && (
                       <span
