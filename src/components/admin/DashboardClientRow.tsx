@@ -11,6 +11,8 @@ interface DashPost {
   contentType: string;
   fileType: string;
   fileUrl: string;
+  adjustmentSource?: "cliente" | "interno" | null;
+  adjustmentComment?: string | null;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -147,7 +149,14 @@ export default function DashboardClientRow({
                     <span className="text-sm">📄</span>
                   )}
                 </div>
-                <p className="text-white text-xs font-medium truncate flex-1 min-w-0">{postLabel(p)}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-xs font-medium truncate">{postLabel(p)}</p>
+                  {p.adjustmentComment && (
+                    <p className="text-[11px] text-amber-400 truncate">
+                      ✏️ {p.adjustmentSource === "cliente" ? "Cliente" : "Interno"}: {p.adjustmentComment}
+                    </p>
+                  )}
+                </div>
                 <span className="text-[10px] text-emerald-400 bg-emerald-900/20 px-1.5 py-0.5 rounded shrink-0">
                   {TYPE_LABELS[p.contentType] ?? p.contentType}
                 </span>

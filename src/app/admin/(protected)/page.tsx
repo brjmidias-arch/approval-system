@@ -15,6 +15,8 @@ type Item = {
   caption: string | null;
   fileType: string;
   fileUrl: string;
+  approvalItem: { status: string; clientComment: string | null } | null;
+  internalReviewItem: { status: string; comment: string | null } | null;
 };
 
 /** A post for display (carousel = its representative slide). */
@@ -25,14 +27,24 @@ type DashPost = {
   contentType: string;
   fileType: string;
   fileUrl: string;
+  adjustmentSource: "cliente" | "interno" | null;
+  adjustmentComment: string | null;
 };
 
-type StageId = "internal" | "internalDone" | "clientReview" | "readyToSchedule" | "inProgramming" | "draft";
+type StageId = "adjustment" | "internal" | "internalDone" | "clientReview" | "readyToSchedule" | "inProgramming" | "draft";
+
+/** Post precisa de ajuste — o cliente OU a revisão interna pediu mudança/reprovou. */
+function needsAdjustment(i: Item): boolean {
+  const a = i.approvalItem?.status;
+  const r = i.internalReviewItem?.status;
+  return a === "ADJUSTMENT" || a === "REJECTED" || r === "ADJUSTMENT" || r === "REJECTED";
+}
 
 const STAGE_PREDICATES: Record<StageId, (i: Item) => boolean> = {
-  internal: (i) => i.status === "INTERNAL_REVIEW",
+  adjustment: needsAdjustment,
+  internal: (i) => i.status === "INTERNAL_REVIEW" && !needsAdjustment(i),
   internalDone: (i) => i.status === "INTERNAL_DONE",
-  clientReview: (i) => i.status === "CLIENT_REVIEW",
+  clientReview: (i) => i.status === "CLIENT_REVIEW" && !needsAdjustment(i),
   readyToSchedule: (i) => i.status === "APPROVED" && !i.sentToProgramacaoAt,
   inProgramming: (i) => i.status === "APPROVED" && !!i.sentToProgramacaoAt,
   draft: (i) => i.status === "DRAFT",
@@ -47,6 +59,18 @@ function distinctPosts(items: Item[], predicate: (item: Item) => boolean): DashP
     const key = item.contentType === "CARROSSEL" && item.groupId ? item.groupId : item.id;
     if (seen.has(key)) continue;
     seen.add(key);
+    // Fonte + comentário do ajuste (quando houver): cliente tem precedência sobre interno.
+    let adjustmentSource: "cliente" | "interno" | null = null;
+    let adjustmentComment: string | null = null;
+    const a = item.approvalItem?.status;
+    const r = item.internalReviewItem?.status;
+    if (a === "ADJUSTMENT" || a === "REJECTED") {
+      adjustmentSource = "cliente";
+      adjustmentComment = item.approvalItem?.clientComment ?? null;
+    } else if (r === "ADJUSTMENT" || r === "REJECTED") {
+      adjustmentSource = "interno";
+      adjustmentComment = item.internalReviewItem?.comment ?? null;
+    }
     out.push({
       id: item.id,
       title: item.title,
@@ -54,12 +78,15 @@ function distinctPosts(items: Item[], predicate: (item: Item) => boolean): DashP
       contentType: item.contentType,
       fileType: item.fileType,
       fileUrl: item.fileUrl,
+      adjustmentSource,
+      adjustmentComment,
     });
   }
   return out;
 }
 
 const STAGES: { id: StageId; label: string; icon: string; color: string; dot: string; bg: string }[] = [
+  { id: "adjustment", label: "Ajustes", icon: "✏️", color: "text-amber-400", dot: "bg-amber-500", bg: "bg-amber-900/20 border-amber-500/30" },
   { id: "internal", label: "Revisão interna", icon: "🔍", color: "text-violet-400", dot: "bg-violet-500", bg: "bg-violet-900/20 border-violet-500/30" },
   { id: "internalDone", label: "Revisão interna concluída", icon: "✅", color: "text-violet-300", dot: "bg-violet-400", bg: "bg-violet-900/10 border-violet-500/20" },
   { id: "clientReview", label: "Aguardando cliente", icon: "👤", color: "text-emerald-400", dot: "bg-emerald-500", bg: "bg-emerald-900/20 border-emerald-500/30" },
@@ -70,6 +97,7 @@ const STAGES: { id: StageId; label: string; icon: string; color: string; dot: st
 
 function computeStagePosts(items: Item[]): Record<StageId, DashPost[]> {
   return {
+    adjustment: distinctPosts(items, STAGE_PREDICATES.adjustment),
     internal: distinctPosts(items, STAGE_PREDICATES.internal),
     internalDone: distinctPosts(items, STAGE_PREDICATES.internalDone),
     clientReview: distinctPosts(items, STAGE_PREDICATES.clientReview),
@@ -97,6 +125,8 @@ export default async function AdminDashboard() {
           caption: true,
           fileType: true,
           fileUrl: true,
+          approvalItem: { select: { status: true, clientComment: true } },
+          internalReviewItem: { select: { status: true, comment: true } },
         },
       },
     },
@@ -109,6 +139,7 @@ export default async function AdminDashboard() {
   }));
 
   const totals: Record<StageId, number> = {
+    adjustment: 0,
     internal: 0,
     internalDone: 0,
     clientReview: 0,
