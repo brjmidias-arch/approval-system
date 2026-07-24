@@ -53,10 +53,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
       update: { status, comment: comment || null, commentResolved: false, reviewedAt: new Date() },
       create: { contentItemId, status, comment: comment || null, commentResolved: false, reviewedAt: new Date() },
     });
-    await prisma.contentItem.update({
-      where: { id: contentItemId },
-      data: { status: status === "APPROVED" ? "INTERNAL_DONE" : "INTERNAL_REVIEW" },
-    });
+
+    if (status === "APPROVED") {
+      // Aprovado internamente → passa AUTOMATICAMENTE para a aprovação do cliente
+      // (cria/reseta a aprovação pendente para o post aparecer no link do cliente).
+      await prisma.contentItem.update({ where: { id: contentItemId }, data: { status: "CLIENT_REVIEW" } });
+      await prisma.approvalItem.upsert({
+        where: { contentItemId },
+        update: { status: "PENDING", clientComment: null, clientCommentResolved: false, reviewedAt: null },
+        create: { contentItemId, status: "PENDING" },
+      });
+    } else {
+      // Ajuste/reprovação → continua na revisão interna
+      await prisma.contentItem.update({ where: { id: contentItemId }, data: { status: "INTERNAL_REVIEW" } });
+    }
+
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Erro ao salvar revisão" }, { status: 500 });
