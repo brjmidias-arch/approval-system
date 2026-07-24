@@ -31,7 +31,7 @@ type DashPost = {
   adjustmentComment: string | null;
 };
 
-type StageId = "adjustment" | "internal" | "internalDone" | "clientReview" | "readyToSchedule" | "inProgramming" | "draft";
+type StageId = "adjustment" | "internal" | "clientReview" | "readyToSchedule" | "inProgramming" | "draft";
 
 /** Post precisa de ajuste — o cliente OU a revisão interna pediu mudança/reprovou. */
 function needsAdjustment(i: Item): boolean {
@@ -42,8 +42,9 @@ function needsAdjustment(i: Item): boolean {
 
 const STAGE_PREDICATES: Record<StageId, (i: Item) => boolean> = {
   adjustment: needsAdjustment,
-  internal: (i) => i.status === "INTERNAL_REVIEW" && !needsAdjustment(i),
-  internalDone: (i) => i.status === "INTERNAL_DONE",
+  // INTERNAL_DONE (legado do modelo por-campanha) cai aqui como fallback: no fluxo
+  // por-post a aprovação interna já pula direto para CLIENT_REVIEW.
+  internal: (i) => (i.status === "INTERNAL_REVIEW" || i.status === "INTERNAL_DONE") && !needsAdjustment(i),
   clientReview: (i) => i.status === "CLIENT_REVIEW" && !needsAdjustment(i),
   readyToSchedule: (i) => i.status === "APPROVED" && !i.sentToProgramacaoAt,
   inProgramming: (i) => i.status === "APPROVED" && !!i.sentToProgramacaoAt,
@@ -88,7 +89,6 @@ function distinctPosts(items: Item[], predicate: (item: Item) => boolean): DashP
 const STAGES: { id: StageId; label: string; icon: string; color: string; dot: string; bg: string }[] = [
   { id: "adjustment", label: "Ajustes", icon: "✏️", color: "text-amber-400", dot: "bg-amber-500", bg: "bg-amber-900/20 border-amber-500/30" },
   { id: "internal", label: "Revisão interna", icon: "🔍", color: "text-violet-400", dot: "bg-violet-500", bg: "bg-violet-900/20 border-violet-500/30" },
-  { id: "internalDone", label: "Revisão interna concluída", icon: "✅", color: "text-violet-300", dot: "bg-violet-400", bg: "bg-violet-900/10 border-violet-500/20" },
   { id: "clientReview", label: "Aguardando cliente", icon: "👤", color: "text-emerald-400", dot: "bg-emerald-500", bg: "bg-emerald-900/20 border-emerald-500/30" },
   { id: "readyToSchedule", label: "Prontos p/ programar", icon: "📅", color: "text-sky-400", dot: "bg-sky-500", bg: "bg-sky-900/20 border-sky-500/30" },
   { id: "inProgramming", label: "Na programação", icon: "🗓️", color: "text-teal-400", dot: "bg-teal-500", bg: "bg-teal-900/20 border-teal-500/30" },
@@ -99,7 +99,6 @@ function computeStagePosts(items: Item[]): Record<StageId, DashPost[]> {
   return {
     adjustment: distinctPosts(items, STAGE_PREDICATES.adjustment),
     internal: distinctPosts(items, STAGE_PREDICATES.internal),
-    internalDone: distinctPosts(items, STAGE_PREDICATES.internalDone),
     clientReview: distinctPosts(items, STAGE_PREDICATES.clientReview),
     readyToSchedule: distinctPosts(items, STAGE_PREDICATES.readyToSchedule),
     inProgramming: distinctPosts(items, STAGE_PREDICATES.inProgramming),
@@ -151,7 +150,6 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
   const totals: Record<StageId, number> = {
     adjustment: 0,
     internal: 0,
-    internalDone: 0,
     clientReview: 0,
     readyToSchedule: 0,
     inProgramming: 0,
