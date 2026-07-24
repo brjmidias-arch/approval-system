@@ -103,7 +103,7 @@ export default function ClientWorkspacePage() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const [editingPost, setEditingPost] = useState<GroupedPost | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "", driveUrl: "", coverDriveUrl: "" });
+  const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "", driveUrl: "", coverDriveUrl: "", contentType: "" });
   const [savingEdit, setSavingEdit] = useState(false);
   const [notifying, setNotifying] = useState(false);
 
@@ -251,6 +251,7 @@ export default function ClientWorkspacePage() {
       scheduledDate: group.rep.scheduledDate ? group.rep.scheduledDate.split("T")[0] : "",
       driveUrl: group.rep.driveUrl || "",
       coverDriveUrl: group.rep.coverDriveUrl || "",
+      contentType: group.rep.contentType,
     });
   }
 
@@ -274,6 +275,10 @@ export default function ClientWorkspacePage() {
             caption: editForm.caption || null,
             scheduledDate: editForm.scheduledDate || null,
             driveUrl: editForm.driveUrl || null,
+            // Tipo só é editável em post único (carrossel mantém o tipo do grupo)
+            ...(editingPost.rep.contentType !== "CARROSSEL" && editForm.contentType && {
+              contentType: editForm.contentType,
+            }),
             ...(editForm.coverDriveUrl.trim() !== "" && {
               coverUrl,
               coverDriveUrl: editForm.coverDriveUrl.trim() || null,
@@ -401,6 +406,20 @@ export default function ClientWorkspacePage() {
                   className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
                 />
               </div>
+              {(["POST_FEED", "REELS", "STORIES"] as string[]).includes(editingPost.rep.contentType) && (
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">Tipo</label>
+                  <select
+                    value={editForm.contentType}
+                    onChange={(e) => setEditForm({ ...editForm, contentType: e.target.value })}
+                    className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="POST_FEED">Post Feed</option>
+                    <option value="REELS">Reels</option>
+                    <option value="STORIES">Stories</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm text-gray-400 mb-1.5">Legenda</label>
                 <textarea
