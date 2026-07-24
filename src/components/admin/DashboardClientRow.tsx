@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import PostActionsMenu from "@/components/admin/PostActionsMenu";
 
 interface DashPost {
   id: string;
@@ -132,35 +133,38 @@ export default function DashboardClientRow({
           {posts.map((p) => {
             const isSel = selected.has(p.id);
             return (
-              <label
+              <div
                 key={p.id}
-                className={`flex items-center gap-3 rounded-lg px-2.5 py-1.5 border cursor-pointer transition-colors ${
+                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 border transition-colors ${
                   isSel ? "bg-emerald-900/15 border-emerald-500/40" : "bg-[#0f0f0f] border-white/[0.06] hover:border-white/15"
                 }`}
               >
-                <input type="checkbox" checked={isSel} onChange={() => toggleSel(p.id)} className="accent-emerald-500 w-4 h-4 shrink-0" />
-                <div className="w-8 h-8 rounded-md overflow-hidden bg-black/40 shrink-0 flex items-center justify-center">
-                  {p.fileType === "IMAGE" ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.fileUrl} alt="" className="w-full h-full object-cover" />
-                  ) : p.fileType === "VIDEO" ? (
-                    <span className="text-sm">🎬</span>
-                  ) : (
-                    <span className="text-sm">📄</span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-xs font-medium truncate">{postLabel(p)}</p>
-                  {p.adjustmentComment && (
-                    <p className="text-[11px] text-amber-400 truncate">
-                      ✏️ {p.adjustmentSource === "cliente" ? "Cliente" : "Interno"}: {p.adjustmentComment}
-                    </p>
-                  )}
-                </div>
-                <span className="text-[10px] text-emerald-400 bg-emerald-900/20 px-1.5 py-0.5 rounded shrink-0">
-                  {TYPE_LABELS[p.contentType] ?? p.contentType}
-                </span>
-              </label>
+                <label className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
+                  <input type="checkbox" checked={isSel} onChange={() => toggleSel(p.id)} className="accent-emerald-500 w-4 h-4 shrink-0" />
+                  <div className="w-8 h-8 rounded-md overflow-hidden bg-black/40 shrink-0 flex items-center justify-center">
+                    {p.fileType === "IMAGE" ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.fileUrl} alt="" className="w-full h-full object-cover" />
+                    ) : p.fileType === "VIDEO" ? (
+                      <span className="text-sm">🎬</span>
+                    ) : (
+                      <span className="text-sm">📄</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-xs font-medium truncate">{postLabel(p)}</p>
+                    {p.adjustmentComment && (
+                      <p className="text-[11px] text-amber-400 truncate">
+                        ✏️ {p.adjustmentSource === "cliente" ? "Cliente" : "Interno"}: {p.adjustmentComment}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-emerald-400 bg-emerald-900/20 px-1.5 py-0.5 rounded shrink-0">
+                    {TYPE_LABELS[p.contentType] ?? p.contentType}
+                  </span>
+                </label>
+                <PostActionsMenu postId={p.id} clientId={clientId} />
+              </div>
             );
           })}
 
