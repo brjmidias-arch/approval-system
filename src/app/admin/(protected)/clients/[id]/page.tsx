@@ -96,7 +96,7 @@ export default function ClientWorkspacePage() {
   const [loading, setLoading] = useState(true);
 
   const [showFolderUpload, setShowFolderUpload] = useState(false);
-  const [copiedWhich, setCopiedWhich] = useState<"client" | "internal" | null>(null);
+  const [copiedWhich, setCopiedWhich] = useState<"client" | "internal" | "message" | null>(null);
   const [copiedLinkItemId, setCopiedLinkItemId] = useState<string | null>(null);
 
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -162,6 +162,30 @@ export default function ClientWorkspacePage() {
     } finally {
       setNotifying(false);
     }
+  }
+
+  function copyClientMessage() {
+    if (!client) return;
+    // Conta posts aguardando o cliente (carrossel = 1 post)
+    const seen = new Set<string>();
+    let n = 0;
+    for (const it of client.contentItems) {
+      if (it.status !== "CLIENT_REVIEW") continue;
+      const key = it.contentType === "CARROSSEL" && it.groupId ? it.groupId : it.id;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      n++;
+    }
+    const nLabel = n === 1 ? "1 post" : `${n} posts`;
+    const url = `${window.location.origin}/aprovar/${client.token}`;
+    const msg =
+      `Olá! 👋 O conteúdo de vocês está pronto para aprovação.\n\n` +
+      `Você tem *${nLabel}* aguardando revisão. É só acessar o link abaixo, olhar cada post e *aprovar* ✅ ou *pedir ajuste* ✏️ (com um comentário do que mudar):\n\n` +
+      `${url}\n\n` +
+      `Assim que aprovar, já entra na nossa programação. Qualquer dúvida, é só chamar aqui. 🙌`;
+    navigator.clipboard.writeText(msg);
+    setCopiedWhich("message");
+    setTimeout(() => setCopiedWhich(null), 2000);
   }
 
   function copyDesignerLink(itemId: string) {
@@ -307,6 +331,12 @@ export default function ClientWorkspacePage() {
             className="text-sm px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
           >
             + Adicionar posts
+          </button>
+          <button
+            onClick={copyClientMessage}
+            className="text-sm px-3 py-2 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/30 rounded-lg transition-colors"
+          >
+            {copiedWhich === "message" ? "Copiado!" : "💬 Copiar mensagem p/ cliente"}
           </button>
           <button
             onClick={copyClientLink}
