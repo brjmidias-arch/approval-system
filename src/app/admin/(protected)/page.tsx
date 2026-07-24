@@ -156,12 +156,18 @@ function computeStagePosts(items: Item[]): Record<StageId, DashPost[]> {
 
 export default async function AdminDashboard({ searchParams }: { searchParams: { view?: string } }) {
   const view = searchParams?.view === "lista" ? "lista" : "kanban";
+  // Não trazer do banco os concluídos antigos (PUBLISHED > 10 dias ou sem data de
+  // publicação): eles somem do dashboard de qualquer forma. Reduz muito a carga.
+  const concluidoCutoff = new Date(Date.now() - CONCLUIDO_TTL_MS);
   const clients = await prisma.client.findMany({
     where: { contentItems: { some: {} } },
     select: {
       id: true,
       name: true,
       contentItems: {
+        where: {
+          OR: [{ status: { not: "PUBLISHED" } }, { postedAt: { gte: concluidoCutoff } }],
+        },
         orderBy: { order: "asc" },
         select: {
           id: true,
