@@ -74,8 +74,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
         });
       }
     } else if (action === "mark-approved") {
-      // Volta para "Prontos p/ programar": aprovado e sem data (a data mora em programados).
-      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "APPROVED", scheduledDate: null, postedAt: null } });
+      // Volta para "Prontos p/ programar" (mantém a data planejada, se houver).
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "APPROVED", postedAt: null } });
     } else if (action === "mark-draft") {
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "DRAFT", postedAt: null } });
     } else if (action === "mark-scheduled") {

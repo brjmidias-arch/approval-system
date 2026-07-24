@@ -77,9 +77,10 @@ const STAGE_PREDICATES: Record<StageId, (i: Item) => boolean> = {
   // por-post a aprovação interna já pula direto para CLIENT_REVIEW.
   internal: (i) => (i.status === "INTERNAL_REVIEW" || i.status === "INTERNAL_DONE") && !needsAdjustment(i),
   clientReview: (i) => i.status === "CLIENT_REVIEW" && !needsAdjustment(i),
-  // Aprovado SEM data → prontos p/ programar; com data (ou já agendado) → posts programados.
-  readyToSchedule: (i) => i.status === "APPROVED" && !i.scheduledDate,
-  scheduled: (i) => i.status === "SCHEDULED" || (i.status === "APPROVED" && !!i.scheduledDate),
+  // Aprovado pelo cliente → prontos p/ programar. Só vai para "Posts programados"
+  // quando o social clica "Agendado" no link (status SCHEDULED) — a data sozinha não move.
+  readyToSchedule: (i) => i.status === "APPROVED",
+  scheduled: (i) => i.status === "SCHEDULED",
   published: (i) => i.status === "PUBLISHED",
   draft: (i) => i.status === "DRAFT",
 };

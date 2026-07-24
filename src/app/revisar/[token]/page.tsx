@@ -70,6 +70,10 @@ export default function InternalReviewPage() {
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [carouselSlide, setCarouselSlide] = useState<Record<string, number>>({});
   const [savingGroup, setSavingGroup] = useState<string | null>(null);
+  const [origin, setOrigin] = useState("");
+  const [copiedMsg, setCopiedMsg] = useState(false);
+
+  useEffect(() => setOrigin(window.location.origin), []);
 
   const fetchCampaign = useCallback(async () => {
     const res = await fetch(`/api/internal/${token}`);
@@ -186,6 +190,18 @@ export default function InternalReviewPage() {
   const total = needsReviewGroups.length;
   const progress = total > 0 ? Math.round((reviewedCount / total) * 100) : 0;
 
+  const anyApproved =
+    alreadyApprovedGroups.length > 0 ||
+    needsReviewGroups.some((g) => reviews[g.groupKey]?.status === "APPROVED");
+  const clientLink = origin ? `${origin}/aprovar/${campaign.token}` : "";
+  const clientMessage = `Olá! 😊 Temos novos conteúdos prontos para a sua aprovação.\n\nÉ rápido: abra o link, veja cada post e toque em *Aprovar* ✅ ou peça um *Ajuste* ✏️.\n\n👉 ${clientLink}`;
+
+  function copyMsg() {
+    navigator.clipboard.writeText(clientMessage);
+    setCopiedMsg(true);
+    setTimeout(() => setCopiedMsg(false), 2500);
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0a0f]">
       {/* Header */}
@@ -226,6 +242,23 @@ export default function InternalReviewPage() {
           <p className="text-gray-400 text-sm">
             Revise cada item abaixo antes de enviar para o cliente. Aprove, solicite ajuste ou reprove com comentário.
           </p>
+        )}
+
+        {anyApproved && clientLink && (
+          <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-4 space-y-3">
+            <p className="text-emerald-300 text-sm font-medium">
+              ✅ Conteúdo aprovado! Copie a mensagem abaixo e envie ao cliente para ele aprovar:
+            </p>
+            <div className="bg-black/40 rounded-lg p-3">
+              <p className="text-gray-300 text-xs whitespace-pre-wrap leading-relaxed break-words">{clientMessage}</p>
+            </div>
+            <button
+              onClick={copyMsg}
+              className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors"
+            >
+              {copiedMsg ? "Copiado! ✓" : "📋 Copiar mensagem + link do cliente"}
+            </button>
+          </div>
         )}
 
         {needsReviewGroups.map((group, gi) => {
