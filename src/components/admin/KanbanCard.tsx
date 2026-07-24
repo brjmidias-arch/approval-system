@@ -35,7 +35,15 @@ function postLabel(p: { title: string | null; caption: string | null }): string 
   return "(sem título)";
 }
 
-export default function KanbanCard({ post, stageId }: { post: KanbanCardData; stageId?: string }) {
+export default function KanbanCard({
+  post,
+  stageId,
+  draggable,
+}: {
+  post: KanbanCardData;
+  stageId?: string;
+  draggable?: boolean;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -60,10 +68,22 @@ export default function KanbanCard({ post, stageId }: { post: KanbanCardData; st
   }
 
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      draggable={draggable}
+      onDragStart={
+        draggable
+          ? (e) => {
+              e.dataTransfer.setData("text/plain", post.id);
+              e.dataTransfer.effectAllowed = "move";
+            }
+          : undefined
+      }
+    >
       <Link
         href={`/admin/clients/${post.clientId}`}
-        className={`block bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-2 hover:border-white/20 transition-colors ${busy ? "opacity-50" : ""}`}
+        draggable={false}
+        className={`block bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-2 hover:border-white/20 transition-colors ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${busy ? "opacity-50" : ""}`}
       >
         <div className="flex items-center gap-2 pr-6">
           <PostThumbnail fileType={post.fileType} fileUrl={post.fileUrl} driveUrl={post.driveUrl} label={postLabel(post)} />
@@ -92,13 +112,14 @@ export default function KanbanCard({ post, stageId }: { post: KanbanCardData; st
           </div>
         )}
         {stageId === "scheduled" && (
-          <div className="flex items-center justify-between gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             <PostDatePicker postId={post.id} value={post.scheduledInput ?? null} label={post.scheduledLabel ?? null} />
+            <CopyProgLinkButton clientId={post.clientId} />
             <button
               type="button"
               onClick={conclude}
               disabled={busy}
-              className="text-[10px] px-2 py-0.5 rounded bg-teal-900/40 hover:bg-teal-900/60 text-teal-300 border border-teal-500/30 shrink-0 disabled:opacity-50 transition-colors"
+              className="text-[10px] px-2 py-0.5 rounded bg-teal-900/40 hover:bg-teal-900/60 text-teal-300 border border-teal-500/30 shrink-0 disabled:opacity-50 transition-colors ml-auto"
             >
               ✓ Concluído
             </button>

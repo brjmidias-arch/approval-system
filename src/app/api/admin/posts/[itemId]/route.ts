@@ -73,6 +73,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
           create: { contentItemId: id, status: "PENDING" },
         });
       }
+    } else if (action === "mark-approved") {
+      // Volta para "Prontos p/ programar": aprovado e sem data (a data mora em programados).
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "APPROVED", scheduledDate: null, postedAt: null } });
+    } else if (action === "mark-draft") {
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "DRAFT", postedAt: null } });
     } else if (action === "mark-scheduled") {
       // Vai para "Posts programados". Limpa postedAt (caso volte de Concluído).
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "SCHEDULED", postedAt: null } });

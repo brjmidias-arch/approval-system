@@ -167,7 +167,7 @@ export default function DashboardClientRow({
                 {(stageId === "readyToSchedule" || stageId === "scheduled") && (
                   <div className="flex items-center gap-1.5 shrink-0">
                     <PostDatePicker postId={p.id} value={p.scheduledInput ?? null} label={p.scheduledLabel ?? null} />
-                    {stageId === "readyToSchedule" && <CopyProgLinkButton clientId={clientId} />}
+                    <CopyProgLinkButton clientId={clientId} />
                     {stageId === "readyToSchedule" && p.daysWaiting != null && p.daysWaiting > 0 && (
                       <span
                         className={`text-[10px] px-1.5 py-0.5 rounded-full ${

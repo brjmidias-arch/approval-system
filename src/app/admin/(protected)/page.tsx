@@ -4,8 +4,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import AutoRefresh from "@/components/admin/AutoRefresh";
 import DashboardClientRow from "@/components/admin/DashboardClientRow";
-import KanbanCard from "@/components/admin/KanbanCard";
-import ConcluidoColumn from "@/components/admin/ConcluidoColumn";
+import KanbanBoard from "@/components/admin/KanbanBoard";
 
 type Item = {
   id: string;
@@ -78,8 +77,9 @@ const STAGE_PREDICATES: Record<StageId, (i: Item) => boolean> = {
   // por-post a aprovação interna já pula direto para CLIENT_REVIEW.
   internal: (i) => (i.status === "INTERNAL_REVIEW" || i.status === "INTERNAL_DONE") && !needsAdjustment(i),
   clientReview: (i) => i.status === "CLIENT_REVIEW" && !needsAdjustment(i),
-  readyToSchedule: (i) => i.status === "APPROVED",
-  scheduled: (i) => i.status === "SCHEDULED",
+  // Aprovado SEM data → prontos p/ programar; com data (ou já agendado) → posts programados.
+  readyToSchedule: (i) => i.status === "APPROVED" && !i.scheduledDate,
+  scheduled: (i) => i.status === "SCHEDULED" || (i.status === "APPROVED" && !!i.scheduledDate),
   published: (i) => i.status === "PUBLISHED",
   draft: (i) => i.status === "DRAFT",
 };
@@ -280,31 +280,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           </div>
 
           {view === "kanban" ? (
-            /* Kanban: colunas por etapa (scroll horizontal) */
-            <div className="flex gap-3 overflow-x-auto pb-3">
-              {STAGES.map((stage) =>
-                stage.id === "published" ? (
-                  <ConcluidoColumn key={stage.id} stage={stage} posts={kanban[stage.id]} />
-                ) : (
-                  <div key={stage.id} className="w-72 shrink-0 flex flex-col">
-                    <div className={`flex items-center gap-2 px-2 py-2 rounded-t-lg border-b-2 ${stage.bg}`}>
-                      <span className="text-sm">{stage.icon}</span>
-                      <h2 className={`text-xs font-semibold ${stage.color}`}>{stage.label}</h2>
-                      <span className="text-[11px] text-gray-500 ml-auto">{kanban[stage.id].length}</span>
-                    </div>
-                    <div className="bg-[#141414] border border-white/[0.06] rounded-b-lg p-1.5 space-y-1.5 min-h-[80px] flex-1">
-                      {kanban[stage.id].length === 0 ? (
-                        <p className="text-[11px] text-gray-600 text-center py-4">—</p>
-                      ) : (
-                        kanban[stage.id].map((p) => (
-                          <KanbanCard key={p.id} post={p} stageId={stage.id} />
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )
-              )}
-            </div>
+            <KanbanBoard stages={STAGES} columns={kanban} />
           ) : (
           /* Lista: seções por etapa */
           <div className="space-y-5">
