@@ -20,7 +20,7 @@ type Item = {
   fileType: string;
   fileUrl: string;
   driveUrl: string | null;
-  approvalItem: { status: string; clientComment: string | null } | null;
+  approvalItem: { status: string; clientComment: string | null; reviewedAt: Date | null } | null;
   internalReviewItem: { status: string; comment: string | null } | null;
 };
 
@@ -34,11 +34,13 @@ type DashPost = {
   fileUrl: string;
   driveUrl: string | null;
   scheduledLabel: string | null;
+  scheduledInput: string | null;
+  daysWaiting: number | null;
   adjustmentSource: "cliente" | "interno" | null;
   adjustmentComment: string | null;
 };
 
-type StageId = "adjustment" | "internal" | "clientReview" | "readyToSchedule" | "published" | "draft";
+type StageId = "adjustment" | "internal" | "clientReview" | "readyToSchedule" | "scheduled" | "published" | "draft";
 
 /** Formata a data agendada como DD/MM (UTC, pois é gravada em T12:00:00Z). */
 function fmtScheduled(d: Date | null): string | null {
@@ -46,6 +48,21 @@ function fmtScheduled(d: Date | null): string | null {
   const dd = String(d.getUTCDate()).padStart(2, "0");
   const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
   return `${dd}/${mm}`;
+}
+
+/** Data agendada no formato YYYY-MM-DD (valor de <input type="date">). */
+function fmtScheduledInput(d: Date | null): string | null {
+  if (!d) return null;
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Dias desde a aprovação do cliente (para o selo de urgência em "Prontos p/ programar"). */
+function daysSince(d: Date | null): number | null {
+  if (!d) return null;
+  return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 /** Post precisa de ajuste — o cliente OU a revisão interna pediu mudança/reprovou. */
@@ -62,6 +79,7 @@ const STAGE_PREDICATES: Record<StageId, (i: Item) => boolean> = {
   internal: (i) => (i.status === "INTERNAL_REVIEW" || i.status === "INTERNAL_DONE") && !needsAdjustment(i),
   clientReview: (i) => i.status === "CLIENT_REVIEW" && !needsAdjustment(i),
   readyToSchedule: (i) => i.status === "APPROVED",
+  scheduled: (i) => i.status === "SCHEDULED",
   published: (i) => i.status === "PUBLISHED",
   draft: (i) => i.status === "DRAFT",
 };
@@ -96,6 +114,8 @@ function distinctPosts(items: Item[], predicate: (item: Item) => boolean): DashP
       fileUrl: item.fileUrl,
       driveUrl: item.driveUrl,
       scheduledLabel: fmtScheduled(item.scheduledDate),
+      scheduledInput: fmtScheduledInput(item.scheduledDate),
+      daysWaiting: daysSince(item.approvalItem?.reviewedAt ?? null),
       adjustmentSource,
       adjustmentComment,
     });
@@ -108,6 +128,7 @@ const STAGES: { id: StageId; label: string; icon: string; color: string; dot: st
   { id: "internal", label: "Revisão interna", icon: "🔍", color: "text-violet-400", dot: "bg-violet-500", bg: "bg-violet-900/20 border-violet-500/30" },
   { id: "clientReview", label: "Aguardando cliente", icon: "👤", color: "text-emerald-400", dot: "bg-emerald-500", bg: "bg-emerald-900/20 border-emerald-500/30" },
   { id: "readyToSchedule", label: "Prontos p/ programar", icon: "📅", color: "text-sky-400", dot: "bg-sky-500", bg: "bg-sky-900/20 border-sky-500/30" },
+  { id: "scheduled", label: "Posts programados", icon: "🗓️", color: "text-indigo-400", dot: "bg-indigo-500", bg: "bg-indigo-900/20 border-indigo-500/30" },
   { id: "published", label: "Concluído", icon: "✅", color: "text-teal-400", dot: "bg-teal-500", bg: "bg-teal-900/20 border-teal-500/30" },
   { id: "draft", label: "Rascunho", icon: "📝", color: "text-gray-400", dot: "bg-gray-500", bg: "bg-[#1a1a1a] border-white/10" },
 ];
@@ -126,6 +147,7 @@ function computeStagePosts(items: Item[]): Record<StageId, DashPost[]> {
     internal: distinctPosts(items, STAGE_PREDICATES.internal),
     clientReview: distinctPosts(items, STAGE_PREDICATES.clientReview),
     readyToSchedule: distinctPosts(items, STAGE_PREDICATES.readyToSchedule),
+    scheduled: distinctPosts(items, STAGE_PREDICATES.scheduled),
     published: distinctPosts(items, STAGE_PREDICATES.published),
     draft: distinctPosts(items, STAGE_PREDICATES.draft),
   };
@@ -153,7 +175,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           fileType: true,
           fileUrl: true,
           driveUrl: true,
-          approvalItem: { select: { status: true, clientComment: true } },
+          approvalItem: { select: { status: true, clientComment: true, reviewedAt: true } },
           internalReviewItem: { select: { status: true, comment: true } },
         },
       },
@@ -171,6 +193,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     internal: 0,
     clientReview: 0,
     readyToSchedule: 0,
+    scheduled: 0,
     published: 0,
     draft: 0,
   };
@@ -274,7 +297,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                         <p className="text-[11px] text-gray-600 text-center py-4">—</p>
                       ) : (
                         kanban[stage.id].map((p) => (
-                          <KanbanCard key={p.id} post={p} showConclude={stage.id === "readyToSchedule"} />
+                          <KanbanCard key={p.id} post={p} stageId={stage.id} />
                         ))
                       )}
                     </div>
@@ -305,6 +328,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                         clientName={client.name}
                         posts={stagePosts[stage.id]}
                         stageColor={stage.color}
+                        stageId={stage.id}
                       />
                     ))}
                   </div>

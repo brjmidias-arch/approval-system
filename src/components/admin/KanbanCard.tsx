@@ -6,6 +6,7 @@ import Link from "next/link";
 import PostActionsMenu from "@/components/admin/PostActionsMenu";
 import PostThumbnail from "@/components/admin/PostThumbnail";
 import PostNameEditor from "@/components/admin/PostNameEditor";
+import PostDatePicker from "@/components/admin/PostDatePicker";
 
 export interface KanbanCardData {
   id: string;
@@ -18,6 +19,8 @@ export interface KanbanCardData {
   clientName: string;
   driveUrl?: string | null;
   scheduledLabel?: string | null;
+  scheduledInput?: string | null;
+  daysWaiting?: number | null;
   adjustmentSource?: "cliente" | "interno" | null;
   adjustmentComment?: string | null;
 }
@@ -31,7 +34,7 @@ function postLabel(p: { title: string | null; caption: string | null }): string 
   return "(sem título)";
 }
 
-export default function KanbanCard({ post, showConclude }: { post: KanbanCardData; showConclude?: boolean }) {
+export default function KanbanCard({ post, stageId }: { post: KanbanCardData; stageId?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -68,23 +71,35 @@ export default function KanbanCard({ post, showConclude }: { post: KanbanCardDat
             <p className="text-[10px] text-gray-500 truncate">{post.clientName}</p>
           </div>
         </div>
-        {(post.scheduledLabel || showConclude) && (
+        {stageId === "readyToSchedule" && (
           <div className="flex items-center justify-between gap-2 mt-1">
-            {post.scheduledLabel ? (
-              <span className="text-[10px] text-sky-400 truncate">📅 Programado para {post.scheduledLabel}</span>
-            ) : (
-              <span />
-            )}
-            {showConclude && (
-              <button
-                type="button"
-                onClick={conclude}
-                disabled={busy}
-                className="text-[10px] px-2 py-0.5 rounded bg-teal-900/40 hover:bg-teal-900/60 text-teal-300 border border-teal-500/30 shrink-0 disabled:opacity-50 transition-colors"
+            <PostDatePicker postId={post.id} value={post.scheduledInput ?? null} />
+            {post.daysWaiting != null && post.daysWaiting > 0 && (
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${
+                  post.daysWaiting >= 7
+                    ? "bg-red-900/30 text-red-400"
+                    : post.daysWaiting >= 3
+                    ? "bg-amber-900/30 text-amber-400"
+                    : "bg-yellow-900/20 text-yellow-500"
+                }`}
               >
-                ✓ Concluir
-              </button>
+                {post.daysWaiting}d
+              </span>
             )}
+          </div>
+        )}
+        {stageId === "scheduled" && (
+          <div className="flex items-center justify-between gap-2 mt-1">
+            <PostDatePicker postId={post.id} value={post.scheduledInput ?? null} />
+            <button
+              type="button"
+              onClick={conclude}
+              disabled={busy}
+              className="text-[10px] px-2 py-0.5 rounded bg-teal-900/40 hover:bg-teal-900/60 text-teal-300 border border-teal-500/30 shrink-0 disabled:opacity-50 transition-colors"
+            >
+              ✓ Concluído
+            </button>
           </div>
         )}
         {post.adjustmentComment && (

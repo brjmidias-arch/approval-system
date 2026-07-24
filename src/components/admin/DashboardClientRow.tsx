@@ -6,6 +6,7 @@ import Link from "next/link";
 import PostActionsMenu from "@/components/admin/PostActionsMenu";
 import PostThumbnail from "@/components/admin/PostThumbnail";
 import PostNameEditor from "@/components/admin/PostNameEditor";
+import PostDatePicker from "@/components/admin/PostDatePicker";
 
 interface DashPost {
   id: string;
@@ -16,6 +17,8 @@ interface DashPost {
   fileUrl: string;
   driveUrl?: string | null;
   scheduledLabel?: string | null;
+  scheduledInput?: string | null;
+  daysWaiting?: number | null;
   adjustmentSource?: "cliente" | "interno" | null;
   adjustmentComment?: string | null;
 }
@@ -42,11 +45,13 @@ export default function DashboardClientRow({
   clientName,
   posts,
   stageColor,
+  stageId,
 }: {
   clientId: string;
   clientName: string;
   posts: DashPost[];
   stageColor: string;
+  stageId?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(true);
@@ -148,9 +153,6 @@ export default function DashboardClientRow({
                   <PostThumbnail fileType={p.fileType} fileUrl={p.fileUrl} driveUrl={p.driveUrl} label={postLabel(p)} />
                   <div className="flex-1 min-w-0">
                     <PostNameEditor postId={p.id} title={p.title} fallbackLabel={postLabel(p)} textClassName="text-white text-xs font-medium" />
-                    {p.scheduledLabel && (
-                      <p className="text-[11px] text-sky-400 truncate">📅 Programado para {p.scheduledLabel}</p>
-                    )}
                     {p.adjustmentComment && (
                       <p className="text-[11px] text-amber-400 truncate">
                         ✏️ {p.adjustmentSource === "cliente" ? "Cliente" : "Interno"}: {p.adjustmentComment}
@@ -161,6 +163,24 @@ export default function DashboardClientRow({
                     {TYPE_LABELS[p.contentType] ?? p.contentType}
                   </span>
                 </label>
+                {(stageId === "readyToSchedule" || stageId === "scheduled") && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <PostDatePicker postId={p.id} value={p.scheduledInput ?? null} />
+                    {stageId === "readyToSchedule" && p.daysWaiting != null && p.daysWaiting > 0 && (
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                          p.daysWaiting >= 7
+                            ? "bg-red-900/30 text-red-400"
+                            : p.daysWaiting >= 3
+                            ? "bg-amber-900/30 text-amber-400"
+                            : "bg-yellow-900/20 text-yellow-500"
+                        }`}
+                      >
+                        {p.daysWaiting}d
+                      </span>
+                    )}
+                  </div>
+                )}
                 <PostActionsMenu postId={p.id} clientId={clientId} />
               </div>
             );

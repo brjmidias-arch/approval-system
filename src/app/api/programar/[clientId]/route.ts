@@ -11,18 +11,14 @@ export async function GET(_req: NextRequest, { params }: { params: { clientId: s
       return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
     }
 
-    // Posts agendáveis do cliente (inclui posts criados direto no cliente, sem campanha):
-    // aprovados, não postados, não-TEXTO, e (enviados à programação OU de campanha legada fechada).
+    // Posts agendáveis do cliente: aprovados, ainda não agendados nem postados, não-TEXTO.
+    // (O admin prepara a data no dashboard; aqui o social media vê e clica "Agendado".)
     const items = await prisma.contentItem.findMany({
       where: {
         clientId: params.clientId,
         status: "APPROVED",
         postedAt: null,
         contentType: { not: "TEXTO" },
-        OR: [
-          { sentToProgramacaoAt: { not: null } },
-          { campaign: { status: { in: ["CLOSED", "PUBLISHED"] } } },
-        ],
       },
       orderBy: { order: "asc" },
       select: {
@@ -76,8 +72,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { clientId: 
       return NextResponse.json({ error: "Campo obrigatório faltando" }, { status: 400 });
     }
 
-    // Guarda IDOR + agendabilidade (direto no post — funciona para posts client-direct e legados):
-    // o item precisa ser do cliente E estar liberado para agendamento.
+    // Guarda IDOR + agendabilidade: o item precisa ser do cliente E estar aprovado/não postado.
     const item = await prisma.contentItem.findFirst({
       where: {
         id: contentItemId,
@@ -85,10 +80,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { clientId: 
         status: "APPROVED",
         postedAt: null,
         contentType: { not: "TEXTO" },
-        OR: [
-          { sentToProgramacaoAt: { not: null } },
-          { campaign: { status: { in: ["CLOSED", "PUBLISHED"] } } },
-        ],
       },
       select: { id: true, groupId: true, contentType: true },
     });
@@ -96,11 +87,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { clientId: 
       return NextResponse.json({ error: "Item não disponível para agendamento" }, { status: 404 });
     }
 
-    // Marca como publicado (carrossel = grupo inteiro)
+    // Marca como AGENDADO (vai para "Posts programados" no dashboard). Carrossel = grupo inteiro.
+    // Não seta postedAt: a conclusão (publicado) é confirmada depois pelo admin.
     const ids = item.contentType === "CARROSSEL" && item.groupId
       ? (await prisma.contentItem.findMany({ where: { groupId: item.groupId }, select: { id: true } })).map((s) => s.id)
       : [item.id];
-    await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "PUBLISHED", postedAt: new Date() } });
+    await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "SCHEDULED" } });
 
     return NextResponse.json({ success: true });
   } catch {

@@ -50,10 +50,16 @@ export default function PostActionsMenu({
     });
   const del = () => fetch(`/api/admin/posts/${postId}`, { method: "DELETE" });
 
+  function copyProgLink() {
+    setOpen(false);
+    navigator.clipboard.writeText(`${window.location.origin}/programar/${clientId}`);
+    alert("Link da programação copiado! Envie para quem agenda os posts.");
+  }
+
   const actions: { label: string; onClick: () => void; danger?: boolean }[] = [
     { label: "🔍 Enviar p/ revisão interna", onClick: () => run(patch({ action: "send-internal" })) },
     { label: "👤 Enviar p/ cliente", onClick: () => run(patch({ action: "send-client" })) },
-    { label: "📅 Enviar p/ programação", onClick: () => run(patch({ sentToProgramacao: true })) },
+    { label: "🔗 Copiar link da programação", onClick: copyProgLink },
     { label: "✅ Concluir (marcar publicado)", onClick: () => run(patch({ action: "mark-published" }), "Concluir este post? Ele vai para a aba Concluído.") },
     { label: "🗑 Excluir", onClick: () => run(del, "Excluir este post? Esta ação não pode ser desfeita."), danger: true },
   ];
