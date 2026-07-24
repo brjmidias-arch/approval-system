@@ -107,7 +107,17 @@ function computeStagePosts(items: Item[]): Record<StageId, DashPost[]> {
   };
 }
 
-export default async function AdminDashboard() {
+function postLabel(p: { title: string | null; caption: string | null }): string {
+  if (p.title && p.title.trim()) return p.title;
+  if (p.caption && p.caption.trim()) {
+    const s = p.caption.trim().replace(/\s+/g, " ");
+    return s.length > 50 ? s.slice(0, 50) + "…" : s;
+  }
+  return "(sem título)";
+}
+
+export default async function AdminDashboard({ searchParams }: { searchParams: { view?: string } }) {
+  const view = searchParams?.view === "kanban" ? "kanban" : "lista";
   const clients = await prisma.client.findMany({
     where: { contentItems: { some: {} } },
     select: {
@@ -155,18 +165,47 @@ export default async function AdminDashboard() {
 
   const grandTotal = STAGES.reduce((sum, stage) => sum + totals[stage.id], 0);
 
+  // Dados achatados por etapa para a visão kanban (cada card sabe seu cliente).
+  type KanbanCard = DashPost & { clientId: string; clientName: string };
+  const kanban = {} as Record<StageId, KanbanCard[]>;
+  for (const stage of STAGES) kanban[stage.id] = [];
+  for (const { client, stagePosts } of clientStages) {
+    for (const stage of STAGES) {
+      for (const p of stagePosts[stage.id]) {
+        kanban[stage.id].push({ ...p, clientId: client.id, clientName: client.name });
+      }
+    }
+  }
+
   return (
     <div className="space-y-5">
       <AutoRefresh intervalMs={30000} />
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-xl font-semibold text-white">Dashboard</h1>
-        <Link
-          href="/admin/clients"
-          className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm px-4 py-2 rounded-lg transition-colors"
-        >
-          + Novo Cliente
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* Toggle Lista / Kanban */}
+          <div className="flex bg-white/5 rounded-lg p-0.5">
+            <Link
+              href="/admin?view=lista"
+              className={`text-xs px-3 py-1.5 rounded-md transition-colors ${view === "lista" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"}`}
+            >
+              ☰ Lista
+            </Link>
+            <Link
+              href="/admin?view=kanban"
+              className={`text-xs px-3 py-1.5 rounded-md transition-colors ${view === "kanban" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"}`}
+            >
+              ▦ Kanban
+            </Link>
+          </div>
+          <Link
+            href="/admin/clients"
+            className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm px-4 py-2 rounded-lg transition-colors"
+          >
+            + Novo Cliente
+          </Link>
+        </div>
       </div>
 
       {grandTotal === 0 ? (
@@ -200,7 +239,56 @@ export default async function AdminDashboard() {
             ))}
           </div>
 
-          {/* Sections by stage */}
+          {view === "kanban" ? (
+            /* Kanban: colunas por etapa (scroll horizontal) */
+            <div className="flex gap-3 overflow-x-auto pb-3">
+              {STAGES.map((stage) => (
+                <div key={stage.id} className="w-72 shrink-0 flex flex-col">
+                  <div className={`flex items-center gap-2 px-2 py-2 rounded-t-lg border-b-2 ${stage.bg}`}>
+                    <span className="text-sm">{stage.icon}</span>
+                    <h2 className={`text-xs font-semibold ${stage.color}`}>{stage.label}</h2>
+                    <span className="text-[11px] text-gray-500 ml-auto">{kanban[stage.id].length}</span>
+                  </div>
+                  <div className="bg-[#141414] border border-white/[0.06] rounded-b-lg p-1.5 space-y-1.5 min-h-[80px] flex-1">
+                    {kanban[stage.id].length === 0 ? (
+                      <p className="text-[11px] text-gray-600 text-center py-4">—</p>
+                    ) : (
+                      kanban[stage.id].map((p) => (
+                        <Link
+                          key={p.id}
+                          href={`/admin/clients/${p.clientId}`}
+                          className="block bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-2 hover:border-white/20 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-md overflow-hidden bg-black/40 shrink-0 flex items-center justify-center">
+                              {p.fileType === "IMAGE" ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={p.fileUrl} alt="" className="w-full h-full object-cover" />
+                              ) : p.fileType === "VIDEO" ? (
+                                <span className="text-xs">🎬</span>
+                              ) : (
+                                <span className="text-xs">📄</span>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-white text-[11px] font-medium truncate">{postLabel(p)}</p>
+                              <p className="text-[10px] text-gray-500 truncate">{p.clientName}</p>
+                            </div>
+                          </div>
+                          {p.adjustmentComment && (
+                            <p className="text-[10px] text-amber-400 mt-1 line-clamp-2">
+                              ✏️ {p.adjustmentSource === "cliente" ? "Cliente" : "Interno"}: {p.adjustmentComment}
+                            </p>
+                          )}
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+          /* Lista: seções por etapa */
           <div className="space-y-5">
             {STAGES.filter((stage) => totals[stage.id] > 0).map((stage) => {
               const clientsInStage = clientStages
@@ -229,6 +317,7 @@ export default async function AdminDashboard() {
               );
             })}
           </div>
+          )}
         </>
       )}
     </div>
