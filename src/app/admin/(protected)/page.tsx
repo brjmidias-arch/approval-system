@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import AutoRefresh from "@/components/admin/AutoRefresh";
 import DashboardClientRow from "@/components/admin/DashboardClientRow";
+import KanbanCard from "@/components/admin/KanbanCard";
 
 type Item = {
   id: string;
@@ -104,15 +105,6 @@ function computeStagePosts(items: Item[]): Record<StageId, DashPost[]> {
     inProgramming: distinctPosts(items, STAGE_PREDICATES.inProgramming),
     draft: distinctPosts(items, STAGE_PREDICATES.draft),
   };
-}
-
-function postLabel(p: { title: string | null; caption: string | null }): string {
-  if (p.title && p.title.trim()) return p.title;
-  if (p.caption && p.caption.trim()) {
-    const s = p.caption.trim().replace(/\s+/g, " ");
-    return s.length > 50 ? s.slice(0, 50) + "…" : s;
-  }
-  return "(sem título)";
 }
 
 export default async function AdminDashboard({ searchParams }: { searchParams: { view?: string } }) {
@@ -251,35 +243,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                     {kanban[stage.id].length === 0 ? (
                       <p className="text-[11px] text-gray-600 text-center py-4">—</p>
                     ) : (
-                      kanban[stage.id].map((p) => (
-                        <Link
-                          key={p.id}
-                          href={`/admin/clients/${p.clientId}`}
-                          className="block bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-2 hover:border-white/20 transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-md overflow-hidden bg-black/40 shrink-0 flex items-center justify-center">
-                              {p.fileType === "IMAGE" ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={p.fileUrl} alt="" className="w-full h-full object-cover" />
-                              ) : p.fileType === "VIDEO" ? (
-                                <span className="text-xs">🎬</span>
-                              ) : (
-                                <span className="text-xs">📄</span>
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-white text-[11px] font-medium truncate">{postLabel(p)}</p>
-                              <p className="text-[10px] text-gray-500 truncate">{p.clientName}</p>
-                            </div>
-                          </div>
-                          {p.adjustmentComment && (
-                            <p className="text-[10px] text-amber-400 mt-1 line-clamp-2">
-                              ✏️ {p.adjustmentSource === "cliente" ? "Cliente" : "Interno"}: {p.adjustmentComment}
-                            </p>
-                          )}
-                        </Link>
-                      ))
+                      kanban[stage.id].map((p) => <KanbanCard key={p.id} post={p} />)
                     )}
                   </div>
                 </div>

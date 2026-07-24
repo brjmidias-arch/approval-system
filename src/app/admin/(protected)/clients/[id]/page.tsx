@@ -57,7 +57,6 @@ interface GroupedPost {
 const STATUS_SECTIONS: { key: PostStageStatus; label: string }[] = [
   { key: "DRAFT", label: "Rascunho" },
   { key: "INTERNAL_REVIEW", label: "Revisão interna" },
-  { key: "INTERNAL_DONE", label: "Revisão interna concluída" },
   { key: "CLIENT_REVIEW", label: "Aguardando cliente" },
   { key: "APPROVED", label: "Aprovado" },
   { key: "PUBLISHED", label: "Publicado" },
@@ -610,16 +609,6 @@ export default function ClientWorkspacePage() {
                             className="text-xs px-2.5 py-1 bg-violet-900/40 hover:bg-violet-900/60 text-violet-400 border border-violet-500/30 rounded-lg transition-colors disabled:opacity-50"
                           >
                             {isBusy ? "..." : "Ajuste feito"}
-                          </button>
-                        )}
-
-                        {rep.status === "INTERNAL_DONE" && (
-                          <button
-                            onClick={() => handleAction(rep.id, "send-client")}
-                            disabled={isBusy}
-                            className="text-xs px-2.5 py-1 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/30 rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            {isBusy ? "..." : "Enviar p/ cliente"}
                           </button>
                         )}
 
