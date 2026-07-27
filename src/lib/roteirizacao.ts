@@ -26,15 +26,21 @@ export async function listClientesRot(): Promise<{ id: string; nome: string }[]>
   return data ?? [];
 }
 
-/** Conteúdos (peças) de um cliente do Roteirização — via os roteiros dele. */
+const CONCLUIDO = new Set(["concluido", "concluído"]);
+const naoConcluido = (status: string | null) => !CONCLUIDO.has((status ?? "").toLowerCase());
+
+/**
+ * Conteúdos (peças) de um cliente do Roteirização — via os roteiros dele.
+ * Mostra só o que NÃO foi concluído (exclui roteiros e peças com status "concluido").
+ */
 export async function listConteudosDoCliente(rotClienteId: string): Promise<RotConteudo[]> {
   const client = rot();
   const { data: roteiros, error: e1 } = await client
     .from("rot_roteiros")
-    .select("id")
+    .select("id, status")
     .eq("cliente_id", rotClienteId);
   if (e1) throw e1;
-  const ids = (roteiros ?? []).map((r) => r.id);
+  const ids = (roteiros ?? []).filter((r) => naoConcluido(r.status)).map((r) => r.id);
   if (ids.length === 0) return [];
   const { data, error } = await client
     .from("rot_conteudos")
@@ -42,7 +48,7 @@ export async function listConteudosDoCliente(rotClienteId: string): Promise<RotC
     .in("roteiro_id", ids)
     .order("ordem");
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).filter((c) => naoConcluido(c.status));
 }
 
 /** Busca uma peça (para puxar título/legenda ao anexar). */
