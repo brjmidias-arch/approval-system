@@ -6,6 +6,7 @@ import Link from "next/link";
 import { CONTENT_TYPE_LABELS, APPROVAL_STATUS_LABELS, APPROVAL_STATUS_COLORS } from "@/types";
 import type { ContentType, ApprovalStatus } from "@/types";
 import FolderUploadModal from "@/components/admin/FolderUploadModal";
+import RoteiroClientLink from "@/components/admin/RoteiroClientLink";
 
 type PostStageStatus = "DRAFT" | "INTERNAL_REVIEW" | "INTERNAL_DONE" | "CLIENT_REVIEW" | "APPROVED" | "PUBLISHED";
 
@@ -45,6 +46,7 @@ interface Client {
   whatsapp: string | null;
   token: string;
   internalToken: string;
+  roteiroClienteId: string | null;
   contentItems: ContentItem[];
 }
 
@@ -326,6 +328,9 @@ export default function ClientWorkspacePage() {
                 <span>{client.whatsapp}</span>
               </>
             )}
+          </div>
+          <div className="mt-3 max-w-md">
+            <RoteiroClientLink clientId={client.id} clientName={client.name} current={client.roteiroClienteId} />
           </div>
         </div>
 

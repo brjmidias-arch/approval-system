@@ -45,11 +45,16 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  const { name, email, whatsapp } = body;
+  const { name, email, whatsapp, roteiroClienteId } = body;
   try {
     const client = await prisma.client.update({
       where: { id: params.id },
-      data: { name, email, whatsapp },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(email !== undefined && { email }),
+        ...(whatsapp !== undefined && { whatsapp }),
+        ...(roteiroClienteId !== undefined && { roteiroClienteId: roteiroClienteId || null }),
+      },
     });
     return NextResponse.json(client);
   } catch {
