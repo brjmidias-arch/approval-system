@@ -6,7 +6,7 @@
 ## Contexto dos dois sistemas
 
 - **Aprovação** (este repo): Next.js + Prisma + Supabase project `wlactdxqoaabkocthyle`. Post = `ContentItem` (fases: DRAFT, INTERNAL_REVIEW, CLIENT_REVIEW, APPROVED, SCHEDULED, PUBLISHED; ajuste via approvalItem/internalReviewItem).
-- **Roteirização**: app estático (`output/index.html`) + Supabase project `kyxwmvgxufjwkiyodsgd` + edge functions. Tabelas:
+- **Roteirização**: app estático (`output/index.html`) + Supabase project `pnzkazqzzfievtdiiegv` + edge functions. Tabelas:
   - `rot_clientes` (cliente).
   - `rot_roteiros` (mês do cliente, `status`).
   - `rot_conteudos` (peça individual: `tipo` reel/carrossel/estatico, `titulo`, `gancho`, `desenvolvimento`, `cta`, `legenda`, `hashtags`, `status` ∈ pendente|aprovado|ajuste|regenerando, `data_sugerida`).
@@ -28,7 +28,7 @@ Novo `src/lib/roteirizacao.ts` — cria um Supabase client apontando para o proj
 - `setConteudoStatus(id, status)` → atualiza `rot_conteudos.status`.
 
 ### Env (Vercel, aprovação)
-- `ROTEIRIZACAO_SUPABASE_URL` = `https://kyxwmvgxufjwkiyodsgd.supabase.co`
+- `ROTEIRIZACAO_SUPABASE_URL` = `https://pnzkazqzzfievtdiiegv.supabase.co`
 - `ROTEIRIZACAO_SUPABASE_SERVICE_ROLE_KEY` = (service role do projeto do roteirização)
 
 ### Dados novos no aprovação (Prisma)

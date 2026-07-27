@@ -4,7 +4,7 @@
 
 **Goal:** No approval-system, anexar cada post à peça correspondente do Roteirização, puxar o texto do roteiro e sincronizar (one-way) o status da peça conforme as fases da aprovação.
 
-**Architecture:** Bancos Supabase separados. O aprovação acessa o banco do Roteirização (`kyxwmvgxufjwkiyodsgd`) via um Supabase client com **service role** (server-only) em `src/lib/roteirizacao.ts`. Vínculo por peça: `ContentItem.roteiroConteudoId` → `rot_conteudos.id`; cliente↔cliente via `Client.roteiroClienteId` → `rot_clientes.id`. Sync de status é best-effort e nunca quebra a ação da aprovação.
+**Architecture:** Bancos Supabase separados. O aprovação acessa o banco do Roteirização (`pnzkazqzzfievtdiiegv`) via um Supabase client com **service role** (server-only) em `src/lib/roteirizacao.ts`. Vínculo por peça: `ContentItem.roteiroConteudoId` → `rot_conteudos.id`; cliente↔cliente via `Client.roteiroClienteId` → `rot_clientes.id`. Sync de status é best-effort e nunca quebra a ação da aprovação.
 
 **Tech Stack:** Next.js 14 (App Router), Prisma, Supabase (`@supabase/supabase-js` — já usado em `src/lib/supabase.ts`), TypeScript.
 
@@ -24,7 +24,7 @@
 
 **Feito pelo usuário + verificado:**
 - Usuário pega a **service role key** do projeto Roteirização (Supabase → Settings → API) e adiciona ao `.env` local do aprovação e ao env da Vercel:
-  - `ROTEIRIZACAO_SUPABASE_URL="https://kyxwmvgxufjwkiyodsgd.supabase.co"`
+  - `ROTEIRIZACAO_SUPABASE_URL="https://pnzkazqzzfievtdiiegv.supabase.co"`
   - `ROTEIRIZACAO_SUPABASE_SERVICE_ROLE_KEY="<service role>"`
 - Sem essas vars, a Fase A não roda. As tarefas assumem que já estão no `.env` local.
 
