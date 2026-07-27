@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { syncRoteiroStatus } from "@/lib/syncRoteiro";
 
 // ids de todos os itens do "post" (grupo do carrossel, ou o próprio item)
 async function postItemIds(itemId: string): Promise<string[]> {
@@ -86,6 +87,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "PUBLISHED", postedAt: new Date() } });
     }
 
+    // Espelha o estado no Roteirização (sequencial; best-effort).
+    for (const id of ids) await syncRoteiroStatus(id);
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Erro ao atualizar post" }, { status: 500 });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncRoteiroStatus } from "@/lib/syncRoteiro";
 
 const POST_SELECT = {
   id: true, fileUrl: true, fileType: true, contentType: true, title: true, caption: true,
@@ -68,6 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
       await prisma.contentItem.update({ where: { id: contentItemId }, data: { status: "INTERNAL_REVIEW" } });
     }
 
+    await syncRoteiroStatus(contentItemId);
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Erro ao salvar revisão" }, { status: 500 });
