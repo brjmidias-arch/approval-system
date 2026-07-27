@@ -7,6 +7,7 @@ import { CONTENT_TYPE_LABELS, APPROVAL_STATUS_LABELS, APPROVAL_STATUS_COLORS } f
 import type { ContentType, ApprovalStatus } from "@/types";
 import FolderUploadModal from "@/components/admin/FolderUploadModal";
 import RoteiroClientLink from "@/components/admin/RoteiroClientLink";
+import AnexarRoteiroPicker, { type RotConteudoOpcao } from "@/components/admin/AnexarRoteiroPicker";
 
 type PostStageStatus = "DRAFT" | "INTERNAL_REVIEW" | "INTERNAL_DONE" | "CLIENT_REVIEW" | "APPROVED" | "PUBLISHED";
 
@@ -35,6 +36,7 @@ interface ContentItem {
   order: number;
   status: PostStageStatus;
   sentToProgramacaoAt: string | null;
+  roteiroConteudoId: string | null;
   approvalItem: ApprovalItem | null;
   internalReviewItem: InternalReviewItem | null;
 }
@@ -104,7 +106,7 @@ export default function ClientWorkspacePage() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const [editingPost, setEditingPost] = useState<GroupedPost | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "", driveUrl: "", coverDriveUrl: "", contentType: "" });
+  const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "", driveUrl: "", coverDriveUrl: "", contentType: "", roteiroConteudoId: "" });
   const [savingEdit, setSavingEdit] = useState(false);
   const [notifying, setNotifying] = useState(false);
 
@@ -253,6 +255,7 @@ export default function ClientWorkspacePage() {
       driveUrl: group.rep.driveUrl || "",
       coverDriveUrl: group.rep.coverDriveUrl || "",
       contentType: group.rep.contentType,
+      roteiroConteudoId: group.rep.roteiroConteudoId || "",
     });
   }
 
@@ -276,6 +279,7 @@ export default function ClientWorkspacePage() {
             caption: editForm.caption || null,
             scheduledDate: editForm.scheduledDate || null,
             driveUrl: editForm.driveUrl || null,
+            roteiroConteudoId: editForm.roteiroConteudoId || null,
             // Tipo só é editável em post único (carrossel mantém o tipo do grupo)
             ...(editingPost.rep.contentType !== "CARROSSEL" && editForm.contentType && {
               contentType: editForm.contentType,
@@ -400,6 +404,22 @@ export default function ClientWorkspacePage() {
           <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h2 className="text-white font-medium mb-4">Editar Post</h2>
             <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">📄 Roteiro (Roteirização)</label>
+                <AnexarRoteiroPicker
+                  clientId={client.id}
+                  current={editForm.roteiroConteudoId}
+                  onPick={(c: RotConteudoOpcao | null) =>
+                    setEditForm((f) => ({
+                      ...f,
+                      roteiroConteudoId: c?.id ?? "",
+                      title: c && !f.title.trim() ? (c.titulo ?? "") : f.title,
+                      caption: c && !f.caption.trim() ? (c.legenda ?? "") : f.caption,
+                    }))
+                  }
+                />
+                <p className="text-[11px] text-gray-600 mt-1">Ao anexar, preenche nome/legenda vazios com o roteiro.</p>
+              </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-1.5">Nome do post</label>
                 <input

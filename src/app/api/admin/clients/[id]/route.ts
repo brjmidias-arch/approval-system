@@ -30,6 +30,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
             order: true,
             status: true,
             sentToProgramacaoAt: true,
+            roteiroConteudoId: true,
             approvalItem: { select: { status: true, clientComment: true } },
             internalReviewItem: { select: { status: true, comment: true } },
           },

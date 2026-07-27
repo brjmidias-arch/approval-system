@@ -25,7 +25,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
   if (!exists) return NextResponse.json({ error: "Post não encontrado" }, { status: 404 });
 
   const body = await req.json();
-  const { title, caption, scheduledDate, driveUrl, coverUrl, coverDriveUrl, fileUrl, fileType, contentType, sentToProgramacao, action } = body;
+  const { title, caption, scheduledDate, driveUrl, coverUrl, coverDriveUrl, fileUrl, fileType, contentType, roteiroConteudoId, sentToProgramacao, action } = body;
 
   try {
     // 1) Edições de campos no item clicado
@@ -41,6 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
         ...(fileUrl !== undefined && { fileUrl }),
         ...(fileType !== undefined && { fileType }),
         ...(contentType !== undefined && { contentType }),
+        ...(roteiroConteudoId !== undefined && { roteiroConteudoId: roteiroConteudoId || null }),
       },
     });
 
