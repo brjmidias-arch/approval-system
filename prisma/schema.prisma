@@ -24,6 +24,7 @@ model Client {
   createdAt     DateTime      @default(now())
   token         String?       @unique @default(uuid())
   internalToken String?       @unique @default(dbgenerated("gen_random_uuid()"))
+  roteiroClienteId String?    // id do rot_clientes no sistema de Roteirização
   campaigns     Campaign[]
   contentItems  ContentItem[]
 }
@@ -67,6 +68,7 @@ model ContentItem {
   clientId           String?
   client             Client?             @relation(fields: [clientId], references: [id], onDelete: Cascade)
   status             String              @default("DRAFT")
+  roteiroConteudoId  String?             // id do rot_conteudos no sistema de Roteirização
   createdAt          DateTime            @default(now())
   approvalItem       ApprovalItem?
   internalReviewItem InternalReviewItem?
