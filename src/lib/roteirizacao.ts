@@ -79,6 +79,7 @@ export async function updateRoteiroScript(
     link_drive?: string;
     legenda?: string;
     link_capa?: string;
+    responsavel?: string;
   }
 ): Promise<void> {
   if (Object.keys(fields).length === 0) return;

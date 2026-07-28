@@ -261,6 +261,13 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
             </Link>
           </div>
           <Link
+            href="/admin/responsaveis"
+            className="text-sm px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 transition-colors"
+            title="Responsáveis por fase (Roteirização)"
+          >
+            ⚙️ Responsáveis
+          </Link>
+          <Link
             href="/admin/clients"
             className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm px-4 py-2 rounded-lg transition-colors"
           >

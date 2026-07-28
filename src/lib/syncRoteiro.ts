@@ -56,7 +56,12 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
       link_drive?: string;
       legenda?: string;
       link_capa?: string;
+      responsavel?: string;
     } = {};
+
+    // Chave de responsável desta fase (ver tabela ResponsavelRoteiro, editável).
+    let respKey: string | null = null;
+    const isVideo = item.contentType === "REELS" || item.fileType === "VIDEO";
 
     // Empurra artefatos de produção do post → roteiro (só quando o post tem o valor).
     if (item.driveUrl) fields.link_drive = item.driveUrl;
@@ -66,6 +71,7 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
     if (needsAdjustment) {
       fields.script_tarefa = "Cliente/interno pede ajuste";
       fields.prazo_roteiro = hojeBR();
+      respKey = isVideo ? "ajusteVideo" : "ajusteOutro";
       // Descrição do status = o ajuste pedido (cliente tem precedência sobre interno).
       const quem = ajusteCliente ? "Cliente" : "Interno";
       const texto = ajusteCliente ? item.approvalItem?.clientComment : item.internalReviewItem?.comment;
@@ -73,18 +79,21 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
     } else if (item.status === "INTERNAL_REVIEW") {
       fields.script_tarefa = "Revisão Interna";
       fields.prazo_roteiro = hojeBR();
+      respKey = "revisaoInterna";
     } else if (item.status === "CLIENT_REVIEW") {
       fields.script_tarefa = "Aprovação Cliente";
       fields.prazo_roteiro = hojeBR();
     } else if (item.status === "APPROVED") {
       // Aprovado pelo cliente: se é vídeo SEM capa → "Criar Capa" (design); senão → programar.
-      const semCapa = (item.contentType === "REELS" || item.fileType === "VIDEO") && !item.coverDriveUrl;
+      const semCapa = isVideo && !item.coverDriveUrl;
       if (semCapa) {
         fields.script_tarefa = "Criar Capa";
         fields.prazo_roteiro = hojeBR();
+        respKey = "criarCapa";
       } else {
         fields.script_tarefa = "Pronto para programar";
         fields.prazo_roteiro = somaDias(hojeBR(), 1);
+        respKey = "prontoProgramar";
       }
     } else if (item.status === "SCHEDULED" || item.status === "PUBLISHED") {
       fields.script_tarefa = "Concluído";
@@ -93,6 +102,12 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
 
     // Fora de ajuste: limpa a descrição (só mexe se estamos sincronizando esta fase).
     if (!needsAdjustment && fields.script_tarefa) fields.comentarios = null;
+
+    // Responsável configurável por fase (tabela ResponsavelRoteiro).
+    if (respKey) {
+      const cfg = await prisma.responsavelRoteiro.findUnique({ where: { chave: respKey } });
+      if (cfg?.nome) fields.responsavel = cfg.nome;
+    }
 
     if (Object.keys(fields).length > 0) {
       await updateRoteiroScript(item.roteiroConteudoId, fields);

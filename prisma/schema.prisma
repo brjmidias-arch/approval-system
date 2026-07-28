@@ -99,3 +99,9 @@ model ApprovalItem {
   reviewedAt            DateTime?
   createdAt             DateTime    @default(now())
 }
+
+// Config editável: responsável no Roteirização por fase da aprovação.
+model ResponsavelRoteiro {
+  chave String @id
+  nome  String
+}
