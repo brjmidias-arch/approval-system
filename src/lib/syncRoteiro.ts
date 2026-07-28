@@ -31,21 +31,27 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
         roteiroConteudoId: true,
         status: true,
         scheduledDate: true,
-        approvalItem: { select: { status: true } },
-        internalReviewItem: { select: { status: true } },
+        approvalItem: { select: { status: true, clientComment: true } },
+        internalReviewItem: { select: { status: true, comment: true } },
       },
     });
     if (!item?.roteiroConteudoId) return;
 
     const a = item.approvalItem?.status;
     const r = item.internalReviewItem?.status;
-    const needsAdjustment = a === "ADJUSTMENT" || a === "REJECTED" || r === "ADJUSTMENT" || r === "REJECTED";
+    const ajusteCliente = a === "ADJUSTMENT" || a === "REJECTED";
+    const ajusteInterno = r === "ADJUSTMENT" || r === "REJECTED";
+    const needsAdjustment = ajusteCliente || ajusteInterno;
 
-    const fields: { script_tarefa?: string; prazo_roteiro?: string | null; data_postagem?: string | null } = {};
+    const fields: { script_tarefa?: string; prazo_roteiro?: string | null; data_postagem?: string | null; comentarios?: string | null } = {};
 
     if (needsAdjustment) {
       fields.script_tarefa = "Cliente/interno pede ajuste";
       fields.prazo_roteiro = hojeBR();
+      // Descrição do status = o ajuste pedido (cliente tem precedência sobre interno).
+      const quem = ajusteCliente ? "Cliente" : "Interno";
+      const texto = ajusteCliente ? item.approvalItem?.clientComment : item.internalReviewItem?.comment;
+      fields.comentarios = texto ? `✏️ ${quem} pediu ajuste: ${texto}` : `✏️ ${quem} pediu ajuste`;
     } else if (item.status === "INTERNAL_REVIEW") {
       fields.script_tarefa = "Revisão Interna";
       fields.prazo_roteiro = hojeBR();
@@ -59,6 +65,9 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
       fields.script_tarefa = "Concluído";
       if (item.scheduledDate) fields.data_postagem = item.scheduledDate.toISOString().slice(0, 10);
     }
+
+    // Fora de ajuste: limpa a descrição (só mexe se estamos sincronizando esta fase).
+    if (!needsAdjustment && fields.script_tarefa) fields.comentarios = null;
 
     if (Object.keys(fields).length > 0) {
       await updateRoteiroScript(item.roteiroConteudoId, fields);
