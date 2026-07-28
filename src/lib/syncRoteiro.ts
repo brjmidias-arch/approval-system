@@ -36,6 +36,7 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
         driveUrl: true,
         caption: true,
         coverDriveUrl: true,
+        coverWaived: true,
         approvalItem: { select: { status: true, clientComment: true } },
         internalReviewItem: { select: { status: true, comment: true } },
       },
@@ -85,7 +86,7 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
       fields.prazo_roteiro = hojeBR();
     } else if (item.status === "APPROVED") {
       // Aprovado pelo cliente: se é vídeo SEM capa → "Criar Capa" (design); senão → programar.
-      const semCapa = isVideo && !item.coverDriveUrl;
+      const semCapa = isVideo && !item.coverDriveUrl && !item.coverWaived;
       if (semCapa) {
         fields.script_tarefa = "Criar Capa";
         fields.prazo_roteiro = hojeBR();

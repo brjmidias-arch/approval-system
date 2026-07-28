@@ -23,6 +23,7 @@ type Item = {
   coverDriveUrl: string | null;
   roteiroConteudoId: string | null;
   asanaUrl: string | null;
+  coverWaived: boolean;
   approvalItem: { status: string; clientComment: string | null; reviewedAt: Date | null } | null;
   internalReviewItem: { status: string; comment: string | null } | null;
 };
@@ -80,7 +81,7 @@ function needsAdjustment(i: Item): boolean {
 /** Vídeo (Reels/vídeo) aprovado que ainda não tem capa → precisa criar a capa (design). */
 function needsCover(i: Item): boolean {
   const isVideo = i.contentType === "REELS" || i.fileType === "VIDEO";
-  return isVideo && !i.coverDriveUrl;
+  return isVideo && !i.coverDriveUrl && !i.coverWaived;
 }
 
 const STAGE_PREDICATES: Record<StageId, (i: Item) => boolean> = {
@@ -204,6 +205,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           coverDriveUrl: true,
           roteiroConteudoId: true,
           asanaUrl: true,
+          coverWaived: true,
           approvalItem: { select: { status: true, clientComment: true, reviewedAt: true } },
           internalReviewItem: { select: { status: true, comment: true } },
         },

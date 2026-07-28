@@ -184,6 +184,25 @@ export default function KanbanCard({
             </button>
           </div>
         )}
+        {stageId === "criarCapa" && (
+          <div className="mt-1.5" onClick={(e) => e.preventDefault()}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (confirm("Programar este vídeo SEM capa? Ele sai de 'Criar capa' e vai para 'Prontos p/ programar'.")) {
+                  patchPost({ coverWaived: true }, "Erro ao mover. Tente novamente.");
+                }
+              }}
+              disabled={busy}
+              className="text-[10px] px-2 py-1 rounded bg-sky-900/40 hover:bg-sky-900/60 text-sky-300 border border-sky-500/30 disabled:opacity-50 transition-colors"
+              title="Dispensa a capa e envia para Prontos p/ programar"
+            >
+              📅 Programar sem capa
+            </button>
+          </div>
+        )}
         {post.adjustmentComment && (
           <p className="text-[10px] text-amber-400 mt-1 line-clamp-2">
             ✏️ {post.adjustmentSource === "cliente" ? "Cliente" : "Interno"}: {post.adjustmentComment}

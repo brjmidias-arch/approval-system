@@ -91,9 +91,11 @@ export default function PostActionsMenu({
     ...(internalMsg ? [{ label: "📋 Copiar msg de aprovação interna", onClick: copyInternalMsg }] : []),
     { label: "🔍 Enviar p/ revisão interna", onClick: () => run(patch({ action: "send-internal" })) },
     { label: "👤 Enviar p/ cliente", onClick: () => run(patch({ action: "send-client" })) },
+    { label: "📅 Prontos p/ programar", onClick: () => run(patch({ action: "mark-approved" })) },
     ...(clientToken ? [{ label: "💬 Copiar mensagem p/ cliente", onClick: copyClientMsg }] : []),
     { label: "🔗 Copiar link da programação", onClick: copyProgLink },
     { label: "🗓️ Marcar como programado", onClick: () => run(patch({ action: "mark-scheduled" })) },
+    { label: "📝 Voltar p/ rascunho", onClick: () => run(patch({ action: "mark-draft" })) },
     { label: "✅ Concluído (foi ao ar)", onClick: () => run(patch({ action: "mark-published" }), "Marcar como concluído? Ele vai para a etapa Concluído e some em 10 dias.") },
     { label: "🗑 Excluir", onClick: () => run(del, "Excluir este post? Esta ação não pode ser desfeita."), danger: true },
   ];
