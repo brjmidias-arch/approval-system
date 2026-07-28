@@ -12,8 +12,10 @@ export function buildAprovacaoMsg(p: {
   return [
     `Post: ${p.title?.trim() || "(sem título)"}`,
     `Cliente: ${p.clientName}`,
-    `Asana: ${p.asanaUrl?.trim() || "—"}`,
     `Roteirização: ${p.connected ? "conectado" : "não conectado"}`,
+    ``,
+    `Asana: ${p.asanaUrl?.trim() || "—"}`,
+    ``,
     `Drive: ${p.driveUrl?.trim() || "—"}`,
   ].join("\n");
 }
