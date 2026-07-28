@@ -11,10 +11,12 @@ import Link from "next/link";
 export default function PostActionsMenu({
   postId,
   clientId,
+  clientToken,
   onBusyChange,
 }: {
   postId: string;
   clientId: string;
+  clientToken?: string | null;
   onBusyChange?: (busy: boolean) => void;
 }) {
   const router = useRouter();
@@ -56,9 +58,19 @@ export default function PostActionsMenu({
     alert("Link da programação copiado! Envie para quem agenda os posts.");
   }
 
+  function copyClientMsg() {
+    setOpen(false);
+    if (!clientToken) return;
+    const link = `${window.location.origin}/aprovar/${clientToken}`;
+    const msg = `Olá! 😊 Temos novos conteúdos prontos para a sua aprovação.\n\nÉ rápido: abra o link, veja cada post e toque em *Aprovar* ✅ ou peça um *Ajuste* ✏️.\n\n👉 ${link}`;
+    navigator.clipboard.writeText(msg);
+    alert("Mensagem + link do cliente copiados! Cole no grupo/WhatsApp do cliente.");
+  }
+
   const actions: { label: string; onClick: () => void; danger?: boolean }[] = [
     { label: "🔍 Enviar p/ revisão interna", onClick: () => run(patch({ action: "send-internal" })) },
     { label: "👤 Enviar p/ cliente", onClick: () => run(patch({ action: "send-client" })) },
+    ...(clientToken ? [{ label: "💬 Copiar mensagem p/ cliente", onClick: copyClientMsg }] : []),
     { label: "🔗 Copiar link da programação", onClick: copyProgLink },
     { label: "🗓️ Marcar como programado", onClick: () => run(patch({ action: "mark-scheduled" })) },
     { label: "✅ Concluído (foi ao ar)", onClick: () => run(patch({ action: "mark-published" }), "Marcar como concluído? Ele vai para a etapa Concluído e some em 10 dias.") },

@@ -18,6 +18,7 @@ export interface KanbanCardData {
   fileUrl: string;
   clientId: string;
   clientName: string;
+  clientToken?: string | null;
   driveUrl?: string | null;
   scheduledLabel?: string | null;
   scheduledInput?: string | null;
@@ -138,7 +139,7 @@ export default function KanbanCard({
 
       {/* Menu de ações no canto do card */}
       <div className="absolute top-1 right-1 z-10">
-        <PostActionsMenu postId={post.id} clientId={post.clientId} onBusyChange={setBusy} />
+        <PostActionsMenu postId={post.id} clientId={post.clientId} clientToken={post.clientToken} onBusyChange={setBusy} />
       </div>
     </div>
   );

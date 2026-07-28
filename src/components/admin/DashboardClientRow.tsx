@@ -44,12 +44,14 @@ function postLabel(p: DashPost): string {
 export default function DashboardClientRow({
   clientId,
   clientName,
+  clientToken,
   posts,
   stageColor,
   stageId,
 }: {
   clientId: string;
   clientName: string;
+  clientToken?: string | null;
   posts: DashPost[];
   stageColor: string;
   stageId?: string;
@@ -187,7 +189,7 @@ export default function DashboardClientRow({
                     )}
                   </div>
                 )}
-                <PostActionsMenu postId={p.id} clientId={clientId} />
+                <PostActionsMenu postId={p.id} clientId={clientId} clientToken={clientToken} />
               </div>
             );
           })}
