@@ -244,23 +244,6 @@ export default function InternalReviewPage() {
           </p>
         )}
 
-        {anyApproved && clientLink && (
-          <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-4 space-y-3">
-            <p className="text-emerald-300 text-sm font-medium">
-              ✅ Conteúdo aprovado! Copie a mensagem abaixo e envie ao cliente para ele aprovar:
-            </p>
-            <div className="bg-black/40 rounded-lg p-3">
-              <p className="text-gray-300 text-xs whitespace-pre-wrap leading-relaxed break-words">{clientMessage}</p>
-            </div>
-            <button
-              onClick={copyMsg}
-              className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors"
-            >
-              {copiedMsg ? "Copiado! ✓" : "📋 Copiar mensagem + link do cliente"}
-            </button>
-          </div>
-        )}
-
         {needsReviewGroups.map((group, gi) => {
           const review = reviews[group.groupKey];
           const status = review?.status || "PENDING";
@@ -562,6 +545,23 @@ export default function InternalReviewPage() {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {anyApproved && clientLink && (
+          <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-4 space-y-3">
+            <p className="text-emerald-300 text-sm font-medium">
+              ✅ Conteúdo aprovado! Copie a mensagem abaixo e envie ao cliente para ele aprovar:
+            </p>
+            <div className="bg-black/40 rounded-lg p-3">
+              <p className="text-gray-300 text-xs whitespace-pre-wrap leading-relaxed break-words">{clientMessage}</p>
+            </div>
+            <button
+              onClick={copyMsg}
+              className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors"
+            >
+              {copiedMsg ? "Copiado! ✓" : "📋 Copiar mensagem + link do cliente"}
+            </button>
           </div>
         )}
 
