@@ -1,17 +1,27 @@
 import { prisma } from "@/lib/prisma";
-import { setConteudoStatus } from "@/lib/roteirizacao";
+import { updateRoteiroScript } from "@/lib/roteirizacao";
+
+/** Data de hoje no fuso de Brasília (YYYY-MM-DD). */
+function hojeBR(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+function somaDias(ymd: string, dias: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + dias);
+  return dt.toISOString().slice(0, 10);
+}
 
 /**
- * Espelha a fase do post na fase de produção (script_tarefa) do roteiro vinculado.
- * Best-effort: NUNCA lança — falha do Roteirização não pode quebrar a aprovação.
+ * Espelha a fase do post no roteiro vinculado (rot_scripts). Best-effort: NUNCA lança.
  *
- * Mapa (aprovação → script_tarefa do Roteirização):
- *   - cliente/interno pediu ajuste/reprova → "Ajuste na produção"
- *   - CLIENT_REVIEW (aguardando cliente)   → "Aprovação"
- *   - APPROVED (prontos p/ programar)      → "Agendar"
- *   - SCHEDULED (posts programados)        → "Agendado"
- *   - PUBLISHED (concluído)                → "Publicado"
- *   - DRAFT / INTERNAL_REVIEW / INTERNAL_DONE → não mexe (fase pré-cliente fica com o time)
+ * Mapa (aprovação → roteirização):
+ *   ajuste (cliente/interno) → "Cliente/interno pede ajuste"  | prazo = hoje
+ *   INTERNAL_REVIEW          → "Revisão Interna"               | prazo = hoje
+ *   CLIENT_REVIEW            → "Aprovação Cliente"             | prazo = hoje
+ *   APPROVED                 → "Pronto para programar"         | prazo = amanhã
+ *   SCHEDULED / PUBLISHED    → "Concluído"                     | data_postagem = data agendada
+ *   DRAFT / INTERNAL_DONE    → não mexe (fica com o time do roteirização)
  */
 export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
   try {
@@ -20,6 +30,7 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
       select: {
         roteiroConteudoId: true,
         status: true,
+        scheduledDate: true,
         approvalItem: { select: { status: true } },
         internalReviewItem: { select: { status: true } },
       },
@@ -30,14 +41,28 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
     const r = item.internalReviewItem?.status;
     const needsAdjustment = a === "ADJUSTMENT" || a === "REJECTED" || r === "ADJUSTMENT" || r === "REJECTED";
 
-    let tarefa: string | null = null;
-    if (needsAdjustment) tarefa = "Ajuste na produção";
-    else if (item.status === "CLIENT_REVIEW") tarefa = "Aprovação";
-    else if (item.status === "APPROVED") tarefa = "Agendar";
-    else if (item.status === "SCHEDULED") tarefa = "Agendado";
-    else if (item.status === "PUBLISHED") tarefa = "Publicado";
+    const fields: { script_tarefa?: string; prazo_roteiro?: string | null; data_postagem?: string | null } = {};
 
-    if (tarefa) await setConteudoStatus(item.roteiroConteudoId, tarefa);
+    if (needsAdjustment) {
+      fields.script_tarefa = "Cliente/interno pede ajuste";
+      fields.prazo_roteiro = hojeBR();
+    } else if (item.status === "INTERNAL_REVIEW") {
+      fields.script_tarefa = "Revisão Interna";
+      fields.prazo_roteiro = hojeBR();
+    } else if (item.status === "CLIENT_REVIEW") {
+      fields.script_tarefa = "Aprovação Cliente";
+      fields.prazo_roteiro = hojeBR();
+    } else if (item.status === "APPROVED") {
+      fields.script_tarefa = "Pronto para programar";
+      fields.prazo_roteiro = somaDias(hojeBR(), 1);
+    } else if (item.status === "SCHEDULED" || item.status === "PUBLISHED") {
+      fields.script_tarefa = "Concluído";
+      if (item.scheduledDate) fields.data_postagem = item.scheduledDate.toISOString().slice(0, 10);
+    }
+
+    if (Object.keys(fields).length > 0) {
+      await updateRoteiroScript(item.roteiroConteudoId, fields);
+    }
   } catch (e) {
     console.error("syncRoteiroStatus falhou (ignorado):", e);
   }
