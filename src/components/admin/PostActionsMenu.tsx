@@ -13,12 +13,14 @@ export default function PostActionsMenu({
   clientId,
   clientToken,
   internalMsg,
+  needsAdjustment,
   onBusyChange,
 }: {
   postId: string;
   clientId: string;
   clientToken?: string | null;
   internalMsg?: string;
+  needsAdjustment?: boolean;
   onBusyChange?: (busy: boolean) => void;
 }) {
   const router = useRouter();
@@ -76,7 +78,13 @@ export default function PostActionsMenu({
     alert("Mensagem de aprovação interna copiada! Cole no grupo de aprovação interna.");
   }
 
+  function ajusteFeito() {
+    if (internalMsg) navigator.clipboard.writeText(internalMsg);
+    run(patch({ action: "adjustment-done" }));
+  }
+
   const actions: { label: string; onClick: () => void; danger?: boolean }[] = [
+    ...(needsAdjustment ? [{ label: "✅ Ajuste feito → revisão interna (copia msg)", onClick: ajusteFeito }] : []),
     ...(internalMsg ? [{ label: "📋 Copiar msg de aprovação interna", onClick: copyInternalMsg }] : []),
     { label: "🔍 Enviar p/ revisão interna", onClick: () => run(patch({ action: "send-internal" })) },
     { label: "👤 Enviar p/ cliente", onClick: () => run(patch({ action: "send-client" })) },

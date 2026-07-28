@@ -205,7 +205,9 @@ export default function DashboardClientRow({
                     asanaUrl: p.asanaUrl,
                     connected: !!p.roteiroAttached,
                     driveUrl: p.driveUrl,
+                    adjustment: p.adjustmentComment,
                   })}
+                  needsAdjustment={!!p.adjustmentSource}
                 />
               </div>
             );

@@ -200,6 +200,20 @@ export default function ClientWorkspacePage() {
     setTimeout(() => setCopiedLinkItemId(null), 2000);
   }
 
+  // Texto do ajuste pendente (cliente tem precedência sobre interno), se houver.
+  function repAdjustment(rep: ContentItem): string | null {
+    const a = rep.approvalItem?.status;
+    const r = rep.internalReviewItem?.status;
+    if (a === "ADJUSTMENT" || a === "REJECTED") return rep.approvalItem?.clientComment ?? null;
+    if (r === "ADJUSTMENT" || r === "REJECTED") return rep.internalReviewItem?.comment ?? null;
+    return null;
+  }
+  function repNeedsAdjustment(rep: ContentItem): boolean {
+    const a = rep.approvalItem?.status;
+    const r = rep.internalReviewItem?.status;
+    return a === "ADJUSTMENT" || a === "REJECTED" || r === "ADJUSTMENT" || r === "REJECTED";
+  }
+
   function copyAprovacaoMsg(rep: ContentItem) {
     const msg = buildAprovacaoMsg({
       title: rep.title,
@@ -207,13 +221,20 @@ export default function ClientWorkspacePage() {
       asanaUrl: rep.asanaUrl,
       connected: !!rep.roteiroConteudoId,
       driveUrl: rep.driveUrl,
+      adjustment: repAdjustment(rep),
     });
     navigator.clipboard.writeText(msg);
     setCopiedMsgItemId(rep.id);
     setTimeout(() => setCopiedMsgItemId(null), 2000);
   }
 
-  async function handleAction(repId: string, action: "send-internal" | "send-client" | "mark-published") {
+  // "Ajuste feito": copia a msg (com o ajuste) e reenvia para revisão interna.
+  function handleAjusteFeito(rep: ContentItem) {
+    copyAprovacaoMsg(rep);
+    handleAction(rep.id, "adjustment-done");
+  }
+
+  async function handleAction(repId: string, action: "send-internal" | "send-client" | "mark-published" | "adjustment-done") {
     setBusyId(repId);
     try {
       const res = await fetch(`/api/admin/posts/${repId}`, {
@@ -669,23 +690,14 @@ export default function ClientWorkspacePage() {
                           </button>
                         )}
 
-                        {rep.status === "INTERNAL_REVIEW" && (rep.internalReviewItem?.status === "ADJUSTMENT" || rep.internalReviewItem?.status === "REJECTED") && (
+                        {repNeedsAdjustment(rep) && (
                           <button
-                            onClick={() => handleAction(rep.id, "send-internal")}
+                            onClick={() => handleAjusteFeito(rep)}
                             disabled={isBusy}
-                            className="text-xs px-2.5 py-1 bg-violet-900/40 hover:bg-violet-900/60 text-violet-400 border border-violet-500/30 rounded-lg transition-colors disabled:opacity-50"
+                            className="text-xs px-2.5 py-1 bg-violet-900/40 hover:bg-violet-900/60 text-violet-300 border border-violet-500/30 rounded-lg transition-colors disabled:opacity-50"
+                            title="Reenvia para revisão interna e copia a mensagem (com o ajuste) para o grupo"
                           >
-                            {isBusy ? "..." : "Ajuste feito"}
-                          </button>
-                        )}
-
-                        {rep.status === "CLIENT_REVIEW" && (rep.approvalItem?.status === "ADJUSTMENT" || rep.approvalItem?.status === "REJECTED") && (
-                          <button
-                            onClick={() => handleAction(rep.id, "send-client")}
-                            disabled={isBusy}
-                            className="text-xs px-2.5 py-1 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/30 rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            {isBusy ? "..." : "Ajuste feito"}
+                            {isBusy ? "..." : "✅ Ajuste feito → revisão interna (copia msg)"}
                           </button>
                         )}
 

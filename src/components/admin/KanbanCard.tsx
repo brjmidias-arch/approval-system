@@ -157,7 +157,9 @@ export default function KanbanCard({
             asanaUrl: post.asanaUrl,
             connected: !!post.roteiroAttached,
             driveUrl: post.driveUrl,
+            adjustment: post.adjustmentComment,
           })}
+          needsAdjustment={!!post.adjustmentSource}
           onBusyChange={setBusy}
         />
       </div>

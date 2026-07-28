@@ -76,6 +76,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
           create: { contentItemId: id, status: "PENDING" },
         });
       }
+    } else if (action === "adjustment-done") {
+      // Ajuste concluído: volta para Revisão interna e limpa as flags de ajuste
+      // (tanto do revisor interno quanto a reprovação/ajuste do cliente já resolvidos).
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "INTERNAL_REVIEW" } });
+      for (const id of ids) {
+        await prisma.internalReviewItem.upsert({
+          where: { contentItemId: id },
+          update: { status: "PENDING", comment: null, commentResolved: false, reviewedAt: null },
+          create: { contentItemId: id, status: "PENDING" },
+        });
+        await prisma.approvalItem.updateMany({
+          where: { contentItemId: id, status: { in: ["ADJUSTMENT", "REJECTED"] } },
+          data: { status: "PENDING", clientComment: null, clientCommentResolved: false, reviewedAt: null },
+        });
+      }
     } else if (action === "mark-approved") {
       // Volta para "Prontos p/ programar" (mantém a data planejada, se houver).
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "APPROVED", postedAt: null } });

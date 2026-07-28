@@ -8,14 +8,21 @@ export function buildAprovacaoMsg(p: {
   asanaUrl?: string | null;
   connected: boolean;
   driveUrl?: string | null;
+  adjustment?: string | null;
 }): string {
-  return [
+  const lines = [
     `Post: ${p.title?.trim() || "(sem título)"}`,
     `Cliente: ${p.clientName}`,
     `Roteirização: ${p.connected ? "conectado" : "não conectado"}`,
+  ];
+  if (p.adjustment?.trim()) {
+    lines.push(``, `Ajuste realizado: ${p.adjustment.trim()}`);
+  }
+  lines.push(
     ``,
     `Asana: ${p.asanaUrl?.trim() || "—"}`,
     ``,
     `Drive: ${p.driveUrl?.trim() || "—"}`,
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
