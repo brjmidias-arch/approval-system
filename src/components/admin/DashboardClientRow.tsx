@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PostActionsMenu from "@/components/admin/PostActionsMenu";
+import { buildAprovacaoMsg } from "@/lib/aprovacaoMsg";
 import PostThumbnail from "@/components/admin/PostThumbnail";
 import PostNameEditor from "@/components/admin/PostNameEditor";
 import PostDatePicker from "@/components/admin/PostDatePicker";
@@ -21,6 +22,7 @@ interface DashPost {
   scheduledInput?: string | null;
   daysWaiting?: number | null;
   roteiroAttached?: boolean;
+  asanaUrl?: string | null;
   adjustmentSource?: "cliente" | "interno" | null;
   adjustmentComment?: string | null;
 }
@@ -193,7 +195,18 @@ export default function DashboardClientRow({
                     )}
                   </div>
                 )}
-                <PostActionsMenu postId={p.id} clientId={clientId} clientToken={clientToken} />
+                <PostActionsMenu
+                  postId={p.id}
+                  clientId={clientId}
+                  clientToken={clientToken}
+                  internalMsg={buildAprovacaoMsg({
+                    title: p.title,
+                    clientName,
+                    asanaUrl: p.asanaUrl,
+                    connected: !!p.roteiroAttached,
+                    driveUrl: p.driveUrl,
+                  })}
+                />
               </div>
             );
           })}

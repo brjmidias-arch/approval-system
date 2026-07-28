@@ -12,11 +12,13 @@ export default function PostActionsMenu({
   postId,
   clientId,
   clientToken,
+  internalMsg,
   onBusyChange,
 }: {
   postId: string;
   clientId: string;
   clientToken?: string | null;
+  internalMsg?: string;
   onBusyChange?: (busy: boolean) => void;
 }) {
   const router = useRouter();
@@ -67,7 +69,15 @@ export default function PostActionsMenu({
     alert("Mensagem + link do cliente copiados! Cole no grupo/WhatsApp do cliente.");
   }
 
+  function copyInternalMsg() {
+    setOpen(false);
+    if (!internalMsg) return;
+    navigator.clipboard.writeText(internalMsg);
+    alert("Mensagem de aprovação interna copiada! Cole no grupo de aprovação interna.");
+  }
+
   const actions: { label: string; onClick: () => void; danger?: boolean }[] = [
+    ...(internalMsg ? [{ label: "📋 Copiar msg de aprovação interna", onClick: copyInternalMsg }] : []),
     { label: "🔍 Enviar p/ revisão interna", onClick: () => run(patch({ action: "send-internal" })) },
     { label: "👤 Enviar p/ cliente", onClick: () => run(patch({ action: "send-client" })) },
     ...(clientToken ? [{ label: "💬 Copiar mensagem p/ cliente", onClick: copyClientMsg }] : []),

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { CONTENT_TYPE_LABELS, APPROVAL_STATUS_LABELS, APPROVAL_STATUS_COLORS } from "@/types";
 import type { ContentType, ApprovalStatus } from "@/types";
 import FolderUploadModal from "@/components/admin/FolderUploadModal";
+import { buildAprovacaoMsg } from "@/lib/aprovacaoMsg";
 import RoteiroClientLink from "@/components/admin/RoteiroClientLink";
 import AnexarRoteiroPicker, { type RotConteudoOpcao } from "@/components/admin/AnexarRoteiroPicker";
 
@@ -37,6 +38,7 @@ interface ContentItem {
   status: PostStageStatus;
   sentToProgramacaoAt: string | null;
   roteiroConteudoId: string | null;
+  asanaUrl: string | null;
   approvalItem: ApprovalItem | null;
   internalReviewItem: InternalReviewItem | null;
 }
@@ -101,12 +103,13 @@ export default function ClientWorkspacePage() {
   const [showFolderUpload, setShowFolderUpload] = useState(false);
   const [copiedWhich, setCopiedWhich] = useState<"client" | "internal" | "message" | null>(null);
   const [copiedLinkItemId, setCopiedLinkItemId] = useState<string | null>(null);
+  const [copiedMsgItemId, setCopiedMsgItemId] = useState<string | null>(null);
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const [editingPost, setEditingPost] = useState<GroupedPost | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "", driveUrl: "", coverDriveUrl: "", contentType: "", roteiroConteudoId: "" });
+  const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "", driveUrl: "", coverDriveUrl: "", contentType: "", roteiroConteudoId: "", asanaUrl: "" });
   const [savingEdit, setSavingEdit] = useState(false);
   const [notifying, setNotifying] = useState(false);
 
@@ -197,6 +200,19 @@ export default function ClientWorkspacePage() {
     setTimeout(() => setCopiedLinkItemId(null), 2000);
   }
 
+  function copyAprovacaoMsg(rep: ContentItem) {
+    const msg = buildAprovacaoMsg({
+      title: rep.title,
+      clientName: client?.name ?? "",
+      asanaUrl: rep.asanaUrl,
+      connected: !!rep.roteiroConteudoId,
+      driveUrl: rep.driveUrl,
+    });
+    navigator.clipboard.writeText(msg);
+    setCopiedMsgItemId(rep.id);
+    setTimeout(() => setCopiedMsgItemId(null), 2000);
+  }
+
   async function handleAction(repId: string, action: "send-internal" | "send-client" | "mark-published") {
     setBusyId(repId);
     try {
@@ -256,6 +272,7 @@ export default function ClientWorkspacePage() {
       coverDriveUrl: group.rep.coverDriveUrl || "",
       contentType: group.rep.contentType,
       roteiroConteudoId: group.rep.roteiroConteudoId || "",
+      asanaUrl: group.rep.asanaUrl || "",
     });
   }
 
@@ -280,6 +297,7 @@ export default function ClientWorkspacePage() {
             scheduledDate: editForm.scheduledDate || null,
             driveUrl: editForm.driveUrl || null,
             roteiroConteudoId: editForm.roteiroConteudoId || null,
+            asanaUrl: editForm.asanaUrl || null,
             // Tipo só é editável em post único (carrossel mantém o tipo do grupo)
             ...(editingPost.rep.contentType !== "CARROSSEL" && editForm.contentType && {
               contentType: editForm.contentType,
@@ -377,6 +395,7 @@ export default function ClientWorkspacePage() {
       {showFolderUpload && (
         <FolderUploadModal
           clientId={id}
+          clientName={client.name}
           existingItemCount={client.contentItems.length}
           onDone={() => { fetchClient(); }}
           onClose={() => setShowFolderUpload(false)}
@@ -419,6 +438,16 @@ export default function ClientWorkspacePage() {
                   }
                 />
                 <p className="text-[11px] text-gray-600 mt-1">Ao anexar, preenche nome/legenda vazios com o roteiro.</p>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">🔗 Link do Asana</label>
+                <input
+                  type="text"
+                  value={editForm.asanaUrl}
+                  onChange={(e) => setEditForm({ ...editForm, asanaUrl: e.target.value })}
+                  placeholder="Link da tarefa no Asana (opcional)"
+                  className="w-full bg-[#0f0f0f] border border-white/15 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-emerald-500"
+                />
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-1.5">Nome do post</label>
@@ -609,6 +638,13 @@ export default function ClientWorkspacePage() {
                           className="text-xs px-2.5 py-1 bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 border border-blue-500/30 rounded-lg transition-colors"
                         >
                           {copiedLinkItemId === rep.id ? "Copiado!" : "🔗 Link p/ designer"}
+                        </button>
+                        <button
+                          onClick={() => copyAprovacaoMsg(rep)}
+                          className="text-xs px-2.5 py-1 bg-fuchsia-900/30 hover:bg-fuchsia-900/50 text-fuchsia-300 border border-fuchsia-500/30 rounded-lg transition-colors"
+                          title="Copiar mensagem para o grupo de aprovação interna"
+                        >
+                          {copiedMsgItemId === rep.id ? "Copiado!" : "📋 Msg aprovação"}
                         </button>
 
                         {rep.internalReviewItem && (

@@ -31,6 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
             status: true,
             sentToProgramacaoAt: true,
             roteiroConteudoId: true,
+            asanaUrl: true,
             approvalItem: { select: { status: true, clientComment: true } },
             internalReviewItem: { select: { status: true, comment: true } },
           },

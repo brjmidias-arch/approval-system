@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { v4 as uuidv4 } from "uuid";
+import AnexarRoteiroPicker from "@/components/admin/AnexarRoteiroPicker";
+import { buildAprovacaoMsg } from "@/lib/aprovacaoMsg";
 
 type ContentType = "CARROSSEL" | "POST_FEED" | "REELS" | "STORIES";
 
@@ -36,6 +38,8 @@ interface ParsedPost {
   sourceUrl: string;
   coverFileId?: string;
   coverDriveUrl?: string;
+  asanaUrl?: string;
+  roteiroConteudoId?: string;
 }
 
 function extractDriveId(url: string): string | null {
@@ -99,17 +103,32 @@ type Step = "input" | "loading" | "review" | "saving" | "done";
 interface Props {
   campaignId?: string;
   clientId?: string;
+  clientName?: string;
   existingItemCount: number;
   onDone: () => void;
   onClose: () => void;
 }
 
-export default function FolderUploadModal({ campaignId, clientId, existingItemCount, onDone, onClose }: Props) {
+export default function FolderUploadModal({ campaignId, clientId, clientName, existingItemCount, onDone, onClose }: Props) {
   const [step, setStep] = useState<Step>("input");
   const [linksText, setLinksText] = useState("");
   const [posts, setPosts] = useState<ParsedPost[]>([]);
   const [error, setError] = useState("");
   const [savedCount, setSavedCount] = useState(0);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  function copyMsg(post: ParsedPost) {
+    const msg = buildAprovacaoMsg({
+      title: post.title,
+      clientName: clientName ?? "",
+      asanaUrl: post.asanaUrl,
+      connected: !!post.roteiroConteudoId,
+      driveUrl: post.folderUrl ?? post.sourceUrl,
+    });
+    navigator.clipboard.writeText(msg);
+    setCopiedId(post.tempId);
+    setTimeout(() => setCopiedId(null), 2000);
+  }
 
   async function handleContinue() {
     const lines = linksText.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -265,6 +284,8 @@ export default function FolderUploadModal({ campaignId, clientId, existingItemCo
               order: baseOrder++,
               coverUrl: i === 0 ? coverUrl : null,
               coverDriveUrl: i === 0 ? coverDriveUrl : null,
+              asanaUrl: i === 0 ? (post.asanaUrl || null) : null,
+              roteiroConteudoId: i === 0 ? (post.roteiroConteudoId || null) : null,
             }),
           });
           if (!res.ok) { postFailed = true; break; }
@@ -412,6 +433,26 @@ export default function FolderUploadModal({ campaignId, clientId, existingItemCo
                         className="bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-emerald-500 [color-scheme:dark]"
                       />
                     </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-gray-500 text-xs shrink-0">Asana:</label>
+                      <input
+                        type="text"
+                        value={post.asanaUrl ?? ""}
+                        onChange={(e) => updatePost(post.tempId, "asanaUrl", e.target.value)}
+                        placeholder="Link da tarefa no Asana (opcional)"
+                        className="flex-1 min-w-0 bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-emerald-500 placeholder-gray-600"
+                      />
+                    </div>
+                    {clientId && (
+                      <div>
+                        <label className="text-gray-500 text-xs block mb-1">Conectar ao Roteirização (opcional):</label>
+                        <AnexarRoteiroPicker
+                          clientId={clientId}
+                          current={post.roteiroConteudoId ?? ""}
+                          onPick={(c) => updatePost(post.tempId, "roteiroConteudoId", c?.id ?? "")}
+                        />
+                      </div>
+                    )}
                     <textarea
                       value={post.caption}
                       onChange={(e) => {
@@ -484,7 +525,7 @@ export default function FolderUploadModal({ campaignId, clientId, existingItemCo
         )}
 
         {/* DONE */}
-        {step === "done" && (
+        {step === "done" && !clientName && (
           <div className="p-8 flex flex-col items-center gap-4 text-center">
             <div className="text-5xl">✅</div>
             <div>
@@ -492,6 +533,43 @@ export default function FolderUploadModal({ campaignId, clientId, existingItemCo
               <p className="text-gray-500 text-sm mt-1">Os posts já aparecem na campanha.</p>
             </div>
             <button onClick={onClose} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors">
+              Fechar
+            </button>
+          </div>
+        )}
+
+        {step === "done" && clientName && (
+          <div className="p-5 space-y-4">
+            <div className="text-center">
+              <div className="text-4xl">✅</div>
+              <p className="text-white font-medium mt-1">
+                {savedCount} {savedCount === 1 ? "post adicionado" : "posts adicionados"}!
+              </p>
+              <p className="text-gray-500 text-xs mt-1">Copie a mensagem de cada post e cole no grupo de aprovação interna.</p>
+            </div>
+            <div className="space-y-2 max-h-[55vh] overflow-y-auto">
+              {posts.map((post) => {
+                const msg = buildAprovacaoMsg({
+                  title: post.title,
+                  clientName,
+                  asanaUrl: post.asanaUrl,
+                  connected: !!post.roteiroConteudoId,
+                  driveUrl: post.folderUrl ?? post.sourceUrl,
+                });
+                return (
+                  <div key={post.tempId} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3">
+                    <pre className="text-gray-300 text-xs whitespace-pre-wrap font-sans mb-2 break-words">{msg}</pre>
+                    <button
+                      onClick={() => copyMsg(post)}
+                      className="w-full py-2 rounded-lg text-sm bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-medium transition-colors"
+                    >
+                      {copiedId === post.tempId ? "Copiado ✓" : "📋 Copiar mensagem"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <button onClick={onClose} className="w-full py-2.5 rounded-lg text-sm bg-white/5 text-gray-300 hover:bg-white/10 transition-colors">
               Fechar
             </button>
           </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { syncRoteiroStatus } from "@/lib/syncRoteiro";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -11,7 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!client) return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
 
   const body = await req.json();
-  const { fileUrl, fileType, title, caption, scheduledDate, driveUrl, coverUrl, coverDriveUrl, contentType, groupId, order } = body;
+  const { fileUrl, fileType, title, caption, scheduledDate, driveUrl, coverUrl, coverDriveUrl, contentType, groupId, order, asanaUrl, roteiroConteudoId } = body;
   if (!fileUrl || !fileType || !contentType) {
     return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
   }
@@ -32,8 +33,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         contentType,
         groupId: groupId || null,
         order: order ?? 0,
+        asanaUrl: asanaUrl || null,
+        roteiroConteudoId: roteiroConteudoId || null,
       },
     });
+    // Se já nasceu conectado a um roteiro, espelha no Roteirização (best-effort).
+    if (roteiroConteudoId) await syncRoteiroStatus(item.id);
     return NextResponse.json(item, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Erro ao criar post" }, { status: 500 });

@@ -76,6 +76,7 @@ export default function DashboardUploadButton({ clients }: { clients: ClientOpt[
       {chosen && (
         <FolderUploadModal
           clientId={chosen.id}
+          clientName={chosen.name}
           existingItemCount={chosen.itemCount}
           onDone={() => router.refresh()}
           onClose={close}

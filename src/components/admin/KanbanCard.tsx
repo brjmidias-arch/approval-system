@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PostActionsMenu from "@/components/admin/PostActionsMenu";
 import PostThumbnail from "@/components/admin/PostThumbnail";
+import { buildAprovacaoMsg } from "@/lib/aprovacaoMsg";
 import PostNameEditor from "@/components/admin/PostNameEditor";
 import PostDatePicker from "@/components/admin/PostDatePicker";
 import CopyProgLinkButton from "@/components/admin/CopyProgLinkButton";
@@ -24,6 +25,7 @@ export interface KanbanCardData {
   scheduledInput?: string | null;
   daysWaiting?: number | null;
   roteiroAttached?: boolean;
+  asanaUrl?: string | null;
   adjustmentSource?: "cliente" | "interno" | null;
   adjustmentComment?: string | null;
 }
@@ -145,7 +147,19 @@ export default function KanbanCard({
 
       {/* Menu de ações no canto do card */}
       <div className="absolute top-1 right-1 z-10">
-        <PostActionsMenu postId={post.id} clientId={post.clientId} clientToken={post.clientToken} onBusyChange={setBusy} />
+        <PostActionsMenu
+          postId={post.id}
+          clientId={post.clientId}
+          clientToken={post.clientToken}
+          internalMsg={buildAprovacaoMsg({
+            title: post.title,
+            clientName: post.clientName,
+            asanaUrl: post.asanaUrl,
+            connected: !!post.roteiroAttached,
+            driveUrl: post.driveUrl,
+          })}
+          onBusyChange={setBusy}
+        />
       </div>
     </div>
   );

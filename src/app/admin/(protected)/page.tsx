@@ -22,6 +22,7 @@ type Item = {
   driveUrl: string | null;
   coverDriveUrl: string | null;
   roteiroConteudoId: string | null;
+  asanaUrl: string | null;
   approvalItem: { status: string; clientComment: string | null; reviewedAt: Date | null } | null;
   internalReviewItem: { status: string; comment: string | null } | null;
 };
@@ -39,6 +40,7 @@ type DashPost = {
   scheduledInput: string | null;
   daysWaiting: number | null;
   roteiroAttached: boolean;
+  asanaUrl: string | null;
   adjustmentSource: "cliente" | "interno" | null;
   adjustmentComment: string | null;
 };
@@ -130,6 +132,7 @@ function distinctPosts(items: Item[], predicate: (item: Item) => boolean): DashP
       scheduledInput: fmtScheduledInput(item.scheduledDate),
       daysWaiting: daysSince(item.approvalItem?.reviewedAt ?? null),
       roteiroAttached: !!item.roteiroConteudoId,
+      asanaUrl: item.asanaUrl,
       adjustmentSource,
       adjustmentComment,
     });
@@ -200,6 +203,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           driveUrl: true,
           coverDriveUrl: true,
           roteiroConteudoId: true,
+          asanaUrl: true,
           approvalItem: { select: { status: true, clientComment: true, reviewedAt: true } },
           internalReviewItem: { select: { status: true, comment: true } },
         },
