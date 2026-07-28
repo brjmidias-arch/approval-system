@@ -201,7 +201,7 @@ export default function KanbanCard({
               className="text-[10px] px-2 py-1 rounded bg-violet-900/40 hover:bg-violet-900/60 text-violet-300 border border-violet-500/30 disabled:opacity-50 transition-colors"
               title="Abre o popup para revisar a mensagem, colar o novo link e reenviar"
             >
-              ✅ Ajuste feito…
+              ✅ Ajuste feito
             </button>
           </div>
         )}
