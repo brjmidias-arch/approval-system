@@ -121,21 +121,18 @@ export default function KanbanCard({
   }
 
   return (
-    <div
-      className="relative"
-      draggable={draggable}
-      onDragStart={
-        draggable
-          ? (e) => {
-              e.dataTransfer.setData("text/plain", post.id);
-              e.dataTransfer.effectAllowed = "move";
-            }
-          : undefined
-      }
-    >
+    <div className="relative">
       <Link
         href={`/admin/clients/${post.clientId}`}
-        draggable={false}
+        draggable={draggable}
+        onDragStart={
+          draggable
+            ? (e) => {
+                e.dataTransfer.setData("text/plain", post.id);
+                e.dataTransfer.effectAllowed = "move";
+              }
+            : undefined
+        }
         className={`block rounded-lg p-2 border transition-colors ${
           stageId === "scheduled"
             ? "bg-emerald-950/30 border-emerald-500/40 hover:border-emerald-400/60"

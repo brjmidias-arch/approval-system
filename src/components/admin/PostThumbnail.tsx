@@ -41,7 +41,7 @@ export default function PostThumbnail({
       >
         {fileType === "IMAGE" ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={fileUrl} alt="" className="w-full h-full object-cover" />
+          <img src={fileUrl} alt="" draggable={false} className="w-full h-full object-cover" />
         ) : fileType === "VIDEO" ? (
           <span className="text-sm">🎬</span>
         ) : (
