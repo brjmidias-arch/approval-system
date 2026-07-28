@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const item = await prisma.contentItem.create({
       data: {
         clientId: client.id,
-        status: "DRAFT",
+        status: "INTERNAL_REVIEW",
         fileUrl,
         fileType,
         title: title || null,
@@ -37,6 +37,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         roteiroConteudoId: roteiroConteudoId || null,
       },
     });
+    // Post nasce direto em Revisão interna: cria o registro de revisão (PENDING).
+    await prisma.internalReviewItem.create({ data: { contentItemId: item.id, status: "PENDING" } });
     // Se já nasceu conectado a um roteiro, espelha no Roteirização (best-effort).
     if (roteiroConteudoId) await syncRoteiroStatus(item.id);
     return NextResponse.json(item, { status: 201 });
