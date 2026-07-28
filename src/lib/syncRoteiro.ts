@@ -53,11 +53,13 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
       comentarios?: string | null;
       link_drive?: string;
       legenda?: string;
+      link_capa?: string;
     } = {};
 
     // Empurra artefatos de produção do post → roteiro (só quando o post tem o valor).
     if (item.driveUrl) fields.link_drive = item.driveUrl;
     if (item.caption) fields.legenda = item.caption;
+    if (item.coverDriveUrl) fields.link_capa = item.coverDriveUrl;
 
     if (needsAdjustment) {
       fields.script_tarefa = "Cliente/interno pede ajuste";
