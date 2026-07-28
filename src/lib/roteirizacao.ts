@@ -10,14 +10,28 @@ function rot() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
+// O roteiro/post é uma linha em rot_scripts (cliente_id direto).
+// `status` aqui = script_tarefa (fase de produção do Roteirização).
 export type RotConteudo = {
   id: string;
-  roteiro_id: string;
-  tipo: string;
+  tipo: string | null;
   titulo: string | null;
   legenda: string | null;
-  status: string;
+  status: string | null;
 };
+
+const CONCLUIDO = new Set(["concluido", "concluído"]);
+const naoConcluido = (tarefa: string | null) => !CONCLUIDO.has((tarefa ?? "").toLowerCase());
+
+function toConteudo(s: {
+  id: string;
+  tipo: string | null;
+  titulo: string | null;
+  legenda: string | null;
+  script_tarefa: string | null;
+}): RotConteudo {
+  return { id: s.id, tipo: s.tipo, titulo: s.titulo, legenda: s.legenda, status: s.script_tarefa };
+}
 
 /** Lista os clientes do Roteirização (para vincular ao cliente do aprovação). */
 export async function listClientesRot(): Promise<{ id: string; nome: string }[]> {
@@ -26,44 +40,36 @@ export async function listClientesRot(): Promise<{ id: string; nome: string }[]>
   return data ?? [];
 }
 
-const CONCLUIDO = new Set(["concluido", "concluído"]);
-const naoConcluido = (status: string | null) => !CONCLUIDO.has((status ?? "").toLowerCase());
-
 /**
- * Conteúdos (peças) de um cliente do Roteirização — via os roteiros dele.
- * Mostra só o que NÃO foi concluído (exclui roteiros e peças com status "concluido").
+ * Roteiros (rot_scripts) de um cliente do Roteirização.
+ * Mostra só os que NÃO estão concluídos (script_tarefa != "Concluído").
  */
 export async function listConteudosDoCliente(rotClienteId: string): Promise<RotConteudo[]> {
-  const client = rot();
-  const { data: roteiros, error: e1 } = await client
-    .from("rot_roteiros")
-    .select("id, status")
-    .eq("cliente_id", rotClienteId);
-  if (e1) throw e1;
-  const ids = (roteiros ?? []).filter((r) => naoConcluido(r.status)).map((r) => r.id);
-  if (ids.length === 0) return [];
-  const { data, error } = await client
-    .from("rot_conteudos")
-    .select("id, roteiro_id, tipo, titulo, legenda, status")
-    .in("roteiro_id", ids)
-    .order("ordem");
+  const { data, error } = await rot()
+    .from("rot_scripts")
+    .select("id, tipo, titulo, legenda, script_tarefa, mes_ano")
+    .eq("cliente_id", rotClienteId)
+    .order("mes_ano", { ascending: false });
   if (error) throw error;
-  return (data ?? []).filter((c) => naoConcluido(c.status));
+  return (data ?? []).filter((s) => naoConcluido(s.script_tarefa)).map(toConteudo);
 }
 
-/** Busca uma peça (para puxar título/legenda ao anexar). */
+/** Busca um roteiro (para puxar título/legenda ao anexar). */
 export async function getConteudo(id: string): Promise<RotConteudo | null> {
   const { data, error } = await rot()
-    .from("rot_conteudos")
-    .select("id, roteiro_id, tipo, titulo, legenda, status")
+    .from("rot_scripts")
+    .select("id, tipo, titulo, legenda, script_tarefa")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
-  return data;
+  return data ? toConteudo(data) : null;
 }
 
-/** Atualiza o status de uma peça no Roteirização (só 'aprovado' ou 'ajuste'). */
-export async function setConteudoStatus(id: string, status: "aprovado" | "ajuste"): Promise<void> {
-  const { error } = await rot().from("rot_conteudos").update({ status }).eq("id", id);
-  if (error) throw error;
+/**
+ * Atualiza a fase de produção do roteiro no Roteirização.
+ * PENDENTE: mapear as fases da aprovação → script_tarefa (a confirmar com o usuário).
+ * Por ora é NO-OP seguro para não gravar fase errada em produção.
+ */
+export async function setConteudoStatus(_id: string, _status: string): Promise<void> {
+  // no-op temporário — ver plano/decisão de mapeamento de fases.
 }
