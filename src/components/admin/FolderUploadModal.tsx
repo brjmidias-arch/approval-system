@@ -448,6 +448,7 @@ export default function FolderUploadModal({ campaignId, clientId, clientName, ex
                         <label className="text-gray-500 text-xs block mb-1">Conectar ao Roteirização (opcional):</label>
                         <AnexarRoteiroPicker
                           clientId={clientId}
+                          clientName={clientName}
                           current={post.roteiroConteudoId ?? ""}
                           onPick={(c) => updatePost(post.tempId, "roteiroConteudoId", c?.id ?? "")}
                         />

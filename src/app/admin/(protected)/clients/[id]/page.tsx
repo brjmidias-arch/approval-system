@@ -427,6 +427,7 @@ export default function ClientWorkspacePage() {
                 <label className="block text-sm text-gray-400 mb-1.5">📄 Roteiro (Roteirização)</label>
                 <AnexarRoteiroPicker
                   clientId={client.id}
+                  clientName={client.name}
                   current={editForm.roteiroConteudoId}
                   onPick={(c: RotConteudoOpcao | null) =>
                     setEditForm((f) => ({

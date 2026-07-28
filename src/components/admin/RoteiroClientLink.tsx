@@ -12,10 +12,12 @@ export default function RoteiroClientLink({
   clientId,
   clientName,
   current,
+  onSaved,
 }: {
   clientId: string;
   clientName: string;
   current: string | null;
+  onSaved?: (roteiroClienteId: string) => void;
 }) {
   const [clientes, setClientes] = useState<RotCliente[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -50,6 +52,10 @@ export default function RoteiroClientLink({
       });
       if (!res.ok) throw new Error();
       setSaved(true);
+      onSaved?.(selected || "");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("roteiro-client-linked", { detail: { clientId } }));
+      }
       setTimeout(() => setSaved(false), 2500);
     } catch {
       alert("Erro ao salvar o vínculo. Tente novamente.");
