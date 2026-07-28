@@ -6,6 +6,7 @@ import Link from "next/link";
 import PostActionsMenu from "@/components/admin/PostActionsMenu";
 import PostThumbnail from "@/components/admin/PostThumbnail";
 import { buildAprovacaoMsg } from "@/lib/aprovacaoMsg";
+import { driveAssetsFromLink } from "@/lib/drive";
 import PostNameEditor from "@/components/admin/PostNameEditor";
 import PostDatePicker from "@/components/admin/PostDatePicker";
 import CopyProgLinkButton from "@/components/admin/CopyProgLinkButton";
@@ -50,25 +51,61 @@ export default function KanbanCard({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [showDrive, setShowDrive] = useState(false);
+  const [driveLink, setDriveLink] = useState("");
 
-  async function conclude(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (busy) return;
+  const internalMsg = buildAprovacaoMsg({
+    title: post.title,
+    clientName: post.clientName,
+    asanaUrl: post.asanaUrl,
+    connected: !!post.roteiroAttached,
+    driveUrl: post.driveUrl,
+    adjustment: post.adjustmentComment,
+  });
+
+  async function patchPost(body: Record<string, unknown>, errMsg: string): Promise<boolean> {
+    if (busy) return false;
     setBusy(true);
     try {
       const res = await fetch(`/api/admin/posts/${post.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "mark-published" }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error();
       router.refresh();
+      return true;
     } catch {
-      alert("Erro ao concluir o post. Tente novamente.");
+      alert(errMsg);
+      return false;
     } finally {
       setBusy(false);
     }
+  }
+
+  async function conclude(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    await patchPost({ action: "mark-published" }, "Erro ao concluir o post. Tente novamente.");
+  }
+
+  function ajusteFeito(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    navigator.clipboard.writeText(internalMsg);
+    patchPost({ action: "adjustment-done" }, "Erro ao reenviar. Tente novamente.");
+  }
+
+  async function saveDriveLink(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const assets = driveAssetsFromLink(driveLink.trim(), post.fileType);
+    if (!assets) {
+      alert("Link do Drive inválido. Cole um link de arquivo ou pasta do Google Drive.");
+      return;
+    }
+    const ok = await patchPost(assets, "Erro ao salvar o link. Tente novamente.");
+    if (ok) { setShowDrive(false); setDriveLink(""); }
   }
 
   return (
@@ -143,6 +180,50 @@ export default function KanbanCard({
             ✏️ {post.adjustmentSource === "cliente" ? "Cliente" : "Interno"}: {post.adjustmentComment}
           </p>
         )}
+        {post.adjustmentSource && (
+          <div className="mt-1.5 space-y-1.5" onClick={(e) => e.preventDefault()}>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={ajusteFeito}
+                disabled={busy}
+                className="text-[10px] px-2 py-1 rounded bg-violet-900/40 hover:bg-violet-900/60 text-violet-300 border border-violet-500/30 disabled:opacity-50 transition-colors"
+                title="Reenvia p/ revisão interna e copia a mensagem (com o ajuste)"
+              >
+                ✅ Ajuste feito (copia msg)
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowDrive((s) => !s); }}
+                disabled={busy}
+                className="text-[10px] px-2 py-1 rounded bg-blue-900/40 hover:bg-blue-900/60 text-blue-300 border border-blue-500/30 disabled:opacity-50 transition-colors"
+                title="Atualizar o link do Drive com o post ajustado"
+              >
+                🔗 Novo link Drive
+              </button>
+            </div>
+            {showDrive && (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={driveLink}
+                  onChange={(e) => setDriveLink(e.target.value)}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  placeholder="Cole o novo link do Drive"
+                  className="flex-1 min-w-0 bg-[#0f0f0f] border border-white/15 rounded px-2 py-1 text-white text-[10px] outline-none focus:border-blue-500 placeholder-gray-600"
+                />
+                <button
+                  type="button"
+                  onClick={saveDriveLink}
+                  disabled={busy || !driveLink.trim()}
+                  className="text-[10px] px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium disabled:opacity-40 transition-colors shrink-0"
+                >
+                  Salvar
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </Link>
 
       {/* Menu de ações no canto do card */}
@@ -151,14 +232,7 @@ export default function KanbanCard({
           postId={post.id}
           clientId={post.clientId}
           clientToken={post.clientToken}
-          internalMsg={buildAprovacaoMsg({
-            title: post.title,
-            clientName: post.clientName,
-            asanaUrl: post.asanaUrl,
-            connected: !!post.roteiroAttached,
-            driveUrl: post.driveUrl,
-            adjustment: post.adjustmentComment,
-          })}
+          internalMsg={internalMsg}
           needsAdjustment={!!post.adjustmentSource}
           onBusyChange={setBusy}
         />
