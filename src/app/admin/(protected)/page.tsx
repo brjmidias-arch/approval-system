@@ -5,6 +5,7 @@ import Link from "next/link";
 import AutoRefresh from "@/components/admin/AutoRefresh";
 import DashboardClientRow from "@/components/admin/DashboardClientRow";
 import KanbanBoard from "@/components/admin/KanbanBoard";
+import DashboardUploadButton from "@/components/admin/DashboardUploadButton";
 
 type Item = {
   id: string;
@@ -207,6 +208,13 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     orderBy: { name: "asc" },
   });
 
+  // Todos os clientes (inclusive sem posts) para o seletor do botão "Enviar roteiros".
+  const allClients = await prisma.client.findMany({
+    select: { id: true, name: true, _count: { select: { contentItems: true } } },
+    orderBy: { name: "asc" },
+  });
+  const clientOptions = allClients.map((c) => ({ id: c.id, name: c.name, itemCount: c._count.contentItems }));
+
   const clientStages = clients.map((client) => ({
     client,
     stagePosts: computeStagePosts(client.contentItems),
@@ -271,6 +279,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           >
             ⚙️ Responsáveis
           </Link>
+          <DashboardUploadButton clients={clientOptions} />
           <Link
             href="/admin/clients"
             className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm px-4 py-2 rounded-lg transition-colors"
