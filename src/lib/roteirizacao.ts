@@ -65,11 +65,8 @@ export async function getConteudo(id: string): Promise<RotConteudo | null> {
   return data ? toConteudo(data) : null;
 }
 
-/**
- * Atualiza a fase de produção do roteiro no Roteirização.
- * PENDENTE: mapear as fases da aprovação → script_tarefa (a confirmar com o usuário).
- * Por ora é NO-OP seguro para não gravar fase errada em produção.
- */
-export async function setConteudoStatus(_id: string, _status: string): Promise<void> {
-  // no-op temporário — ver plano/decisão de mapeamento de fases.
+/** Atualiza a fase de produção (script_tarefa) do roteiro no Roteirização. */
+export async function setConteudoStatus(id: string, scriptTarefa: string): Promise<void> {
+  const { error } = await rot().from("rot_scripts").update({ script_tarefa: scriptTarefa }).eq("id", id);
+  if (error) throw error;
 }

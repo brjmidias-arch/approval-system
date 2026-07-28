@@ -2,11 +2,16 @@ import { prisma } from "@/lib/prisma";
 import { setConteudoStatus } from "@/lib/roteirizacao";
 
 /**
- * Espelha o estado do post na peça vinculada do Roteirização.
+ * Espelha a fase do post na fase de produção (script_tarefa) do roteiro vinculado.
  * Best-effort: NUNCA lança — falha do Roteirização não pode quebrar a aprovação.
- * Mapeamento (reaproveitando os 4 status do Roteirização):
- *   - cliente OU interno pediu ajuste/reprova → "ajuste"
- *   - caso contrário (em produção/aprovado/publicado) → "aprovado"
+ *
+ * Mapa (aprovação → script_tarefa do Roteirização):
+ *   - cliente/interno pediu ajuste/reprova → "Ajuste na produção"
+ *   - CLIENT_REVIEW (aguardando cliente)   → "Aprovação"
+ *   - APPROVED (prontos p/ programar)      → "Agendar"
+ *   - SCHEDULED (posts programados)        → "Agendado"
+ *   - PUBLISHED (concluído)                → "Publicado"
+ *   - DRAFT / INTERNAL_REVIEW / INTERNAL_DONE → não mexe (fase pré-cliente fica com o time)
  */
 export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
   try {
@@ -14,6 +19,7 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
       where: { id: contentItemId },
       select: {
         roteiroConteudoId: true,
+        status: true,
         approvalItem: { select: { status: true } },
         internalReviewItem: { select: { status: true } },
       },
@@ -24,7 +30,14 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
     const r = item.internalReviewItem?.status;
     const needsAdjustment = a === "ADJUSTMENT" || a === "REJECTED" || r === "ADJUSTMENT" || r === "REJECTED";
 
-    await setConteudoStatus(item.roteiroConteudoId, needsAdjustment ? "ajuste" : "aprovado");
+    let tarefa: string | null = null;
+    if (needsAdjustment) tarefa = "Ajuste na produção";
+    else if (item.status === "CLIENT_REVIEW") tarefa = "Aprovação";
+    else if (item.status === "APPROVED") tarefa = "Agendar";
+    else if (item.status === "SCHEDULED") tarefa = "Agendado";
+    else if (item.status === "PUBLISHED") tarefa = "Publicado";
+
+    if (tarefa) await setConteudoStatus(item.roteiroConteudoId, tarefa);
   } catch (e) {
     console.error("syncRoteiroStatus falhou (ignorado):", e);
   }
