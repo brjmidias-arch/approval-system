@@ -30,6 +30,8 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
       select: {
         roteiroConteudoId: true,
         status: true,
+        contentType: true,
+        fileType: true,
         scheduledDate: true,
         driveUrl: true,
         caption: true,
@@ -75,8 +77,15 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
       fields.script_tarefa = "Aprovação Cliente";
       fields.prazo_roteiro = hojeBR();
     } else if (item.status === "APPROVED") {
-      fields.script_tarefa = "Pronto para programar";
-      fields.prazo_roteiro = somaDias(hojeBR(), 1);
+      // Aprovado pelo cliente: se é vídeo SEM capa → "Criar capa" (design); senão → programar.
+      const semCapa = (item.contentType === "REELS" || item.fileType === "VIDEO") && !item.coverDriveUrl;
+      if (semCapa) {
+        fields.script_tarefa = "Criar capa";
+        fields.prazo_roteiro = hojeBR();
+      } else {
+        fields.script_tarefa = "Pronto para programar";
+        fields.prazo_roteiro = somaDias(hojeBR(), 1);
+      }
     } else if (item.status === "SCHEDULED" || item.status === "PUBLISHED") {
       fields.script_tarefa = "Concluído";
       if (item.scheduledDate) fields.data_postagem = item.scheduledDate.toISOString().slice(0, 10);

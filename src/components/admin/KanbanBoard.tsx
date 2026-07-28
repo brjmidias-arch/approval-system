@@ -16,6 +16,7 @@ interface Stage {
 /** Ação de status aplicada ao soltar um card na coluna (null = não é destino de drop). */
 const DROP_ACTION: Record<string, string | null> = {
   adjustment: null, // etapa computada (ajuste vem do comentário) — não é destino
+  criarCapa: null, // etapa computada (vídeo aprovado sem capa) — não é destino
   internal: "send-internal",
   clientReview: "send-client",
   readyToSchedule: "mark-approved",

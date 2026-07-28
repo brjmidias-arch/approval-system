@@ -19,6 +19,7 @@ type Item = {
   fileType: string;
   fileUrl: string;
   driveUrl: string | null;
+  coverDriveUrl: string | null;
   approvalItem: { status: string; clientComment: string | null; reviewedAt: Date | null } | null;
   internalReviewItem: { status: string; comment: string | null } | null;
 };
@@ -39,7 +40,7 @@ type DashPost = {
   adjustmentComment: string | null;
 };
 
-type StageId = "adjustment" | "internal" | "clientReview" | "readyToSchedule" | "scheduled" | "published" | "draft";
+type StageId = "adjustment" | "internal" | "clientReview" | "criarCapa" | "readyToSchedule" | "scheduled" | "published" | "draft";
 
 /** Formata a data agendada como DD/MM (UTC, pois é gravada em T12:00:00Z). */
 function fmtScheduled(d: Date | null): string | null {
@@ -71,15 +72,23 @@ function needsAdjustment(i: Item): boolean {
   return a === "ADJUSTMENT" || a === "REJECTED" || r === "ADJUSTMENT" || r === "REJECTED";
 }
 
+/** Vídeo (Reels/vídeo) aprovado que ainda não tem capa → precisa criar a capa (design). */
+function needsCover(i: Item): boolean {
+  const isVideo = i.contentType === "REELS" || i.fileType === "VIDEO";
+  return isVideo && !i.coverDriveUrl;
+}
+
 const STAGE_PREDICATES: Record<StageId, (i: Item) => boolean> = {
   adjustment: needsAdjustment,
   // INTERNAL_DONE (legado do modelo por-campanha) cai aqui como fallback: no fluxo
   // por-post a aprovação interna já pula direto para CLIENT_REVIEW.
   internal: (i) => (i.status === "INTERNAL_REVIEW" || i.status === "INTERNAL_DONE") && !needsAdjustment(i),
   clientReview: (i) => i.status === "CLIENT_REVIEW" && !needsAdjustment(i),
-  // Aprovado pelo cliente → prontos p/ programar. Só vai para "Posts programados"
-  // quando o social clica "Agendado" no link (status SCHEDULED) — a data sozinha não move.
-  readyToSchedule: (i) => i.status === "APPROVED",
+  // Aprovado pelo cliente mas é vídeo SEM capa → vai para "Criar capa" (design).
+  criarCapa: (i) => i.status === "APPROVED" && needsCover(i),
+  // Aprovado pelo cliente (com capa, ou não-vídeo) → prontos p/ programar. Só vai para
+  // "Posts programados" quando o social clica "Agendado" no link (status SCHEDULED).
+  readyToSchedule: (i) => i.status === "APPROVED" && !needsCover(i),
   scheduled: (i) => i.status === "SCHEDULED",
   published: (i) => i.status === "PUBLISHED",
   draft: (i) => i.status === "DRAFT",
@@ -128,6 +137,7 @@ const STAGES: { id: StageId; label: string; icon: string; color: string; dot: st
   { id: "adjustment", label: "Ajustes", icon: "✏️", color: "text-amber-400", dot: "bg-amber-500", bg: "bg-amber-900/20 border-amber-500/30" },
   { id: "internal", label: "Revisão interna", icon: "🔍", color: "text-violet-400", dot: "bg-violet-500", bg: "bg-violet-900/20 border-violet-500/30" },
   { id: "clientReview", label: "Aguardando cliente", icon: "👤", color: "text-emerald-400", dot: "bg-emerald-500", bg: "bg-emerald-900/20 border-emerald-500/30" },
+  { id: "criarCapa", label: "Criar capa", icon: "🎨", color: "text-pink-400", dot: "bg-pink-500", bg: "bg-pink-900/20 border-pink-500/30" },
   { id: "readyToSchedule", label: "Prontos p/ programar", icon: "📅", color: "text-sky-400", dot: "bg-sky-500", bg: "bg-sky-900/20 border-sky-500/30" },
   { id: "scheduled", label: "Posts programados", icon: "🗓️", color: "text-indigo-400", dot: "bg-indigo-500", bg: "bg-indigo-900/20 border-indigo-500/30" },
   { id: "published", label: "Concluído", icon: "✅", color: "text-teal-400", dot: "bg-teal-500", bg: "bg-teal-900/20 border-teal-500/30" },
@@ -147,6 +157,7 @@ function computeStagePosts(items: Item[]): Record<StageId, DashPost[]> {
     adjustment: distinctPosts(items, STAGE_PREDICATES.adjustment),
     internal: distinctPosts(items, STAGE_PREDICATES.internal),
     clientReview: distinctPosts(items, STAGE_PREDICATES.clientReview),
+    criarCapa: distinctPosts(items, STAGE_PREDICATES.criarCapa),
     readyToSchedule: distinctPosts(items, STAGE_PREDICATES.readyToSchedule),
     scheduled: distinctPosts(items, STAGE_PREDICATES.scheduled),
     published: distinctPosts(items, STAGE_PREDICATES.published),
@@ -183,6 +194,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           fileType: true,
           fileUrl: true,
           driveUrl: true,
+          coverDriveUrl: true,
           approvalItem: { select: { status: true, clientComment: true, reviewedAt: true } },
           internalReviewItem: { select: { status: true, comment: true } },
         },
@@ -200,6 +212,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     adjustment: 0,
     internal: 0,
     clientReview: 0,
+    criarCapa: 0,
     readyToSchedule: 0,
     scheduled: 0,
     published: 0,
