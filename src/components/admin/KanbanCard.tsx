@@ -96,7 +96,7 @@ export default function KanbanCard({
           <div className="min-w-0 flex-1">
             <PostNameEditor postId={post.id} title={post.title} fallbackLabel={postLabel(post)} textClassName="text-white text-[11px] font-medium" />
             <div className="flex items-center gap-1.5">
-              <p className="text-[10px] text-gray-500 truncate">{post.clientName}</p>
+              <p className="text-[10px] text-gray-500 truncate min-w-0">{post.clientName}</p>
               {post.roteiroAttached && (
                 <span className="text-[9px] text-fuchsia-300 bg-fuchsia-900/30 border border-fuchsia-500/30 px-1 py-0.5 rounded shrink-0" title="Roteiro anexado ao Roteirização">🔗 Roteiro</span>
               )}
