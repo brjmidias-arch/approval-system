@@ -71,7 +71,15 @@ export async function getConteudo(id: string): Promise<RotConteudo | null> {
  */
 export async function updateRoteiroScript(
   id: string,
-  fields: { script_tarefa?: string; prazo_roteiro?: string | null; data_postagem?: string | null; comentarios?: string | null }
+  fields: {
+    script_tarefa?: string;
+    prazo_roteiro?: string | null;
+    data_postagem?: string | null;
+    comentarios?: string | null;
+    link_drive?: string;
+    legenda?: string;
+    link_capa?: string;
+  }
 ): Promise<void> {
   if (Object.keys(fields).length === 0) return;
   const { error } = await rot().from("rot_scripts").update(fields).eq("id", id);

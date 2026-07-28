@@ -31,6 +31,9 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
         roteiroConteudoId: true,
         status: true,
         scheduledDate: true,
+        driveUrl: true,
+        caption: true,
+        coverDriveUrl: true,
         approvalItem: { select: { status: true, clientComment: true } },
         internalReviewItem: { select: { status: true, comment: true } },
       },
@@ -43,7 +46,18 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
     const ajusteInterno = r === "ADJUSTMENT" || r === "REJECTED";
     const needsAdjustment = ajusteCliente || ajusteInterno;
 
-    const fields: { script_tarefa?: string; prazo_roteiro?: string | null; data_postagem?: string | null; comentarios?: string | null } = {};
+    const fields: {
+      script_tarefa?: string;
+      prazo_roteiro?: string | null;
+      data_postagem?: string | null;
+      comentarios?: string | null;
+      link_drive?: string;
+      legenda?: string;
+    } = {};
+
+    // Empurra artefatos de produção do post → roteiro (só quando o post tem o valor).
+    if (item.driveUrl) fields.link_drive = item.driveUrl;
+    if (item.caption) fields.legenda = item.caption;
 
     if (needsAdjustment) {
       fields.script_tarefa = "Cliente/interno pede ajuste";
