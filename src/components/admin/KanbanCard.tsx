@@ -51,15 +51,19 @@ export default function KanbanCard({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [showDrive, setShowDrive] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [driveLink, setDriveLink] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  const internalMsg = buildAprovacaoMsg({
+  // Assets do novo link (se informado e válido) e mensagem exibida no popup.
+  const newAssets = driveLink.trim() ? driveAssetsFromLink(driveLink.trim(), post.fileType) : null;
+  const linkInvalido = driveLink.trim().length > 0 && !newAssets;
+  const modalMsg = buildAprovacaoMsg({
     title: post.title,
     clientName: post.clientName,
     asanaUrl: post.asanaUrl,
     connected: !!post.roteiroAttached,
-    driveUrl: post.driveUrl,
+    driveUrl: newAssets?.driveUrl ?? post.driveUrl,
     adjustment: post.adjustmentComment,
   });
 
@@ -89,23 +93,31 @@ export default function KanbanCard({
     await patchPost({ action: "mark-published" }, "Erro ao concluir o post. Tente novamente.");
   }
 
-  function ajusteFeito(e: React.MouseEvent) {
+  function openModal(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    navigator.clipboard.writeText(internalMsg);
-    patchPost({ action: "adjustment-done" }, "Erro ao reenviar. Tente novamente.");
+    setDriveLink("");
+    setCopied(false);
+    setShowModal(true);
   }
 
-  async function saveDriveLink(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    const assets = driveAssetsFromLink(driveLink.trim(), post.fileType);
-    if (!assets) {
+  function copyModalMsg() {
+    navigator.clipboard.writeText(modalMsg);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function confirmAjuste() {
+    if (linkInvalido) {
       alert("Link do Drive inválido. Cole um link de arquivo ou pasta do Google Drive.");
       return;
     }
-    const ok = await patchPost(assets, "Erro ao salvar o link. Tente novamente.");
-    if (ok) { setShowDrive(false); setDriveLink(""); }
+    navigator.clipboard.writeText(modalMsg);
+    const ok = await patchPost(
+      { ...(newAssets ?? {}), action: "adjustment-done" },
+      "Erro ao reenviar. Tente novamente."
+    );
+    if (ok) { setShowModal(false); setDriveLink(""); }
   }
 
   return (
@@ -181,47 +193,16 @@ export default function KanbanCard({
           </p>
         )}
         {post.adjustmentSource && (
-          <div className="mt-1.5 space-y-1.5" onClick={(e) => e.preventDefault()}>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <button
-                type="button"
-                onClick={ajusteFeito}
-                disabled={busy}
-                className="text-[10px] px-2 py-1 rounded bg-violet-900/40 hover:bg-violet-900/60 text-violet-300 border border-violet-500/30 disabled:opacity-50 transition-colors"
-                title="Reenvia p/ revisão interna e copia a mensagem (com o ajuste)"
-              >
-                ✅ Ajuste feito (copia msg)
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowDrive((s) => !s); }}
-                disabled={busy}
-                className="text-[10px] px-2 py-1 rounded bg-blue-900/40 hover:bg-blue-900/60 text-blue-300 border border-blue-500/30 disabled:opacity-50 transition-colors"
-                title="Atualizar o link do Drive com o post ajustado"
-              >
-                🔗 Novo link Drive
-              </button>
-            </div>
-            {showDrive && (
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="text"
-                  value={driveLink}
-                  onChange={(e) => setDriveLink(e.target.value)}
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                  placeholder="Cole o novo link do Drive"
-                  className="flex-1 min-w-0 bg-[#0f0f0f] border border-white/15 rounded px-2 py-1 text-white text-[10px] outline-none focus:border-blue-500 placeholder-gray-600"
-                />
-                <button
-                  type="button"
-                  onClick={saveDriveLink}
-                  disabled={busy || !driveLink.trim()}
-                  className="text-[10px] px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium disabled:opacity-40 transition-colors shrink-0"
-                >
-                  Salvar
-                </button>
-              </div>
-            )}
+          <div className="mt-1.5" onClick={(e) => e.preventDefault()}>
+            <button
+              type="button"
+              onClick={openModal}
+              disabled={busy}
+              className="text-[10px] px-2 py-1 rounded bg-violet-900/40 hover:bg-violet-900/60 text-violet-300 border border-violet-500/30 disabled:opacity-50 transition-colors"
+              title="Abre o popup para revisar a mensagem, colar o novo link e reenviar"
+            >
+              ✅ Ajuste feito…
+            </button>
           </div>
         )}
       </Link>
@@ -232,11 +213,69 @@ export default function KanbanCard({
           postId={post.id}
           clientId={post.clientId}
           clientToken={post.clientToken}
-          internalMsg={internalMsg}
+          internalMsg={modalMsg}
           needsAdjustment={!!post.adjustmentSource}
+          canReopenAdjustment={stageId === "internal" || stageId === "clientReview"}
           onBusyChange={setBusy}
         />
       </div>
+
+      {/* Popup do "Ajuste feito" */}
+      {showModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={(e) => { e.stopPropagation(); setShowModal(false); }}
+        >
+          <div
+            className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-md p-5 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-semibold text-sm">Ajuste feito → revisão interna</h3>
+              <button onClick={() => setShowModal(false)} className="text-gray-500 hover:text-white text-xl leading-none">×</button>
+            </div>
+
+            <div>
+              <label className="text-[11px] text-gray-500 block mb-1">Novo link do Drive (opcional)</label>
+              <input
+                type="text"
+                value={driveLink}
+                onChange={(e) => setDriveLink(e.target.value)}
+                placeholder="Cole o link do Drive do post ajustado"
+                className={`w-full bg-[#0f0f0f] border rounded-lg px-3 py-2 text-white text-xs outline-none placeholder-gray-600 ${linkInvalido ? "border-red-500/60" : "border-white/15 focus:border-blue-500"}`}
+              />
+              {linkInvalido && <p className="text-[11px] text-red-400 mt-1">Link do Drive inválido.</p>}
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] text-gray-500">Mensagem para o grupo</label>
+                <button onClick={copyModalMsg} className="text-[11px] text-fuchsia-300 hover:text-fuchsia-200">
+                  {copied ? "Copiado ✓" : "📋 Copiar"}
+                </button>
+              </div>
+              <pre className="text-gray-300 text-[11px] whitespace-pre-wrap break-words bg-[#0f0f0f] border border-white/10 rounded-lg p-3 max-h-52 overflow-y-auto font-sans">{modalMsg}</pre>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setShowModal(false)}
+                disabled={busy}
+                className="flex-1 py-2 rounded-lg text-sm bg-white/5 text-gray-300 hover:bg-white/10 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmAjuste}
+                disabled={busy || linkInvalido}
+                className="flex-1 py-2 rounded-lg text-sm bg-violet-600 hover:bg-violet-500 text-white font-medium transition-colors disabled:opacity-50"
+              >
+                {busy ? "..." : "Confirmar e copiar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

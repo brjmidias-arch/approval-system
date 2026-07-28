@@ -77,19 +77,37 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
         });
       }
     } else if (action === "adjustment-done") {
-      // Ajuste concluído: volta para Revisão interna e limpa as flags de ajuste
-      // (tanto do revisor interno quanto a reprovação/ajuste do cliente já resolvidos).
+      // Ajuste concluído: volta para Revisão interna. Mantém os comentários (marca
+      // como resolvidos) para permitir desfazer ("Voltar para ajuste").
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "INTERNAL_REVIEW" } });
       for (const id of ids) {
         await prisma.internalReviewItem.upsert({
           where: { contentItemId: id },
-          update: { status: "PENDING", comment: null, commentResolved: false, reviewedAt: null },
+          update: { status: "PENDING", commentResolved: true, reviewedAt: null },
           create: { contentItemId: id, status: "PENDING" },
         });
         await prisma.approvalItem.updateMany({
           where: { contentItemId: id, status: { in: ["ADJUSTMENT", "REJECTED"] } },
-          data: { status: "PENDING", clientComment: null, clientCommentResolved: false, reviewedAt: null },
+          data: { status: "PENDING", clientCommentResolved: true, reviewedAt: null },
         });
+      }
+    } else if (action === "undo-adjustment-done") {
+      // Desfaz o "Ajuste feito": volta o post para a etapa de Ajustes, restaurando
+      // a flag no item que carrega o comentário (cliente tem precedência).
+      const comReviews = await prisma.contentItem.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, approvalItem: { select: { clientComment: true } }, internalReviewItem: { select: { comment: true } } },
+      });
+      for (const it of comReviews) {
+        if (it.approvalItem?.clientComment) {
+          await prisma.approvalItem.updateMany({ where: { contentItemId: it.id }, data: { status: "REJECTED", clientCommentResolved: false } });
+        } else {
+          await prisma.internalReviewItem.upsert({
+            where: { contentItemId: it.id },
+            update: { status: "ADJUSTMENT", commentResolved: false },
+            create: { contentItemId: it.id, status: "ADJUSTMENT" },
+          });
+        }
       }
     } else if (action === "mark-approved") {
       // Volta para "Prontos p/ programar" (mantém a data planejada, se houver).

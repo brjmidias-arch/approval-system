@@ -14,6 +14,7 @@ export default function PostActionsMenu({
   clientToken,
   internalMsg,
   needsAdjustment,
+  canReopenAdjustment,
   onBusyChange,
 }: {
   postId: string;
@@ -21,6 +22,7 @@ export default function PostActionsMenu({
   clientToken?: string | null;
   internalMsg?: string;
   needsAdjustment?: boolean;
+  canReopenAdjustment?: boolean;
   onBusyChange?: (busy: boolean) => void;
 }) {
   const router = useRouter();
@@ -85,6 +87,7 @@ export default function PostActionsMenu({
 
   const actions: { label: string; onClick: () => void; danger?: boolean }[] = [
     ...(needsAdjustment ? [{ label: "✅ Ajuste feito → revisão interna (copia msg)", onClick: ajusteFeito }] : []),
+    ...(canReopenAdjustment && !needsAdjustment ? [{ label: "↩️ Voltar para ajuste (desfazer)", onClick: () => run(patch({ action: "undo-adjustment-done" })) }] : []),
     ...(internalMsg ? [{ label: "📋 Copiar msg de aprovação interna", onClick: copyInternalMsg }] : []),
     { label: "🔍 Enviar p/ revisão interna", onClick: () => run(patch({ action: "send-internal" })) },
     { label: "👤 Enviar p/ cliente", onClick: () => run(patch({ action: "send-client" })) },
