@@ -20,6 +20,7 @@ interface DashPost {
   scheduledLabel?: string | null;
   scheduledInput?: string | null;
   daysWaiting?: number | null;
+  roteiroAttached?: boolean;
   adjustmentSource?: "cliente" | "interno" | null;
   adjustmentComment?: string | null;
 }
@@ -166,6 +167,9 @@ export default function DashboardClientRow({
                       </p>
                     )}
                   </div>
+                  {p.roteiroAttached && (
+                    <span className="text-[10px] text-fuchsia-300 bg-fuchsia-900/30 border border-fuchsia-500/30 px-1.5 py-0.5 rounded shrink-0" title="Roteiro anexado ao Roteirização">🔗 Roteiro</span>
+                  )}
                   <span className="text-[10px] text-emerald-400 bg-emerald-900/20 px-1.5 py-0.5 rounded shrink-0">
                     {TYPE_LABELS[p.contentType] ?? p.contentType}
                   </span>

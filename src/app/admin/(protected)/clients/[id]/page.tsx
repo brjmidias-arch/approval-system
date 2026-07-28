@@ -571,6 +571,11 @@ export default function ClientWorkspacePage() {
                               Carrossel — {group.items.length} slides
                             </span>
                           )}
+                          {rep.roteiroConteudoId && (
+                            <span className="text-xs font-medium text-fuchsia-300 bg-fuchsia-900/30 border border-fuchsia-500/30 px-2 py-0.5 rounded" title="Roteiro anexado ao Roteirização">
+                              🔗 Roteiro anexado
+                            </span>
+                          )}
                           {rep.scheduledDate && (
                             <span className="text-xs text-gray-500">
                               {new Date(rep.scheduledDate).toLocaleDateString("pt-BR")}
