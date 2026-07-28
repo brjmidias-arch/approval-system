@@ -77,10 +77,10 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
       fields.script_tarefa = "Aprovação Cliente";
       fields.prazo_roteiro = hojeBR();
     } else if (item.status === "APPROVED") {
-      // Aprovado pelo cliente: se é vídeo SEM capa → "Criar capa" (design); senão → programar.
+      // Aprovado pelo cliente: se é vídeo SEM capa → "Criar Capa" (design); senão → programar.
       const semCapa = (item.contentType === "REELS" || item.fileType === "VIDEO") && !item.coverDriveUrl;
       if (semCapa) {
-        fields.script_tarefa = "Criar capa";
+        fields.script_tarefa = "Criar Capa";
         fields.prazo_roteiro = hojeBR();
       } else {
         fields.script_tarefa = "Pronto para programar";
