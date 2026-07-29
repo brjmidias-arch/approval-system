@@ -184,6 +184,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
       id: true,
       name: true,
       token: true,
+      internalToken: true,
       contentItems: {
         where: {
           OR: [{ status: { not: "PUBLISHED" } }, { postedAt: { gte: concluidoCutoff } }],
@@ -216,10 +217,10 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
 
   // Todos os clientes (inclusive sem posts) para o seletor do botão "Enviar roteiros".
   const allClients = await prisma.client.findMany({
-    select: { id: true, name: true, _count: { select: { contentItems: true } } },
+    select: { id: true, name: true, internalToken: true, _count: { select: { contentItems: true } } },
     orderBy: { name: "asc" },
   });
-  const clientOptions = allClients.map((c) => ({ id: c.id, name: c.name, itemCount: c._count.contentItems }));
+  const clientOptions = allClients.map((c) => ({ id: c.id, name: c.name, internalToken: c.internalToken, itemCount: c._count.contentItems }));
 
   const clientStages = clients.map((client) => ({
     client,
@@ -245,13 +246,13 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
   const grandTotal = STAGES.reduce((sum, stage) => sum + totals[stage.id], 0);
 
   // Dados achatados por etapa para a visão kanban (cada card sabe seu cliente).
-  type KanbanCard = DashPost & { clientId: string; clientName: string; clientToken: string | null };
+  type KanbanCard = DashPost & { clientId: string; clientName: string; clientToken: string | null; clientInternalToken: string | null };
   const kanban = {} as Record<StageId, KanbanCard[]>;
   for (const stage of STAGES) kanban[stage.id] = [];
   for (const { client, stagePosts } of clientStages) {
     for (const stage of STAGES) {
       for (const p of stagePosts[stage.id]) {
-        kanban[stage.id].push({ ...p, clientId: client.id, clientName: client.name, clientToken: client.token });
+        kanban[stage.id].push({ ...p, clientId: client.id, clientName: client.name, clientToken: client.token, clientInternalToken: client.internalToken });
       }
     }
   }
@@ -350,6 +351,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                         clientId={client.id}
                         clientName={client.name}
                         clientToken={client.token}
+                        clientInternalToken={client.internalToken}
                         posts={stagePosts[stage.id]}
                         stageColor={stage.color}
                         stageId={stage.id}

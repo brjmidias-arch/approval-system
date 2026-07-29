@@ -21,6 +21,7 @@ export interface KanbanCardData {
   clientId: string;
   clientName: string;
   clientToken?: string | null;
+  clientInternalToken?: string | null;
   driveUrl?: string | null;
   scheduledLabel?: string | null;
   scheduledInput?: string | null;
@@ -58,12 +59,14 @@ export default function KanbanCard({
   // Assets do novo link (se informado e válido) e mensagem exibida no popup.
   const newAssets = driveLink.trim() ? driveAssetsFromLink(driveLink.trim(), post.fileType) : null;
   const linkInvalido = driveLink.trim().length > 0 && !newAssets;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const internalUrl = post.clientInternalToken ? `${origin}/revisar/${post.clientInternalToken}` : null;
   const modalMsg = buildAprovacaoMsg({
     title: post.title,
     clientName: post.clientName,
     asanaUrl: post.asanaUrl,
     connected: !!post.roteiroAttached,
-    driveUrl: newAssets?.driveUrl ?? post.driveUrl,
+    internalUrl,
     adjustment: post.adjustmentComment,
   });
 

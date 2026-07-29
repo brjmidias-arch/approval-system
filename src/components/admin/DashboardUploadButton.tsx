@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import FolderUploadModal from "@/components/admin/FolderUploadModal";
 
-type ClientOpt = { id: string; name: string; itemCount: number };
+type ClientOpt = { id: string; name: string; itemCount: number; internalToken?: string | null };
 
 export default function DashboardUploadButton({ clients }: { clients: ClientOpt[] }) {
   const router = useRouter();
@@ -77,6 +77,7 @@ export default function DashboardUploadButton({ clients }: { clients: ClientOpt[
         <FolderUploadModal
           clientId={chosen.id}
           clientName={chosen.name}
+          clientInternalToken={chosen.internalToken}
           existingItemCount={chosen.itemCount}
           onDone={() => router.refresh()}
           onClose={close}

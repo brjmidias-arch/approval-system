@@ -215,12 +215,14 @@ export default function ClientWorkspacePage() {
   }
 
   function copyAprovacaoMsg(rep: ContentItem) {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const internalUrl = client?.internalToken ? `${origin}/revisar/${client.internalToken}` : null;
     const msg = buildAprovacaoMsg({
       title: rep.title,
       clientName: client?.name ?? "",
       asanaUrl: rep.asanaUrl,
       connected: !!rep.roteiroConteudoId,
-      driveUrl: rep.driveUrl,
+      internalUrl,
       adjustment: repAdjustment(rep),
     });
     navigator.clipboard.writeText(msg);
@@ -417,6 +419,7 @@ export default function ClientWorkspacePage() {
         <FolderUploadModal
           clientId={id}
           clientName={client.name}
+          clientInternalToken={client.internalToken}
           existingItemCount={client.contentItems.length}
           onDone={() => { fetchClient(); }}
           onClose={() => setShowFolderUpload(false)}

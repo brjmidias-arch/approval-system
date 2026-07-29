@@ -104,12 +104,13 @@ interface Props {
   campaignId?: string;
   clientId?: string;
   clientName?: string;
+  clientInternalToken?: string | null;
   existingItemCount: number;
   onDone: () => void;
   onClose: () => void;
 }
 
-export default function FolderUploadModal({ campaignId, clientId, clientName, existingItemCount, onDone, onClose }: Props) {
+export default function FolderUploadModal({ campaignId, clientId, clientName, clientInternalToken, existingItemCount, onDone, onClose }: Props) {
   const [step, setStep] = useState<Step>("input");
   const [linksText, setLinksText] = useState("");
   const [posts, setPosts] = useState<ParsedPost[]>([]);
@@ -117,13 +118,16 @@ export default function FolderUploadModal({ campaignId, clientId, clientName, ex
   const [savedCount, setSavedCount] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const internalUrl = clientInternalToken ? `${origin}/revisar/${clientInternalToken}` : null;
+
   function copyMsg(post: ParsedPost) {
     const msg = buildAprovacaoMsg({
       title: post.title,
       clientName: clientName ?? "",
       asanaUrl: post.asanaUrl,
       connected: !!post.roteiroConteudoId,
-      driveUrl: post.folderUrl ?? post.sourceUrl,
+      internalUrl,
     });
     navigator.clipboard.writeText(msg);
     setCopiedId(post.tempId);
@@ -555,7 +559,7 @@ export default function FolderUploadModal({ campaignId, clientId, clientName, ex
                   clientName,
                   asanaUrl: post.asanaUrl,
                   connected: !!post.roteiroConteudoId,
-                  driveUrl: post.folderUrl ?? post.sourceUrl,
+                  internalUrl,
                 });
                 return (
                   <div key={post.tempId} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3">

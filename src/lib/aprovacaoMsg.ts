@@ -7,7 +7,7 @@ export function buildAprovacaoMsg(p: {
   clientName: string;
   asanaUrl?: string | null;
   connected: boolean;
-  driveUrl?: string | null;
+  internalUrl?: string | null;
   adjustment?: string | null;
 }): string {
   const lines = [
@@ -22,7 +22,7 @@ export function buildAprovacaoMsg(p: {
     ``,
     `Asana: ${p.asanaUrl?.trim() || "—"}`,
     ``,
-    `Drive: ${p.driveUrl?.trim() || "—"}`,
+    `Aprovação interna: ${p.internalUrl?.trim() || "—"}`,
   );
   return lines.join("\n");
 }

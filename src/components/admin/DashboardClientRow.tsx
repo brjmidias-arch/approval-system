@@ -48,6 +48,7 @@ export default function DashboardClientRow({
   clientId,
   clientName,
   clientToken,
+  clientInternalToken,
   posts,
   stageColor,
   stageId,
@@ -55,6 +56,7 @@ export default function DashboardClientRow({
   clientId: string;
   clientName: string;
   clientToken?: string | null;
+  clientInternalToken?: string | null;
   posts: DashPost[];
   stageColor: string;
   stageId?: string;
@@ -204,7 +206,9 @@ export default function DashboardClientRow({
                     clientName,
                     asanaUrl: p.asanaUrl,
                     connected: !!p.roteiroAttached,
-                    driveUrl: p.driveUrl,
+                    internalUrl: clientInternalToken
+                      ? `${typeof window !== "undefined" ? window.location.origin : ""}/revisar/${clientInternalToken}`
+                      : null,
                     adjustment: p.adjustmentComment,
                   })}
                   needsAdjustment={!!p.adjustmentSource}
