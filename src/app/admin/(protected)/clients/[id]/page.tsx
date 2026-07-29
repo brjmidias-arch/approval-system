@@ -7,6 +7,7 @@ import { CONTENT_TYPE_LABELS, APPROVAL_STATUS_LABELS, APPROVAL_STATUS_COLORS } f
 import type { ContentType, ApprovalStatus } from "@/types";
 import FolderUploadModal from "@/components/admin/FolderUploadModal";
 import { buildAprovacaoMsg } from "@/lib/aprovacaoMsg";
+import { extractDriveId, driveThumbUrl, drivePreviewUrl, driveFileViewUrl, driveAssetsFromLink } from "@/lib/drive";
 import RoteiroClientLink from "@/components/admin/RoteiroClientLink";
 import AnexarRoteiroPicker, { type RotConteudoOpcao } from "@/components/admin/AnexarRoteiroPicker";
 
@@ -310,7 +311,52 @@ export default function ClientWorkspacePage() {
     }
 
     try {
-      for (const item of editingPost.items) {
+      // Se o Link do Drive mudou, regenera a mídia (preview) — senão a revisão
+      // continua mostrando a versão antiga. Arquivo → regenera o item; pasta
+      // (carrossel) → re-escaneia e atualiza cada slide na ordem.
+      const link = editForm.driveUrl.trim();
+      const linkChanged = link.length > 0 && link !== (editingPost.rep.driveUrl ?? "");
+      let slideAssets: { fileUrl: string; driveUrl: string; fileType: string }[] | null = null;
+      let singleFileUrl: string | null = null;
+
+      if (linkChanged) {
+        if (link.includes("/folders/")) {
+          const folderId = extractDriveId(link);
+          if (!folderId) throw new Error("Link de pasta do Drive inválido.");
+          const r = await fetch("/api/drive/folder", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ folderId }),
+          });
+          const d = await r.json();
+          const files: { id: string; mimeType: string }[] = Array.isArray(d.files) ? d.files : [];
+          if (!files.length) {
+            throw new Error("Não consegui ler os arquivos dessa pasta. Confirme que está compartilhada como 'Qualquer pessoa com o link'.");
+          }
+          slideAssets = files.map((f) => {
+            const isVid = (f.mimeType || "").startsWith("video/");
+            return {
+              fileUrl: isVid ? drivePreviewUrl(f.id) : driveThumbUrl(f.id),
+              driveUrl: driveFileViewUrl(f.id),
+              fileType: isVid ? "VIDEO" : "IMAGE",
+            };
+          });
+          if (slideAssets.length !== editingPost.items.length) {
+            const ok = confirm(
+              `A pasta tem ${slideAssets.length} arquivo(s), mas o post tem ${editingPost.items.length} slide(s). Vou atualizar os ${Math.min(slideAssets.length, editingPost.items.length)} primeiros. Continuar?`
+            );
+            if (!ok) { setSavingEdit(false); return; }
+          }
+        } else {
+          const assets = driveAssetsFromLink(link, editingPost.rep.fileType);
+          if (!assets?.fileUrl) throw new Error("Link do Drive inválido. Cole um link de arquivo ou pasta.");
+          singleFileUrl = assets.fileUrl;
+        }
+      }
+
+      for (let i = 0; i < editingPost.items.length; i++) {
+        const item = editingPost.items[i];
+        const slide = slideAssets ? slideAssets[i] : null;
         const res = await fetch(`/api/admin/posts/${item.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -321,6 +367,9 @@ export default function ClientWorkspacePage() {
             driveUrl: editForm.driveUrl || null,
             roteiroConteudoId: editForm.roteiroConteudoId || null,
             asanaUrl: editForm.asanaUrl || null,
+            // Mídia nova (preview): carrossel usa o slide correspondente; post único usa o arquivo.
+            ...(slide && { fileUrl: slide.fileUrl, fileType: slide.fileType }),
+            ...(!slideAssets && singleFileUrl && i === 0 && { fileUrl: singleFileUrl }),
             // Tipo só é editável em post único (carrossel mantém o tipo do grupo)
             ...(editingPost.rep.contentType !== "CARROSSEL" && editForm.contentType && {
               contentType: editForm.contentType,
