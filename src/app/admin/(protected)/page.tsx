@@ -6,6 +6,8 @@ import AutoRefresh from "@/components/admin/AutoRefresh";
 import DashboardClientRow from "@/components/admin/DashboardClientRow";
 import KanbanBoard from "@/components/admin/KanbanBoard";
 import DashboardUploadButton from "@/components/admin/DashboardUploadButton";
+import CopyDesignerCoverLink from "@/components/admin/CopyDesignerCoverLink";
+import { designerCoverToken } from "@/lib/designerToken";
 
 type Item = {
   id: string;
@@ -300,6 +302,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           >
             ⚙️ Responsáveis
           </Link>
+          <CopyDesignerCoverLink token={designerCoverToken()} />
           <DashboardUploadButton clients={clientOptions} />
           <Link
             href="/admin/clients"
