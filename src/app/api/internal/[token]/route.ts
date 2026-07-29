@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
+import { notifyTelegram, tgEscape } from "@/lib/telegram";
 
 const POST_SELECT = {
   id: true, fileUrl: true, fileType: true, contentType: true, title: true, caption: true,
@@ -45,7 +46,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
   // (INTERNAL_REVIEW, ou INTERNAL_DONE para permitir reabrir a decisão interna).
   const item = await prisma.contentItem.findFirst({
     where: { id: contentItemId, clientId: client.id, status: { in: ["INTERNAL_REVIEW", "INTERNAL_DONE"] } },
-    select: { id: true },
+    select: { id: true, title: true, client: { select: { name: true } } },
   });
   if (!item) return NextResponse.json({ error: "Item não disponível para revisão" }, { status: 404 });
 
@@ -73,6 +74,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     }
 
     await syncRoteiroStatus(contentItemId);
+
+    // Aviso no Telegram (best-effort).
+    const nome = tgEscape(item.client?.name);
+    const post = tgEscape(item.title || "(sem título)");
+    const com = tgEscape(comment);
+    if (status === "APPROVED") {
+      await notifyTelegram(`✅ <b>Revisão interna aprovou</b>\nCliente: ${nome}\nPost: ${post}`);
+    } else if (status === "ADJUSTMENT") {
+      await notifyTelegram(`✏️ <b>Revisão interna pediu ajuste</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nAjuste: ${com}` : ""}`);
+    } else {
+      await notifyTelegram(`❌ <b>Revisão interna reprovou</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nMotivo: ${com}` : ""}`);
+    }
+
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Erro ao salvar revisão" }, { status: 500 });

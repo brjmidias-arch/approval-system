@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
+import { notifyTelegram, tgEscape } from "@/lib/telegram";
 
 const POST_SELECT = {
   id: true, fileUrl: true, fileType: true, contentType: true, title: true, caption: true,
@@ -44,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
   // IDOR + gate: item precisa ser do cliente E estar aguardando aprovação de capa.
   const item = await prisma.contentItem.findFirst({
     where: { id: contentItemId, clientId: client.id, ...COVER_PENDING },
-    select: { id: true, groupId: true },
+    select: { id: true, groupId: true, title: true, client: { select: { name: true } } },
   });
   if (!item) return NextResponse.json({ error: "Capa não disponível para aprovação" }, { status: 404 });
 
@@ -57,6 +58,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
       await prisma.contentItem.update({ where: { id: contentItemId }, data: { coverDriveUrl: null, coverUrl: null, coverApproved: false } });
     }
     await syncRoteiroStatus(contentItemId);
+
+    // Aviso no Telegram (best-effort).
+    const nome = tgEscape(item.client?.name);
+    const post = tgEscape(item.title || "(sem título)");
+    if (action === "approve") {
+      await notifyTelegram(`✅ <b>Capa aprovada</b>\nCliente: ${nome}\nPost: ${post}`);
+    } else {
+      await notifyTelegram(`↩️ <b>Capa reprovada (refazer)</b>\nCliente: ${nome}\nPost: ${post}`);
+    }
+
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Erro ao salvar" }, { status: 500 });

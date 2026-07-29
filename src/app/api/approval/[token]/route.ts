@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
+import { notifyTelegram, tgEscape } from "@/lib/telegram";
 
 const POST_SELECT = {
   id: true, fileUrl: true, fileType: true, contentType: true, title: true, caption: true,
@@ -47,7 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
   // evergreen aprove um post que já voltou para revisão interna / rascunho / publicado.
   const item = await prisma.contentItem.findFirst({
     where: { id: contentItemId, clientId: client.id, status: { in: ["CLIENT_REVIEW", "APPROVED"] } },
-    select: { id: true },
+    select: { id: true, title: true, client: { select: { name: true } } },
   });
   if (!item) return NextResponse.json({ error: "Item não disponível para aprovação" }, { status: 404 });
 
@@ -63,6 +64,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
       data: { status: status === "APPROVED" ? "APPROVED" : "CLIENT_REVIEW" },
     });
     await syncRoteiroStatus(contentItemId);
+
+    // Aviso no Telegram (best-effort).
+    const nome = tgEscape(item.client?.name);
+    const post = tgEscape(item.title || "(sem título)");
+    const com = tgEscape(clientComment);
+    if (status === "APPROVED") {
+      await notifyTelegram(`✅ <b>Cliente aprovou</b>\nCliente: ${nome}\nPost: ${post}`);
+    } else if (status === "ADJUSTMENT") {
+      await notifyTelegram(`✏️ <b>Cliente pediu ajuste</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nAjuste: ${com}` : ""}`);
+    } else {
+      await notifyTelegram(`❌ <b>Cliente reprovou</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nMotivo: ${com}` : ""}`);
+    }
+
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Erro ao salvar avaliação" }, { status: 500 });
