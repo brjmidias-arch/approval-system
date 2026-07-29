@@ -71,6 +71,7 @@ model ContentItem {
   roteiroConteudoId  String?             // id do rot_conteudos no sistema de Roteirização
   asanaUrl           String?             // link da tarefa no Asana (opcional)
   coverWaived        Boolean             @default(false) // vídeo liberado p/ programar sem capa
+  coverApproved      Boolean             @default(false) // capa aprovada na etapa "Aprovar capa"
   createdAt          DateTime            @default(now())
   approvalItem       ApprovalItem?
   internalReviewItem InternalReviewItem?

@@ -17,6 +17,7 @@ interface Stage {
 const DROP_ACTION: Record<string, string | null> = {
   adjustment: null, // etapa computada (ajuste vem do comentário) — não é destino
   criarCapa: null, // etapa computada (vídeo aprovado sem capa) — não é destino
+  aprovarCapa: null, // etapa computada (capa aguardando aprovação) — não é destino
   internal: "send-internal",
   clientReview: "send-client",
   readyToSchedule: "mark-approved",

@@ -201,6 +201,7 @@ export default function DashboardClientRow({
                   postId={p.id}
                   clientId={clientId}
                   clientToken={clientToken}
+                  coverPending={stageId === "aprovarCapa"}
                   internalMsg={buildAprovacaoMsg({
                     title: p.title,
                     clientName,

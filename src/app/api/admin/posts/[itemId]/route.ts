@@ -62,20 +62,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { sentToProgramacaoAt: sentToProgramacao ? new Date() : null } });
     }
 
-    // Capa recém-adicionada a um vídeo que estava em "Criar capa" (aprovado pelo
-    // cliente, vídeo, sem capa) → volta para Revisão interna para aprovar a capa
-    // antes de ir para "Prontos p/ programar".
-    const isVideo = exists.contentType === "REELS" || exists.fileType === "VIDEO";
+    // Capa recém-adicionada → começa como NÃO aprovada, para cair na etapa
+    // "Aprovar capa" (não volta para a Revisão interna, evitando confusão).
     const coverJustAdded = coverDriveUrl !== undefined && !!coverDriveUrl && !exists.coverDriveUrl;
-    if (!action && coverJustAdded && exists.status === "APPROVED" && isVideo) {
-      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "INTERNAL_REVIEW" } });
-      for (const id of ids) {
-        await prisma.internalReviewItem.upsert({
-          where: { contentItemId: id },
-          update: { status: "PENDING", comment: null, commentResolved: false, reviewedAt: null },
-          create: { contentItemId: id, status: "PENDING" },
-        });
-      }
+    if (!action && coverJustAdded) {
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { coverApproved: false } });
     }
 
     // 2) Transições de etapa (propagam ao grupo)
@@ -134,6 +125,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
           });
         }
       }
+    } else if (action === "approve-cover") {
+      // Aprova a capa → sai de "Aprovar capa" e vai para "Prontos p/ programar".
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { coverApproved: true } });
+    } else if (action === "redo-cover") {
+      // Refazer capa → limpa a capa e volta para "Criar capa".
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { coverDriveUrl: null, coverUrl: null, coverApproved: false } });
     } else if (action === "mark-approved") {
       // Volta para "Prontos p/ programar" (mantém a data planejada, se houver).
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "APPROVED", postedAt: null } });

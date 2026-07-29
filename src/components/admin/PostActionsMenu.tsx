@@ -15,6 +15,7 @@ export default function PostActionsMenu({
   internalMsg,
   needsAdjustment,
   canReopenAdjustment,
+  coverPending,
   onBusyChange,
 }: {
   postId: string;
@@ -23,6 +24,7 @@ export default function PostActionsMenu({
   internalMsg?: string;
   needsAdjustment?: boolean;
   canReopenAdjustment?: boolean;
+  coverPending?: boolean;
   onBusyChange?: (busy: boolean) => void;
 }) {
   const router = useRouter();
@@ -86,6 +88,8 @@ export default function PostActionsMenu({
   }
 
   const actions: { label: string; onClick: () => void; danger?: boolean }[] = [
+    ...(coverPending ? [{ label: "✅ Aprovar capa → Prontos p/ programar", onClick: () => run(patch({ action: "approve-cover" })) }] : []),
+    ...(coverPending ? [{ label: "↩️ Refazer capa (volta p/ Criar capa)", onClick: () => run(patch({ action: "redo-cover" }), "Remover a capa atual e voltar para Criar capa?") }] : []),
     ...(needsAdjustment ? [{ label: "✅ Ajuste feito → revisão interna (copia msg)", onClick: ajusteFeito }] : []),
     ...(canReopenAdjustment && !needsAdjustment ? [{ label: "↩️ Voltar para ajuste (desfazer)", onClick: () => run(patch({ action: "undo-adjustment-done" })) }] : []),
     ...(internalMsg ? [{ label: "📋 Copiar msg de aprovação interna", onClick: copyInternalMsg }] : []),

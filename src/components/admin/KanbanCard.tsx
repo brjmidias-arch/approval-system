@@ -206,6 +206,38 @@ export default function KanbanCard({
             </button>
           </div>
         )}
+        {stageId === "aprovarCapa" && (
+          <div className="mt-1.5 flex items-center gap-1.5 flex-wrap" onClick={(e) => e.preventDefault()}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                patchPost({ action: "approve-cover" }, "Erro ao aprovar. Tente novamente.");
+              }}
+              disabled={busy}
+              className="text-[10px] px-2 py-1 rounded bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/30 disabled:opacity-50 transition-colors"
+              title="Aprova a capa e envia para Prontos p/ programar"
+            >
+              ✅ Aprovar capa
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (confirm("Refazer a capa? A capa atual será removida e o vídeo volta para 'Criar capa'.")) {
+                  patchPost({ action: "redo-cover" }, "Erro ao mover. Tente novamente.");
+                }
+              }}
+              disabled={busy}
+              className="text-[10px] px-2 py-1 rounded bg-amber-900/40 hover:bg-amber-900/60 text-amber-300 border border-amber-500/30 disabled:opacity-50 transition-colors"
+              title="Remove a capa e volta para Criar capa"
+            >
+              ↩️ Refazer capa
+            </button>
+          </div>
+        )}
         {post.adjustmentComment && (
           <p className="text-[10px] text-amber-400 mt-1 line-clamp-2">
             ✏️ {post.adjustmentSource === "cliente" ? "Cliente" : "Interno"}: {post.adjustmentComment}

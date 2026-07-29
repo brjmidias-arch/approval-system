@@ -24,6 +24,7 @@ type Item = {
   roteiroConteudoId: string | null;
   asanaUrl: string | null;
   coverWaived: boolean;
+  coverApproved: boolean;
   approvalItem: { status: string; clientComment: string | null; reviewedAt: Date | null } | null;
   internalReviewItem: { status: string; comment: string | null } | null;
 };
@@ -46,7 +47,7 @@ type DashPost = {
   adjustmentComment: string | null;
 };
 
-type StageId = "adjustment" | "internal" | "clientReview" | "criarCapa" | "readyToSchedule" | "scheduled" | "published" | "draft";
+type StageId = "adjustment" | "internal" | "clientReview" | "criarCapa" | "aprovarCapa" | "readyToSchedule" | "scheduled" | "published" | "draft";
 
 /** Formata a data agendada como DD/MM (UTC, pois é gravada em T12:00:00Z). */
 function fmtScheduled(d: Date | null): string | null {
@@ -84,6 +85,12 @@ function needsCover(i: Item): boolean {
   return isVideo && !i.coverDriveUrl && !i.coverWaived;
 }
 
+/** Vídeo com capa adicionada mas ainda não aprovada → etapa "Aprovar capa". */
+function needsCoverApproval(i: Item): boolean {
+  const isVideo = i.contentType === "REELS" || i.fileType === "VIDEO";
+  return isVideo && !!i.coverDriveUrl && !i.coverApproved && !i.coverWaived;
+}
+
 const STAGE_PREDICATES: Record<StageId, (i: Item) => boolean> = {
   adjustment: needsAdjustment,
   // INTERNAL_DONE (legado do modelo por-campanha) cai aqui como fallback: no fluxo
@@ -92,9 +99,11 @@ const STAGE_PREDICATES: Record<StageId, (i: Item) => boolean> = {
   clientReview: (i) => i.status === "CLIENT_REVIEW" && !needsAdjustment(i),
   // Aprovado pelo cliente mas é vídeo SEM capa → vai para "Criar capa" (design).
   criarCapa: (i) => i.status === "APPROVED" && needsCover(i),
-  // Aprovado pelo cliente (com capa, ou não-vídeo) → prontos p/ programar. Só vai para
-  // "Posts programados" quando o social clica "Agendado" no link (status SCHEDULED).
-  readyToSchedule: (i) => i.status === "APPROVED" && !needsCover(i),
+  // Vídeo com capa adicionada, aguardando aprovação da capa → "Aprovar capa".
+  aprovarCapa: (i) => i.status === "APPROVED" && needsCoverApproval(i),
+  // Aprovado pelo cliente (capa aprovada/dispensada, ou não-vídeo) → prontos p/ programar.
+  // Só vai para "Posts programados" quando o social clica "Agendado" (status SCHEDULED).
+  readyToSchedule: (i) => i.status === "APPROVED" && !needsCover(i) && !needsCoverApproval(i),
   scheduled: (i) => i.status === "SCHEDULED",
   published: (i) => i.status === "PUBLISHED",
   draft: (i) => i.status === "DRAFT",
@@ -146,6 +155,7 @@ const STAGES: { id: StageId; label: string; icon: string; color: string; dot: st
   { id: "internal", label: "Revisão interna", icon: "🔍", color: "text-violet-400", dot: "bg-violet-500", bg: "bg-violet-900/20 border-violet-500/30" },
   { id: "clientReview", label: "Aguardando cliente", icon: "👤", color: "text-emerald-400", dot: "bg-emerald-500", bg: "bg-emerald-900/20 border-emerald-500/30" },
   { id: "criarCapa", label: "Criar capa", icon: "🎨", color: "text-pink-400", dot: "bg-pink-500", bg: "bg-pink-900/20 border-pink-500/30" },
+  { id: "aprovarCapa", label: "Aprovar capa", icon: "🖼️", color: "text-fuchsia-400", dot: "bg-fuchsia-500", bg: "bg-fuchsia-900/20 border-fuchsia-500/30" },
   { id: "readyToSchedule", label: "Prontos p/ programar", icon: "📅", color: "text-sky-400", dot: "bg-sky-500", bg: "bg-sky-900/20 border-sky-500/30" },
   { id: "scheduled", label: "Posts programados", icon: "🗓️", color: "text-indigo-400", dot: "bg-indigo-500", bg: "bg-indigo-900/20 border-indigo-500/30" },
   { id: "published", label: "Concluído", icon: "✅", color: "text-teal-400", dot: "bg-teal-500", bg: "bg-teal-900/20 border-teal-500/30" },
@@ -166,6 +176,7 @@ function computeStagePosts(items: Item[]): Record<StageId, DashPost[]> {
     internal: distinctPosts(items, STAGE_PREDICATES.internal),
     clientReview: distinctPosts(items, STAGE_PREDICATES.clientReview),
     criarCapa: distinctPosts(items, STAGE_PREDICATES.criarCapa),
+    aprovarCapa: distinctPosts(items, STAGE_PREDICATES.aprovarCapa),
     readyToSchedule: distinctPosts(items, STAGE_PREDICATES.readyToSchedule),
     scheduled: distinctPosts(items, STAGE_PREDICATES.scheduled),
     published: distinctPosts(items, STAGE_PREDICATES.published),
@@ -207,6 +218,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           roteiroConteudoId: true,
           asanaUrl: true,
           coverWaived: true,
+          coverApproved: true,
           approvalItem: { select: { status: true, clientComment: true, reviewedAt: true } },
           internalReviewItem: { select: { status: true, comment: true } },
         },
@@ -232,6 +244,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     internal: 0,
     clientReview: 0,
     criarCapa: 0,
+    aprovarCapa: 0,
     readyToSchedule: 0,
     scheduled: 0,
     published: 0,
