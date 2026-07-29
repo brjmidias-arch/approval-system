@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp } from "@/lib/whatsapp";
+import { sendPendingDigest } from "@/lib/notifyStep";
 
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -39,6 +40,9 @@ export async function GET(req: NextRequest) {
       });
     }
   }
+
+  // Lembrete diário de pendências no Telegram (best-effort).
+  await sendPendingDigest();
 
   return NextResponse.json({ sent: results.filter((r) => r.sent).length, results });
 }

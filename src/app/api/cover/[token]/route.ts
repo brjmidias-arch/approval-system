@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
-import { notifyTelegram, tgEscape } from "@/lib/telegram";
+import { notifyNextStep } from "@/lib/notifyStep";
 
 const POST_SELECT = {
   id: true, fileUrl: true, fileType: true, contentType: true, title: true, caption: true,
@@ -59,14 +59,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     }
     await syncRoteiroStatus(contentItemId);
 
-    // Aviso no Telegram (best-effort).
-    const nome = tgEscape(item.client?.name);
-    const post = tgEscape(item.title || "(sem título)");
-    if (action === "approve") {
-      await notifyTelegram(`✅ <b>Capa aprovada</b>\nCliente: ${nome}\nPost: ${post}`);
-    } else {
-      await notifyTelegram(`↩️ <b>Capa reprovada (refazer)</b>\nCliente: ${nome}\nPost: ${post}`);
-    }
+    // Aviso no Telegram (best-effort) com o próximo passo.
+    await notifyNextStep(contentItemId, action === "approve" ? "✅ Capa aprovada" : "↩️ Capa reprovada (refazer)");
 
     return NextResponse.json({ success: true });
   } catch {

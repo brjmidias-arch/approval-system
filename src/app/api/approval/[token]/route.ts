@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
+import { notifyNextStep } from "@/lib/notifyStep";
 
 const POST_SELECT = {
   id: true, fileUrl: true, fileType: true, contentType: true, title: true, caption: true,
@@ -70,7 +71,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     const post = tgEscape(item.title || "(sem título)");
     const com = tgEscape(clientComment);
     if (status === "APPROVED") {
-      await notifyTelegram(`✅ <b>Cliente aprovou</b>\nCliente: ${nome}\nPost: ${post}`);
+      await notifyNextStep(contentItemId, "✅ Cliente aprovou");
     } else if (status === "ADJUSTMENT") {
       await notifyTelegram(`✏️ <b>Cliente pediu ajuste</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nAjuste: ${com}` : ""}`);
     } else {
