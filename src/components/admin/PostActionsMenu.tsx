@@ -16,6 +16,7 @@ export default function PostActionsMenu({
   needsAdjustment,
   canReopenAdjustment,
   coverPending,
+  designerToken,
   onBusyChange,
 }: {
   postId: string;
@@ -25,6 +26,7 @@ export default function PostActionsMenu({
   needsAdjustment?: boolean;
   canReopenAdjustment?: boolean;
   coverPending?: boolean;
+  designerToken?: string;
   onBusyChange?: (busy: boolean) => void;
 }) {
   const router = useRouter();
@@ -66,6 +68,13 @@ export default function PostActionsMenu({
     alert("Link da programação copiado! Envie para quem agenda os posts.");
   }
 
+  function copyDesignerLink() {
+    setOpen(false);
+    if (!designerToken) return;
+    navigator.clipboard.writeText(`${window.location.origin}/criar-capa/${designerToken}`);
+    alert("Link do designer copiado! Ele tem todos os vídeos que precisam de capa.");
+  }
+
   function copyClientMsg() {
     setOpen(false);
     if (!clientToken) return;
@@ -98,6 +107,7 @@ export default function PostActionsMenu({
     { label: "📅 Prontos p/ programar", onClick: () => run(patch({ action: "mark-approved" })) },
     ...(clientToken ? [{ label: "💬 Copiar mensagem p/ cliente", onClick: copyClientMsg }] : []),
     { label: "🔗 Copiar link da programação", onClick: copyProgLink },
+    ...(designerToken ? [{ label: "🎨 Copiar link do designer (capas)", onClick: copyDesignerLink }] : []),
     { label: "🗓️ Marcar como programado", onClick: () => run(patch({ action: "mark-scheduled" })) },
     { label: "📝 Voltar p/ rascunho", onClick: () => run(patch({ action: "mark-draft" })) },
     { label: "✅ Concluído (foi ao ar)", onClick: () => run(patch({ action: "mark-published" }), "Marcar como concluído? Ele vai para a etapa Concluído e some em 10 dias.") },

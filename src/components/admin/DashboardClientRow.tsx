@@ -52,11 +52,13 @@ export default function DashboardClientRow({
   posts,
   stageColor,
   stageId,
+  designerToken,
 }: {
   clientId: string;
   clientName: string;
   clientToken?: string | null;
   clientInternalToken?: string | null;
+  designerToken?: string;
   posts: DashPost[];
   stageColor: string;
   stageId?: string;
@@ -202,6 +204,7 @@ export default function DashboardClientRow({
                   clientId={clientId}
                   clientToken={clientToken}
                   coverPending={stageId === "aprovarCapa"}
+                  designerToken={designerToken}
                   internalMsg={buildAprovacaoMsg({
                     title: p.title,
                     clientName,

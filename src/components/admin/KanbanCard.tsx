@@ -46,10 +46,12 @@ export default function KanbanCard({
   post,
   stageId,
   draggable,
+  designerToken,
 }: {
   post: KanbanCardData;
   stageId?: string;
   draggable?: boolean;
+  designerToken?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -318,6 +320,7 @@ export default function KanbanCard({
           internalMsg={modalMsg}
           needsAdjustment={!!post.adjustmentSource}
           canReopenAdjustment={stageId === "internal" || stageId === "clientReview"}
+          designerToken={designerToken}
           onBusyChange={setBusy}
         />
       </div>

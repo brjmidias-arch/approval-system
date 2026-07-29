@@ -345,7 +345,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           </div>
 
           {view === "kanban" ? (
-            <KanbanBoard stages={STAGES} columns={kanban} />
+            <KanbanBoard stages={STAGES} columns={kanban} designerToken={designerCoverToken()} />
           ) : (
           /* Lista: seções por etapa */
           <div className="space-y-5">
@@ -369,6 +369,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                         clientName={client.name}
                         clientToken={client.token}
                         clientInternalToken={client.internalToken}
+                        designerToken={designerCoverToken()}
                         posts={stagePosts[stage.id]}
                         stageColor={stage.color}
                         stageId={stage.id}

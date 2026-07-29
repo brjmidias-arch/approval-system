@@ -29,9 +29,11 @@ const DROP_ACTION: Record<string, string | null> = {
 export default function KanbanBoard({
   stages,
   columns,
+  designerToken,
 }: {
   stages: Stage[];
   columns: Record<string, KanbanCardData[]>;
+  designerToken?: string;
 }) {
   const router = useRouter();
   const [overStage, setOverStage] = useState<string | null>(null);
@@ -98,7 +100,7 @@ export default function KanbanBoard({
                 {cards.length === 0 ? (
                   <p className="text-[11px] text-gray-600 text-center py-4">{isOver ? "Solte aqui" : "—"}</p>
                 ) : (
-                  cards.map((p) => <KanbanCard key={p.id} post={p} stageId={stage.id} draggable />)
+                  cards.map((p) => <KanbanCard key={p.id} post={p} stageId={stage.id} draggable designerToken={designerToken} />)
                 )}
               </div>
             )}
