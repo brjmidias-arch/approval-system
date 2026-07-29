@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
-import { notifyNextStep } from "@/lib/notifyStep";
 
 const POST_SELECT = {
   id: true, fileUrl: true, fileType: true, contentType: true, title: true, caption: true,
@@ -81,11 +80,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     const post = tgEscape(item.title || "(sem título)");
     const com = tgEscape(comment);
     const designerPost = `\n\n✏️ Post p/ o designer: ${process.env.NEXTAUTH_URL || ""}/post/${contentItemId}`;
-    if (status === "APPROVED") {
-      await notifyNextStep(contentItemId, "✅ Revisão interna aprovou");
-    } else if (status === "ADJUSTMENT") {
+    // Revisão interna APROVADA não gera aviso (fora do escopo). Só ajuste/reprovação.
+    if (status === "ADJUSTMENT") {
       await notifyTelegram(`✏️ <b>Revisão interna pediu ajuste</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nAjuste: ${com}` : ""}${designerPost}`);
-    } else {
+    } else if (status === "REJECTED") {
       await notifyTelegram(`❌ <b>Revisão interna reprovou</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nMotivo: ${com}` : ""}${designerPost}`);
     }
 
