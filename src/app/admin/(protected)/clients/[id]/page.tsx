@@ -354,34 +354,38 @@ export default function ClientWorkspacePage() {
         }
       }
 
-      for (let i = 0; i < editingPost.items.length; i++) {
-        const item = editingPost.items[i];
-        const slide = slideAssets ? slideAssets[i] : null;
-        const res = await fetch(`/api/admin/posts/${item.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: editForm.title || null,
-            caption: editForm.caption || null,
-            scheduledDate: editForm.scheduledDate || null,
-            driveUrl: editForm.driveUrl || null,
-            roteiroConteudoId: editForm.roteiroConteudoId || null,
-            asanaUrl: editForm.asanaUrl || null,
-            // Mídia nova (preview): carrossel usa o slide correspondente; post único usa o arquivo.
-            ...(slide && { fileUrl: slide.fileUrl, fileType: slide.fileType }),
-            ...(!slideAssets && singleFileUrl && i === 0 && { fileUrl: singleFileUrl }),
-            // Tipo só é editável em post único (carrossel mantém o tipo do grupo)
-            ...(editingPost.rep.contentType !== "CARROSSEL" && editForm.contentType && {
-              contentType: editForm.contentType,
+      // PATCHes em paralelo; só o 1º item sincroniza com a roteirização (o sync
+      // abrange o grupo inteiro), evitando N sincronizações num carrossel.
+      await Promise.all(
+        editingPost.items.map(async (item, i) => {
+          const slide = slideAssets ? slideAssets[i] : null;
+          const res = await fetch(`/api/admin/posts/${item.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: editForm.title || null,
+              caption: editForm.caption || null,
+              scheduledDate: editForm.scheduledDate || null,
+              driveUrl: editForm.driveUrl || null,
+              roteiroConteudoId: editForm.roteiroConteudoId || null,
+              asanaUrl: editForm.asanaUrl || null,
+              skipSync: i !== 0,
+              // Mídia nova (preview): carrossel usa o slide correspondente; post único usa o arquivo.
+              ...(slide && { fileUrl: slide.fileUrl, fileType: slide.fileType }),
+              ...(!slideAssets && singleFileUrl && i === 0 && { fileUrl: singleFileUrl }),
+              // Tipo só é editável em post único (carrossel mantém o tipo do grupo)
+              ...(editingPost.rep.contentType !== "CARROSSEL" && editForm.contentType && {
+                contentType: editForm.contentType,
+              }),
+              ...(editForm.coverDriveUrl.trim() !== "" && {
+                coverUrl,
+                coverDriveUrl: editForm.coverDriveUrl.trim() || null,
+              }),
             }),
-            ...(editForm.coverDriveUrl.trim() !== "" && {
-              coverUrl,
-              coverDriveUrl: editForm.coverDriveUrl.trim() || null,
-            }),
-          }),
-        });
-        if (!res.ok) throw new Error("Erro ao salvar post.");
-      }
+          });
+          if (!res.ok) throw new Error("Erro ao salvar post.");
+        })
+      );
 
       setEditingPost(null);
       await fetchClient();

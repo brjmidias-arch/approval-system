@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
   if (!exists) return NextResponse.json({ error: "Post não encontrado" }, { status: 404 });
 
   const body = await req.json();
-  const { title, caption, scheduledDate, driveUrl, coverUrl, coverDriveUrl, fileUrl, fileType, contentType, roteiroConteudoId, asanaUrl, coverWaived, sentToProgramacao, action } = body;
+  const { title, caption, scheduledDate, driveUrl, coverUrl, coverDriveUrl, fileUrl, fileType, contentType, roteiroConteudoId, asanaUrl, coverWaived, sentToProgramacao, action, skipSync } = body;
 
   try {
     // 1) Edições de campos no item clicado
@@ -122,8 +122,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "PUBLISHED", postedAt: new Date() } });
     }
 
-    // Espelha o estado no Roteirização (sequencial; best-effort).
-    for (const id of ids) await syncRoteiroStatus(id);
+    // Espelha o estado no Roteirização (paralelo; best-effort). Em edições de
+    // carrossel, o cliente manda skipSync nos slides extras e sincroniza só 1x.
+    if (!skipSync) await Promise.all(ids.map((id) => syncRoteiroStatus(id)));
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Erro ao atualizar post" }, { status: 500 });
