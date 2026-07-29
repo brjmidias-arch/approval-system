@@ -57,14 +57,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     });
 
     if (status === "APPROVED") {
-      // Aprovado internamente → passa AUTOMATICAMENTE para a aprovação do cliente
-      // (cria/reseta a aprovação pendente para o post aparecer no link do cliente).
-      await prisma.contentItem.update({ where: { id: contentItemId }, data: { status: "CLIENT_REVIEW" } });
-      await prisma.approvalItem.upsert({
-        where: { contentItemId },
-        update: { status: "PENDING", clientComment: null, clientCommentResolved: false, reviewedAt: null },
-        create: { contentItemId, status: "PENDING" },
-      });
+      // Se o cliente JÁ aprovou este conteúdo (ex.: revisão da capa após "Criar capa"),
+      // aprovar internamente manda direto para "Prontos p/ programar" (não volta ao cliente).
+      const jaAprovado = await prisma.approvalItem.findUnique({ where: { contentItemId }, select: { status: true } });
+      if (jaAprovado?.status === "APPROVED") {
+        await prisma.contentItem.update({ where: { id: contentItemId }, data: { status: "APPROVED" } });
+      } else {
+        // Aprovado internamente → passa AUTOMATICAMENTE para a aprovação do cliente
+        // (cria/reseta a aprovação pendente para o post aparecer no link do cliente).
+        await prisma.contentItem.update({ where: { id: contentItemId }, data: { status: "CLIENT_REVIEW" } });
+        await prisma.approvalItem.upsert({
+          where: { contentItemId },
+          update: { status: "PENDING", clientComment: null, clientCommentResolved: false, reviewedAt: null },
+          create: { contentItemId, status: "PENDING" },
+        });
+      }
     } else {
       // Ajuste/reprovação → continua na revisão interna
       await prisma.contentItem.update({ where: { id: contentItemId }, data: { status: "INTERNAL_REVIEW" } });

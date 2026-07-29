@@ -23,7 +23,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
-  const exists = await prisma.contentItem.findUnique({ where: { id: params.itemId }, select: { id: true } });
+  const exists = await prisma.contentItem.findUnique({
+    where: { id: params.itemId },
+    select: { id: true, status: true, coverDriveUrl: true, contentType: true, fileType: true },
+  });
   if (!exists) return NextResponse.json({ error: "Post não encontrado" }, { status: 404 });
 
   const body = await req.json();
@@ -57,6 +60,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
     }
     if (sentToProgramacao !== undefined) {
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { sentToProgramacaoAt: sentToProgramacao ? new Date() : null } });
+    }
+
+    // Capa recém-adicionada a um vídeo que estava em "Criar capa" (aprovado pelo
+    // cliente, vídeo, sem capa) → volta para Revisão interna para aprovar a capa
+    // antes de ir para "Prontos p/ programar".
+    const isVideo = exists.contentType === "REELS" || exists.fileType === "VIDEO";
+    const coverJustAdded = coverDriveUrl !== undefined && !!coverDriveUrl && !exists.coverDriveUrl;
+    if (!action && coverJustAdded && exists.status === "APPROVED" && isVideo) {
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "INTERNAL_REVIEW" } });
+      for (const id of ids) {
+        await prisma.internalReviewItem.upsert({
+          where: { contentItemId: id },
+          update: { status: "PENDING", comment: null, commentResolved: false, reviewedAt: null },
+          create: { contentItemId: id, status: "PENDING" },
+        });
+      }
     }
 
     // 2) Transições de etapa (propagam ao grupo)
