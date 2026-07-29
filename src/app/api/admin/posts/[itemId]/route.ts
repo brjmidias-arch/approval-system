@@ -84,7 +84,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
       for (const id of ids) {
         await prisma.approvalItem.upsert({
           where: { contentItemId: id },
-          update: { status: "PENDING", clientComment: null, clientCommentResolved: false, reviewedAt: null },
+          // Mantém o comentário do ajuste do cliente (marca como resolvido) para ele
+          // ver "o que pedi (já resolvido)" ao reavaliar no link de aprovação.
+          update: { status: "PENDING", clientCommentResolved: true, reviewedAt: null },
           create: { contentItemId: id, status: "PENDING" },
         });
       }
