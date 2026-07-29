@@ -24,6 +24,7 @@ model Client {
   createdAt     DateTime      @default(now())
   token         String?       @unique @default(uuid())
   internalToken String?       @unique @default(dbgenerated("gen_random_uuid()"))
+  coverToken    String?       @unique @default(dbgenerated("gen_random_uuid()"))
   roteiroClienteId String?    // id do rot_clientes no sistema de Roteirização
   campaigns     Campaign[]
   contentItems  ContentItem[]

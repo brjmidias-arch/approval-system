@@ -6,7 +6,7 @@ import Link from "next/link";
 import PostActionsMenu from "@/components/admin/PostActionsMenu";
 import PostThumbnail from "@/components/admin/PostThumbnail";
 import { buildAprovacaoMsg } from "@/lib/aprovacaoMsg";
-import { driveAssetsFromLink } from "@/lib/drive";
+import { driveAssetsFromLink, extractDriveId, driveThumbUrl } from "@/lib/drive";
 import PostNameEditor from "@/components/admin/PostNameEditor";
 import PostDatePicker from "@/components/admin/PostDatePicker";
 import CopyProgLinkButton from "@/components/admin/CopyProgLinkButton";
@@ -22,6 +22,7 @@ export interface KanbanCardData {
   clientName: string;
   clientToken?: string | null;
   clientInternalToken?: string | null;
+  clientCoverToken?: string | null;
   driveUrl?: string | null;
   scheduledLabel?: string | null;
   scheduledInput?: string | null;
@@ -55,6 +56,7 @@ export default function KanbanCard({
   const [showModal, setShowModal] = useState(false);
   const [driveLink, setDriveLink] = useState("");
   const [copied, setCopied] = useState(false);
+  const [coverLink, setCoverLink] = useState("");
 
   // Assets do novo link (se informado e válido) e mensagem exibida no popup.
   const newAssets = driveLink.trim() ? driveAssetsFromLink(driveLink.trim(), post.fileType) : null;
@@ -94,6 +96,21 @@ export default function KanbanCard({
     e.preventDefault();
     e.stopPropagation();
     await patchPost({ action: "mark-published" }, "Erro ao concluir o post. Tente novamente.");
+  }
+
+  // "Criar capa": salva o link da capa (→ move para "Aprovar capa") e copia o
+  // link público de aprovação da capa.
+  function enviarCapa(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const link = coverLink.trim();
+    const id = extractDriveId(link);
+    if (!id) { alert("Cole um link válido da capa no Google Drive."); return; }
+    if (post.clientCoverToken) {
+      navigator.clipboard.writeText(`${origin}/capa/${post.clientCoverToken}`);
+      alert("Link de aprovação da capa copiado! O post foi para 'Aprovar capa'. Envie o link para aprovar a capa.");
+    }
+    patchPost({ coverDriveUrl: link, coverUrl: driveThumbUrl(id) }, "Erro ao enviar a capa. Tente novamente.");
   }
 
   function openModal(e: React.MouseEvent) {
@@ -188,22 +205,41 @@ export default function KanbanCard({
           </div>
         )}
         {stageId === "criarCapa" && (
-          <div className="mt-1.5" onClick={(e) => e.preventDefault()}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (confirm("Programar este vídeo SEM capa? Ele sai de 'Criar capa' e vai para 'Prontos p/ programar'.")) {
-                  patchPost({ coverWaived: true }, "Erro ao mover. Tente novamente.");
-                }
-              }}
-              disabled={busy}
-              className="text-[10px] px-2 py-1 rounded bg-sky-900/40 hover:bg-sky-900/60 text-sky-300 border border-sky-500/30 disabled:opacity-50 transition-colors"
-              title="Dispensa a capa e envia para Prontos p/ programar"
-            >
-              📅 Programar sem capa
-            </button>
+          <div className="mt-1.5 space-y-1.5" onClick={(e) => e.preventDefault()}>
+            <input
+              type="text"
+              value={coverLink}
+              onChange={(e) => setCoverLink(e.target.value)}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              placeholder="Link da capa no Drive"
+              className="w-full bg-[#0f0f0f] border border-white/15 rounded px-2 py-1 text-white text-[10px] outline-none focus:border-fuchsia-500 placeholder-gray-600"
+            />
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={enviarCapa}
+                disabled={busy || !coverLink.trim()}
+                className="text-[10px] px-2 py-1 rounded bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-medium disabled:opacity-40 transition-colors"
+                title="Salva a capa, envia para 'Aprovar capa' e copia o link de aprovação da capa"
+              >
+                📋 Copiar link de aprovação da capa
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (confirm("Programar este vídeo SEM capa? Ele sai de 'Criar capa' e vai para 'Prontos p/ programar'.")) {
+                    patchPost({ coverWaived: true }, "Erro ao mover. Tente novamente.");
+                  }
+                }}
+                disabled={busy}
+                className="text-[10px] px-2 py-1 rounded bg-sky-900/40 hover:bg-sky-900/60 text-sky-300 border border-sky-500/30 disabled:opacity-50 transition-colors"
+                title="Dispensa a capa e envia para Prontos p/ programar"
+              >
+                📅 Programar sem capa
+              </button>
+            </div>
           </div>
         )}
         {stageId === "aprovarCapa" && (
@@ -236,6 +272,21 @@ export default function KanbanCard({
             >
               ↩️ Refazer capa
             </button>
+            {post.clientCoverToken && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(`${origin}/capa/${post.clientCoverToken}`);
+                  alert("Link de aprovação da capa copiado!");
+                }}
+                className="text-[10px] px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-gray-300 border border-white/15 transition-colors"
+                title="Copiar link de aprovação da capa"
+              >
+                🔗 Link da capa
+              </button>
+            )}
           </div>
         )}
         {post.adjustmentComment && (

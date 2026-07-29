@@ -196,6 +196,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
       name: true,
       token: true,
       internalToken: true,
+      coverToken: true,
       contentItems: {
         where: {
           OR: [{ status: { not: "PUBLISHED" } }, { postedAt: { gte: concluidoCutoff } }],
@@ -259,13 +260,13 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
   const grandTotal = STAGES.reduce((sum, stage) => sum + totals[stage.id], 0);
 
   // Dados achatados por etapa para a visão kanban (cada card sabe seu cliente).
-  type KanbanCard = DashPost & { clientId: string; clientName: string; clientToken: string | null; clientInternalToken: string | null };
+  type KanbanCard = DashPost & { clientId: string; clientName: string; clientToken: string | null; clientInternalToken: string | null; clientCoverToken: string | null };
   const kanban = {} as Record<StageId, KanbanCard[]>;
   for (const stage of STAGES) kanban[stage.id] = [];
   for (const { client, stagePosts } of clientStages) {
     for (const stage of STAGES) {
       for (const p of stagePosts[stage.id]) {
-        kanban[stage.id].push({ ...p, clientId: client.id, clientName: client.name, clientToken: client.token, clientInternalToken: client.internalToken });
+        kanban[stage.id].push({ ...p, clientId: client.id, clientName: client.name, clientToken: client.token, clientInternalToken: client.internalToken, clientCoverToken: client.coverToken });
       }
     }
   }
