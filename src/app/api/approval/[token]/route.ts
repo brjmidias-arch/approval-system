@@ -70,12 +70,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     const nome = tgEscape(item.client?.name);
     const post = tgEscape(item.title || "(sem título)");
     const com = tgEscape(clientComment);
+    const designerPost = `\n\n✏️ Post p/ o designer: ${process.env.NEXTAUTH_URL || ""}/post/${contentItemId}`;
     if (status === "APPROVED") {
       await notifyNextStep(contentItemId, "✅ Cliente aprovou");
     } else if (status === "ADJUSTMENT") {
-      await notifyTelegram(`✏️ <b>Cliente pediu ajuste</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nAjuste: ${com}` : ""}`);
+      await notifyTelegram(`✏️ <b>Cliente pediu ajuste</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nAjuste: ${com}` : ""}${designerPost}`);
     } else {
-      await notifyTelegram(`❌ <b>Cliente reprovou</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nMotivo: ${com}` : ""}`);
+      await notifyTelegram(`❌ <b>Cliente reprovou</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nMotivo: ${com}` : ""}${designerPost}`);
     }
 
     return NextResponse.json({ success: true });
