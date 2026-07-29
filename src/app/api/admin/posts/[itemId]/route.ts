@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
+import { refreshGroupMediaFromDrive } from "@/lib/driveMedia";
 
 // ids de todos os itens do "post" (grupo do carrossel, ou o próprio item)
 async function postItemIds(itemId: string): Promise<string[]> {
@@ -92,6 +93,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
           data: { status: "PENDING", clientCommentResolved: true, reviewedAt: null },
         });
       }
+      // Atualiza automaticamente a arte a partir do Drive (best-effort).
+      const src = await prisma.contentItem.findUnique({ where: { id: params.itemId }, select: { driveUrl: true } });
+      const groupItems = await prisma.contentItem.findMany({ where: { id: { in: ids } }, orderBy: { order: "asc" }, select: { id: true, fileType: true } });
+      await refreshGroupMediaFromDrive(src?.driveUrl ?? null, groupItems);
     } else if (action === "undo-adjustment-done") {
       // Desfaz o "Ajuste feito": volta o post para a etapa de Ajustes, restaurando
       // a flag no item que carrega o comentário (cliente tem precedência).
