@@ -10,6 +10,12 @@ type Status = "PENDING" | "APPROVED" | "ADJUSTMENT" | "REJECTED";
 interface InternalReviewItem {
   status: Status;
   comment: string | null;
+  commentResolved?: boolean;
+}
+
+interface ApprovalInfo {
+  clientComment: string | null;
+  clientCommentResolved?: boolean;
 }
 
 interface ContentItem {
@@ -24,6 +30,7 @@ interface ContentItem {
   driveUrl: string | null;
   coverDriveUrl: string | null;
   internalReviewItem: InternalReviewItem | null;
+  approvalItem?: ApprovalInfo | null;
 }
 
 interface Campaign {
@@ -416,6 +423,23 @@ export default function InternalReviewPage() {
                     <span className="text-xs text-gray-600">#{gi + 1}</span>
                   </div>
                 )}
+
+                {(() => {
+                  const rev = items[0].internalReviewItem;
+                  const apr = items[0].approvalItem;
+                  const ajustes: string[] = [];
+                  if (rev?.commentResolved && rev.comment) ajustes.push(rev.comment);
+                  if (apr?.clientCommentResolved && apr.clientComment) ajustes.push(apr.clientComment);
+                  if (!ajustes.length) return null;
+                  return (
+                    <div className="bg-emerald-900/20 border border-emerald-500/30 rounded-lg p-3 mb-3">
+                      <p className="text-xs font-semibold text-emerald-400 mb-1">🔧 Ajuste solicitado (já resolvido):</p>
+                      {ajustes.map((t, i) => (
+                        <p key={i} className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">{t}</p>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 {currentItem.caption && (
                   <div className="bg-black/30 rounded-lg p-3 mb-3">

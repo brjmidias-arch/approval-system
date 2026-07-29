@@ -17,7 +17,7 @@ interface ContentItem {
   groupId: string | null;
   coverUrl: string | null;
   driveUrl: string | null;
-  approvalItem: { status: Status; clientComment: string | null } | null;
+  approvalItem: { status: Status; clientComment: string | null; clientCommentResolved?: boolean } | null;
 }
 
 interface Campaign {
@@ -457,6 +457,13 @@ export default function ApprovalPage() {
                       </span>
                     )}
                     <span className="text-xs text-gray-600">#{gi + 1}</span>
+                  </div>
+                )}
+
+                {items[0].approvalItem?.clientCommentResolved && items[0].approvalItem.clientComment && (
+                  <div className="bg-emerald-900/20 border border-emerald-500/30 rounded-lg p-3 mb-3">
+                    <p className="text-xs font-semibold text-emerald-500 mb-1">🔧 Ajuste solicitado (já resolvido):</p>
+                    <p className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">{items[0].approvalItem.clientComment}</p>
                   </div>
                 )}
 

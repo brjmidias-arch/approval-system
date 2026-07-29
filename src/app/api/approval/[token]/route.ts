@@ -5,7 +5,7 @@ import { syncRoteiroStatus } from "@/lib/syncRoteiro";
 const POST_SELECT = {
   id: true, fileUrl: true, fileType: true, contentType: true, title: true, caption: true,
   scheduledDate: true, groupId: true, order: true, coverUrl: true, driveUrl: true,
-  approvalItem: { select: { status: true, clientComment: true } },
+  approvalItem: { select: { status: true, clientComment: true, clientCommentResolved: true } },
 } as const;
 
 export async function GET(_req: NextRequest, { params }: { params: { token: string } }) {
