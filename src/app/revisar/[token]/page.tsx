@@ -79,6 +79,7 @@ export default function InternalReviewPage() {
   const [savingGroup, setSavingGroup] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
   const [copiedMsg, setCopiedMsg] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => setOrigin(window.location.origin), []);
 
@@ -207,6 +208,12 @@ export default function InternalReviewPage() {
     navigator.clipboard.writeText(clientMessage);
     setCopiedMsg(true);
     setTimeout(() => setCopiedMsg(false), 2500);
+  }
+
+  function copyLink() {
+    navigator.clipboard.writeText(clientLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
   }
 
   return (
@@ -580,12 +587,20 @@ export default function InternalReviewPage() {
             <div className="bg-black/40 rounded-lg p-3">
               <p className="text-gray-300 text-xs whitespace-pre-wrap leading-relaxed break-words">{clientMessage}</p>
             </div>
-            <button
-              onClick={copyMsg}
-              className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors"
-            >
-              {copiedMsg ? "Copiado! ✓" : "📋 Copiar mensagem + link do cliente"}
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={copyMsg}
+                className="flex-1 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors"
+              >
+                {copiedMsg ? "Copiado! ✓" : "📋 Copiar mensagem + link"}
+              </button>
+              <button
+                onClick={copyLink}
+                className="flex-1 py-2.5 rounded-lg bg-white/10 hover:bg-white/15 text-white text-sm font-medium border border-white/15 transition-colors"
+              >
+                {copiedLink ? "Copiado! ✓" : "🔗 Copiar só o link"}
+              </button>
+            </div>
           </div>
         )}
 
