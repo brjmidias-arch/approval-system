@@ -112,7 +112,6 @@ export default function ClientWorkspacePage() {
   const [editingPost, setEditingPost] = useState<GroupedPost | null>(null);
   const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "", driveUrl: "", coverDriveUrl: "", contentType: "", roteiroConteudoId: "", asanaUrl: "" });
   const [savingEdit, setSavingEdit] = useState(false);
-  const [refetchingArt, setRefetchingArt] = useState(false);
   const [notifying, setNotifying] = useState(false);
 
   const fetchClient = useCallback(async () => {
@@ -333,37 +332,6 @@ export default function ClientWorkspacePage() {
     return { slideAssets: null, singleFileUrl: bt(assets.fileUrl) };
   }
 
-  // Força re-buscar a arte do Drive (mesmo com o link igual) e atualiza os previews.
-  async function refetchArt() {
-    if (!editingPost) return;
-    const link = editForm.driveUrl.trim();
-    if (!link) { alert("Cole o link do Drive primeiro."); return; }
-    setRefetchingArt(true);
-    try {
-      const { slideAssets, singleFileUrl } = await fetchDriveMedia(link);
-      await Promise.all(
-        editingPost.items.map((item, i) => {
-          const slide = slideAssets ? slideAssets[i] : null;
-          const body: Record<string, unknown> = { skipSync: i !== 0 };
-          if (slide) { body.fileUrl = slide.fileUrl; body.fileType = slide.fileType; }
-          else if (!slideAssets && singleFileUrl && i === 0) { body.fileUrl = singleFileUrl; }
-          if (body.fileUrl === undefined) return Promise.resolve();
-          return fetch(`/api/admin/posts/${item.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          }).then((res) => { if (!res.ok) throw new Error("Erro ao atualizar a arte."); });
-        })
-      );
-      await fetchClient();
-      alert("Arte atualizada do Drive! Se ainda aparecer a antiga, dê Ctrl+Shift+R na página de revisão/aprovação.");
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Erro ao atualizar a arte.");
-    } finally {
-      setRefetchingArt(false);
-    }
-  }
-
   async function handleEditSave() {
     if (!editingPost) return;
     setSavingEdit(true);
@@ -375,28 +343,24 @@ export default function ClientWorkspacePage() {
     }
 
     try {
-      // Se o Link do Drive mudou, regenera a mídia (preview) — senão a revisão
-      // continua mostrando a versão antiga. Arquivo → regenera o item; pasta
-      // (carrossel) → re-escaneia e atualiza cada slide na ordem.
+      // O salvar SEMPRE re-busca a arte do Drive (preview) — assim não precisa de
+      // botão. Best-effort: se não conseguir ler a pasta, salva o texto mesmo assim.
       const link = editForm.driveUrl.trim();
-      const linkChanged = link.length > 0 && link !== (editingPost.rep.driveUrl ?? "");
       let slideAssets: { fileUrl: string; fileType: string }[] | null = null;
       let singleFileUrl: string | null = null;
-
-      if (linkChanged) {
-        const media = await fetchDriveMedia(link);
-        slideAssets = media.slideAssets;
-        singleFileUrl = media.singleFileUrl;
-        if (slideAssets && slideAssets.length !== editingPost.items.length) {
-          const ok = confirm(
-            `A pasta tem ${slideAssets.length} arquivo(s), mas o post tem ${editingPost.items.length} slide(s). Vou atualizar os ${Math.min(slideAssets.length, editingPost.items.length)} primeiros. Continuar?`
-          );
-          if (!ok) { setSavingEdit(false); return; }
+      let artError = false;
+      if (link) {
+        try {
+          const media = await fetchDriveMedia(link);
+          slideAssets = media.slideAssets;
+          singleFileUrl = media.singleFileUrl;
+        } catch {
+          artError = true;
         }
       }
 
-      // PATCHes em paralelo; só o 1º item sincroniza com a roteirização (o sync
-      // abrange o grupo inteiro), evitando N sincronizações num carrossel.
+      // PATCHes em paralelo. Só o 1º item propaga a data e sincroniza a roteirização
+      // (ambos abrangem o grupo) — evita deadlock e N sincronizações num carrossel.
       await Promise.all(
         editingPost.items.map(async (item, i) => {
           const slide = slideAssets ? slideAssets[i] : null;
@@ -406,10 +370,10 @@ export default function ClientWorkspacePage() {
             body: JSON.stringify({
               title: editForm.title || null,
               caption: editForm.caption || null,
-              scheduledDate: editForm.scheduledDate || null,
               driveUrl: editForm.driveUrl || null,
               roteiroConteudoId: editForm.roteiroConteudoId || null,
               asanaUrl: editForm.asanaUrl || null,
+              ...(i === 0 && { scheduledDate: editForm.scheduledDate || null }),
               skipSync: i !== 0,
               // Mídia nova (preview): carrossel usa o slide correspondente; post único usa o arquivo.
               ...(slide && { fileUrl: slide.fileUrl, fileType: slide.fileType }),
@@ -430,6 +394,9 @@ export default function ClientWorkspacePage() {
 
       setEditingPost(null);
       await fetchClient();
+      if (artError) {
+        alert("Post salvo, mas não consegui atualizar a arte do Drive. Confirme que a pasta está compartilhada como 'Qualquer pessoa com o link'.");
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
     } finally {
@@ -619,15 +586,7 @@ export default function ClientWorkspacePage() {
                   placeholder="https://drive.google.com/..."
                   className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 placeholder-gray-600"
                 />
-                <button
-                  type="button"
-                  onClick={refetchArt}
-                  disabled={refetchingArt || savingEdit}
-                  className="mt-2 text-xs px-3 py-1.5 rounded-lg bg-blue-900/40 hover:bg-blue-900/60 text-blue-300 border border-blue-500/30 disabled:opacity-50 transition-colors"
-                  title="Busca as imagens/vídeos atuais desta pasta/arquivo e atualiza os previews (use se trocou a arte no mesmo link)"
-                >
-                  {refetchingArt ? "Atualizando..." : "🔄 Atualizar arte do Drive"}
-                </button>
+                <p className="text-[11px] text-gray-600 mt-1">Ao salvar, a arte é buscada automaticamente deste link.</p>
               </div>
 
               {(editingPost.rep.fileType === "VIDEO" || editingPost.rep.contentType === "REELS") && (
