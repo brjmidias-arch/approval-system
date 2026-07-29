@@ -7,7 +7,7 @@ import { CONTENT_TYPE_LABELS, APPROVAL_STATUS_LABELS, APPROVAL_STATUS_COLORS } f
 import type { ContentType, ApprovalStatus } from "@/types";
 import FolderUploadModal from "@/components/admin/FolderUploadModal";
 import { buildAprovacaoMsg } from "@/lib/aprovacaoMsg";
-import { extractDriveId, driveThumbUrl, drivePreviewUrl, driveFileViewUrl, driveAssetsFromLink } from "@/lib/drive";
+import { extractDriveId, driveThumbUrl, drivePreviewUrl, driveAssetsFromLink } from "@/lib/drive";
 import RoteiroClientLink from "@/components/admin/RoteiroClientLink";
 import AnexarRoteiroPicker, { type RotConteudoOpcao } from "@/components/admin/AnexarRoteiroPicker";
 
@@ -112,6 +112,7 @@ export default function ClientWorkspacePage() {
   const [editingPost, setEditingPost] = useState<GroupedPost | null>(null);
   const [editForm, setEditForm] = useState({ title: "", caption: "", scheduledDate: "", driveUrl: "", coverDriveUrl: "", contentType: "", roteiroConteudoId: "", asanaUrl: "" });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [refetchingArt, setRefetchingArt] = useState(false);
   const [notifying, setNotifying] = useState(false);
 
   const fetchClient = useCallback(async () => {
@@ -300,6 +301,69 @@ export default function ClientWorkspacePage() {
     });
   }
 
+  // Busca a mídia (preview) a partir de um link do Drive. Cache-buster (&v) força
+  // o navegador a baixar a arte nova mesmo se a URL da miniatura for parecida.
+  async function fetchDriveMedia(link: string): Promise<{
+    slideAssets: { fileUrl: string; fileType: string }[] | null;
+    singleFileUrl: string | null;
+  }> {
+    const bust = Date.now();
+    const bt = (u: string) => (u.includes("thumbnail?") ? `${u}&v=${bust}` : u);
+    if (link.includes("/folders/")) {
+      const folderId = extractDriveId(link);
+      if (!folderId) throw new Error("Link de pasta do Drive inválido.");
+      const r = await fetch("/api/drive/folder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderId }),
+      });
+      const d = await r.json();
+      const files: { id: string; mimeType: string }[] = Array.isArray(d.files) ? d.files : [];
+      if (!files.length) {
+        throw new Error("Não consegui ler os arquivos dessa pasta. Confirme que está compartilhada como 'Qualquer pessoa com o link'.");
+      }
+      const slideAssets = files.map((f) => {
+        const isVid = (f.mimeType || "").startsWith("video/");
+        return { fileUrl: bt(isVid ? drivePreviewUrl(f.id) : driveThumbUrl(f.id)), fileType: isVid ? "VIDEO" : "IMAGE" };
+      });
+      return { slideAssets, singleFileUrl: null };
+    }
+    const assets = driveAssetsFromLink(link, editingPost?.rep.fileType ?? "IMAGE");
+    if (!assets?.fileUrl) throw new Error("Link do Drive inválido. Cole um link de arquivo ou pasta.");
+    return { slideAssets: null, singleFileUrl: bt(assets.fileUrl) };
+  }
+
+  // Força re-buscar a arte do Drive (mesmo com o link igual) e atualiza os previews.
+  async function refetchArt() {
+    if (!editingPost) return;
+    const link = editForm.driveUrl.trim();
+    if (!link) { alert("Cole o link do Drive primeiro."); return; }
+    setRefetchingArt(true);
+    try {
+      const { slideAssets, singleFileUrl } = await fetchDriveMedia(link);
+      await Promise.all(
+        editingPost.items.map((item, i) => {
+          const slide = slideAssets ? slideAssets[i] : null;
+          const body: Record<string, unknown> = { skipSync: i !== 0 };
+          if (slide) { body.fileUrl = slide.fileUrl; body.fileType = slide.fileType; }
+          else if (!slideAssets && singleFileUrl && i === 0) { body.fileUrl = singleFileUrl; }
+          if (body.fileUrl === undefined) return Promise.resolve();
+          return fetch(`/api/admin/posts/${item.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          }).then((res) => { if (!res.ok) throw new Error("Erro ao atualizar a arte."); });
+        })
+      );
+      await fetchClient();
+      alert("Arte atualizada do Drive! Se ainda aparecer a antiga, dê Ctrl+Shift+R na página de revisão/aprovação.");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erro ao atualizar a arte.");
+    } finally {
+      setRefetchingArt(false);
+    }
+  }
+
   async function handleEditSave() {
     if (!editingPost) return;
     setSavingEdit(true);
@@ -316,41 +380,18 @@ export default function ClientWorkspacePage() {
       // (carrossel) → re-escaneia e atualiza cada slide na ordem.
       const link = editForm.driveUrl.trim();
       const linkChanged = link.length > 0 && link !== (editingPost.rep.driveUrl ?? "");
-      let slideAssets: { fileUrl: string; driveUrl: string; fileType: string }[] | null = null;
+      let slideAssets: { fileUrl: string; fileType: string }[] | null = null;
       let singleFileUrl: string | null = null;
 
       if (linkChanged) {
-        if (link.includes("/folders/")) {
-          const folderId = extractDriveId(link);
-          if (!folderId) throw new Error("Link de pasta do Drive inválido.");
-          const r = await fetch("/api/drive/folder", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ folderId }),
-          });
-          const d = await r.json();
-          const files: { id: string; mimeType: string }[] = Array.isArray(d.files) ? d.files : [];
-          if (!files.length) {
-            throw new Error("Não consegui ler os arquivos dessa pasta. Confirme que está compartilhada como 'Qualquer pessoa com o link'.");
-          }
-          slideAssets = files.map((f) => {
-            const isVid = (f.mimeType || "").startsWith("video/");
-            return {
-              fileUrl: isVid ? drivePreviewUrl(f.id) : driveThumbUrl(f.id),
-              driveUrl: driveFileViewUrl(f.id),
-              fileType: isVid ? "VIDEO" : "IMAGE",
-            };
-          });
-          if (slideAssets.length !== editingPost.items.length) {
-            const ok = confirm(
-              `A pasta tem ${slideAssets.length} arquivo(s), mas o post tem ${editingPost.items.length} slide(s). Vou atualizar os ${Math.min(slideAssets.length, editingPost.items.length)} primeiros. Continuar?`
-            );
-            if (!ok) { setSavingEdit(false); return; }
-          }
-        } else {
-          const assets = driveAssetsFromLink(link, editingPost.rep.fileType);
-          if (!assets?.fileUrl) throw new Error("Link do Drive inválido. Cole um link de arquivo ou pasta.");
-          singleFileUrl = assets.fileUrl;
+        const media = await fetchDriveMedia(link);
+        slideAssets = media.slideAssets;
+        singleFileUrl = media.singleFileUrl;
+        if (slideAssets && slideAssets.length !== editingPost.items.length) {
+          const ok = confirm(
+            `A pasta tem ${slideAssets.length} arquivo(s), mas o post tem ${editingPost.items.length} slide(s). Vou atualizar os ${Math.min(slideAssets.length, editingPost.items.length)} primeiros. Continuar?`
+          );
+          if (!ok) { setSavingEdit(false); return; }
         }
       }
 
@@ -578,6 +619,15 @@ export default function ClientWorkspacePage() {
                   placeholder="https://drive.google.com/..."
                   className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 placeholder-gray-600"
                 />
+                <button
+                  type="button"
+                  onClick={refetchArt}
+                  disabled={refetchingArt || savingEdit}
+                  className="mt-2 text-xs px-3 py-1.5 rounded-lg bg-blue-900/40 hover:bg-blue-900/60 text-blue-300 border border-blue-500/30 disabled:opacity-50 transition-colors"
+                  title="Busca as imagens/vídeos atuais desta pasta/arquivo e atualiza os previews (use se trocou a arte no mesmo link)"
+                >
+                  {refetchingArt ? "Atualizando..." : "🔄 Atualizar arte do Drive"}
+                </button>
               </div>
 
               {(editingPost.rep.fileType === "VIDEO" || editingPost.rep.contentType === "REELS") && (
