@@ -10,9 +10,10 @@ const LABELS: Record<string, string> = {
   ajusteVideo: "Ajuste de vídeo / Reels",
   ajusteOutro: "Ajuste de post feed / carrossel / estático",
   criarCapa: "Criar capa",
+  aprovarCapa: "Aprovar capa",
   prontoProgramar: "Pronto para programar",
 };
-const ORDEM = ["revisaoInterna", "ajusteVideo", "ajusteOutro", "criarCapa", "prontoProgramar"];
+const ORDEM = ["revisaoInterna", "ajusteVideo", "ajusteOutro", "criarCapa", "aprovarCapa", "prontoProgramar"];
 
 export default function ResponsaveisPage() {
   const [itens, setItens] = useState<Item[] | null>(null);

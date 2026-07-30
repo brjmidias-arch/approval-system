@@ -105,7 +105,7 @@ function responsavelFor(cfg: RespCfg, label: string, isVideo: boolean): string |
   switch (label) {
     case L_INTERNA: return cfg.revisaoInterna || null;
     case L_CRIAR_CAPA: return cfg.criarCapa || null;
-    case L_APROVAR_CAPA: return cfg.criarCapa || null;
+    case L_APROVAR_CAPA: return cfg.aprovarCapa || null;
     case L_PROGRAMAR: return cfg.prontoProgramar || null;
     case L_AJUSTE: return (isVideo ? cfg.ajusteVideo : cfg.ajusteOutro) || null;
     default: return null;
