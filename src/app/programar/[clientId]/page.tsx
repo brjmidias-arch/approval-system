@@ -28,12 +28,21 @@ export default function ProgramarPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
+  const [dates, setDates] = useState<Record<string, string>>({});
+  const [savingDateId, setSavingDateId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch(`/api/programar/${clientId}`, { cache: "no-store" });
       if (!res.ok) { setNotFound(true); return; }
-      setData(await res.json());
+      const json: Data = await res.json();
+      setData(json);
+      // Semeia o campo de data com o que já veio do dashboard (formato YYYY-MM-DD).
+      const seed: Record<string, string> = {};
+      for (const c of json.campaigns ?? []) for (const p of c.posts) {
+        seed[p.id] = p.scheduledDate ? new Date(p.scheduledDate).toISOString().slice(0, 10) : "";
+      }
+      setDates(seed);
     } catch {
       setNotFound(true);
     } finally {
@@ -43,13 +52,32 @@ export default function ProgramarPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Auto-save da data digitada no link (grava no post; carrossel = grupo todo).
+  async function saveDate(postId: string, value: string) {
+    setDates((prev) => ({ ...prev, [postId]: value }));
+    setSavingDateId(postId);
+    try {
+      await fetch(`/api/programar/${clientId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentItemId: postId, scheduledDate: value || null, action: "set-date" }),
+      });
+    } catch {
+      // best-effort: a data também é reenviada ao clicar em "Agendado".
+    } finally {
+      setSavingDateId(null);
+    }
+  }
+
   async function markPosted(postId: string) {
+    const date = dates[postId];
+    if (!date) { alert("Escolha a data do agendamento primeiro."); return; }
     setMarkingId(postId);
     try {
       const res = await fetch(`/api/programar/${clientId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentItemId: postId }),
+        body: JSON.stringify({ contentItemId: postId, scheduledDate: date }),
       });
       if (!res.ok) throw new Error();
       setData((prev) =>
@@ -109,17 +137,24 @@ export default function ProgramarPage() {
                         <span className="text-xs text-emerald-400 bg-emerald-900/20 px-1.5 py-0.5 rounded">
                           {CONTENT_TYPE_LABELS[post.contentType] ?? post.contentType}
                         </span>
-                        {post.scheduledDate && (
-                          <span className="text-xs text-gray-400 bg-white/5 px-1.5 py-0.5 rounded">
-                            📅 {new Date(post.scheduledDate).toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit" })}
-                          </span>
-                        )}
+                      </div>
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <label className="text-[11px] text-gray-400 shrink-0">📅 Data do agendamento:</label>
+                        <input
+                          type="date"
+                          value={dates[post.id] ?? ""}
+                          onChange={(e) => saveDate(post.id, e.target.value)}
+                          style={{ colorScheme: "dark" }}
+                          className="bg-[#0f0f0f] border border-white/15 rounded-md px-2 py-1 text-xs text-white outline-none focus:border-emerald-500"
+                        />
+                        {savingDateId === post.id && <span className="text-[11px] text-gray-500">salvando…</span>}
                       </div>
                     </div>
                     <button
                       onClick={() => markPosted(post.id)}
-                      disabled={markingId === post.id}
-                      className="shrink-0 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+                      disabled={markingId === post.id || !dates[post.id]}
+                      title={!dates[post.id] ? "Escolha a data primeiro" : undefined}
+                      className="shrink-0 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium px-2.5 py-1.5 rounded-lg transition-colors"
                     >
                       {markingId === post.id ? "..." : "Agendado ✓"}
                     </button>
