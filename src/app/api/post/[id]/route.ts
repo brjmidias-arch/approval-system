@@ -37,6 +37,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
           })
         : [{ id: item.id, fileUrl: item.fileUrl, fileType: item.fileType, order: item.order }];
 
+    // Histórico de ajustes do post (agrega todos os slides do grupo), mais recente primeiro.
+    const history = await prisma.adjustmentHistory.findMany({
+      where: { contentItemId: { in: slidesRaw.map((s) => s.id) } },
+      orderBy: { createdAt: "desc" },
+      select: { source: true, status: true, comment: true, createdAt: true },
+    });
+
     return NextResponse.json({
       campaignName: item.campaign?.name ?? null,
       clientName: item.client?.name ?? item.campaign?.client?.name ?? "",
@@ -50,6 +57,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       clientCommentResolved: item.approvalItem?.clientCommentResolved ?? false,
       internalComment: item.internalReviewItem?.comment ?? null,
       internalCommentResolved: item.internalReviewItem?.commentResolved ?? false,
+      history,
     });
   } catch {
     return NextResponse.json({ error: "Erro ao buscar post" }, { status: 500 });

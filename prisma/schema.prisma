@@ -82,6 +82,22 @@ model ContentItem {
   createdAt          DateTime            @default(now())
   approvalItem       ApprovalItem?
   internalReviewItem InternalReviewItem?
+  adjustmentHistory  AdjustmentHistory[]
+}
+
+// Histórico de ajustes/reprovações pedidos (cliente ou interno). Diferente dos
+// campos clientComment/comment (que são limpos ao avançar), aqui cada pedido fica
+// registrado para consulta ("o que já foi pedido neste post").
+model AdjustmentHistory {
+  id            String      @id @default(cuid())
+  contentItemId String
+  contentItem   ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  source        String      // "CLIENTE" | "INTERNO"
+  status        String      // "ADJUSTMENT" | "REJECTED"
+  comment       String?
+  createdAt     DateTime    @default(now())
+
+  @@index([contentItemId])
 }
 
 model InternalReviewItem {

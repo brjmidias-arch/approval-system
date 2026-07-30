@@ -80,6 +80,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     const isRep = item.groupId
       ? !(await prisma.contentItem.findFirst({ where: { groupId: item.groupId, order: { lt: item.order } }, select: { id: true } }))
       : true;
+    // Histórico: registra cada ajuste/reprovação da revisão interna (não é limpo ao avançar).
+    if (isRep && (status === "ADJUSTMENT" || status === "REJECTED")) {
+      try {
+        await prisma.adjustmentHistory.create({ data: { contentItemId, source: "INTERNO", status, comment: comment || null } });
+      } catch { /* best-effort */ }
+    }
     const nome = tgEscape(item.client?.name);
     const post = tgEscape(item.title || "(sem título)");
     const com = tgEscape(comment);

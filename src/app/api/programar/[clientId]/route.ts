@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncRoteiroStatus } from "@/lib/syncRoteiro";
 
 export async function GET(_req: NextRequest, { params }: { params: { clientId: string } }) {
   try {
@@ -87,12 +88,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { clientId: 
       return NextResponse.json({ error: "Item não disponível para agendamento" }, { status: 404 });
     }
 
-    // Marca como AGENDADO (vai para "Posts programados" no dashboard). Carrossel = grupo inteiro.
-    // Não seta postedAt: a conclusão (publicado) é confirmada depois pelo admin.
+    // Agendou com a data certa = post CONCLUÍDO. Vai direto para "Concluído" (PUBLISHED)
+    // e o Roteirização recebe data_postagem = data agendada + status "Concluído" (via sync).
+    // Carrossel = grupo inteiro.
     const ids = item.contentType === "CARROSSEL" && item.groupId
       ? (await prisma.contentItem.findMany({ where: { groupId: item.groupId }, select: { id: true } })).map((s) => s.id)
       : [item.id];
-    await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "SCHEDULED" } });
+    await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "PUBLISHED", postedAt: new Date() } });
+    await Promise.all(ids.map((id) => syncRoteiroStatus(id)));
 
     return NextResponse.json({ success: true });
   } catch {

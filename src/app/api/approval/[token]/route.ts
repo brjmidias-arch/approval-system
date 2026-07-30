@@ -71,6 +71,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
       ? !(await prisma.contentItem.findFirst({ where: { groupId: item.groupId, order: { lt: item.order } }, select: { id: true } }))
       : true;
     if (isRep) {
+      // Histórico: registra cada ajuste/reprovação pedido (não é limpo ao avançar).
+      if (status === "ADJUSTMENT" || status === "REJECTED") {
+        try {
+          await prisma.adjustmentHistory.create({ data: { contentItemId, source: "CLIENTE", status, comment: clientComment || null } });
+        } catch { /* best-effort */ }
+      }
       const nome = tgEscape(item.client?.name);
       const post = tgEscape(item.title || "(sem título)");
       const com = tgEscape(clientComment);

@@ -23,6 +23,14 @@ interface PostData {
   clientCommentResolved: boolean;
   internalComment: string | null;
   internalCommentResolved: boolean;
+  history: HistoryItem[];
+}
+
+interface HistoryItem {
+  source: "CLIENTE" | "INTERNO";
+  status: "ADJUSTMENT" | "REJECTED";
+  comment: string | null;
+  createdAt: string;
 }
 
 export default function PostPage() {
@@ -134,6 +142,34 @@ export default function PostPage() {
             <span className="opacity-70">Revisão interna: </span>
             <span className={data.internalCommentResolved ? "line-through opacity-60" : ""}>{data.internalComment}</span>
             {data.internalCommentResolved && <span className="ml-1.5">✅</span>}
+          </div>
+        )}
+
+        {/* Histórico de ajustes (todos os pedidos, do mais recente ao mais antigo) */}
+        {data.history.length > 0 && (
+          <div className="border-t border-white/10 pt-4 space-y-2">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Histórico de ajustes</p>
+            {data.history.map((h, i) => {
+              const isClient = h.source === "CLIENTE";
+              const label = h.status === "REJECTED" ? "Reprovou" : "Pediu ajuste";
+              const who = isClient ? "Cliente" : "Revisão interna";
+              return (
+                <div
+                  key={i}
+                  className={`text-sm rounded-lg px-3 py-2.5 border ${
+                    isClient
+                      ? "text-amber-400 bg-amber-900/10 border-amber-500/15"
+                      : "text-violet-300 bg-violet-900/10 border-violet-500/15"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs opacity-70">{who} · {label}</span>
+                    <span className="text-xs opacity-50">{new Date(h.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                  </div>
+                  {h.comment && <p className="mt-1 whitespace-pre-line">{h.comment}</p>}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
