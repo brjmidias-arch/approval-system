@@ -359,7 +359,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           </div>
 
           {view === "kanban" ? (
-            <KanbanBoard stages={STAGES} columns={kanban} designerToken={designerCoverToken()} />
+            <KanbanBoard stages={STAGES} columns={kanban} designerToken={designerCoverToken()} adjustToken={designerAdjustToken()} />
           ) : (
           /* Lista: seções por etapa */
           <div className="space-y-5">

@@ -30,15 +30,24 @@ export default function KanbanBoard({
   stages,
   columns,
   designerToken,
+  adjustToken,
 }: {
   stages: Stage[];
   columns: Record<string, KanbanCardData[]>;
   designerToken?: string;
+  adjustToken?: string;
 }) {
   const router = useRouter();
   const [overStage, setOverStage] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ published: true });
   const [busy, setBusy] = useState(false);
+  const [copiedStage, setCopiedStage] = useState<string | null>(null);
+
+  function stageDesignerLink(stageId: string): string | null {
+    if (stageId === "adjustment" && adjustToken) return `/ajustes/${adjustToken}`;
+    if (stageId === "criarCapa" && designerToken) return `/criar-capa/${designerToken}`;
+    return null;
+  }
 
   async function onDropTo(stageId: string, e: React.DragEvent) {
     e.preventDefault();
@@ -78,18 +87,33 @@ export default function KanbanBoard({
             onDragLeave={droppable ? () => setOverStage((s) => (s === stage.id ? null : s)) : undefined}
             onDrop={droppable ? (e) => onDropTo(stage.id, e) : undefined}
           >
-            <button
-              type="button"
-              onClick={() => setCollapsed((c) => ({ ...c, [stage.id]: !c[stage.id] }))}
-              className={`flex items-center gap-2 px-2 py-2 rounded-t-lg border-b-2 ${stage.bg} w-full text-left ${
-                isOver ? "ring-2 ring-white/40" : ""
-              }`}
-            >
-              <span className="text-sm">{stage.icon}</span>
-              <h2 className={`text-xs font-semibold ${stage.color}`}>{stage.label}</h2>
-              <span className="text-[11px] text-gray-500 ml-auto">{cards.length}</span>
-              <span className="text-gray-400 text-[10px]">{isCollapsed ? "▸" : "▾"}</span>
-            </button>
+            <div className={`flex items-stretch rounded-t-lg border-b-2 ${stage.bg} ${isOver ? "ring-2 ring-white/40" : ""}`}>
+              <button
+                type="button"
+                onClick={() => setCollapsed((c) => ({ ...c, [stage.id]: !c[stage.id] }))}
+                className="flex items-center gap-2 px-2 py-2 flex-1 min-w-0 text-left"
+              >
+                <span className="text-sm">{stage.icon}</span>
+                <h2 className={`text-xs font-semibold ${stage.color}`}>{stage.label}</h2>
+                <span className="text-[11px] text-gray-500 ml-auto">{cards.length}</span>
+                <span className="text-gray-400 text-[10px]">{isCollapsed ? "▸" : "▾"}</span>
+              </button>
+              {stageDesignerLink(stage.id) && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(`${window.location.origin}${stageDesignerLink(stage.id)}`);
+                    setCopiedStage(stage.id);
+                    setTimeout(() => setCopiedStage((s) => (s === stage.id ? null : s)), 2000);
+                  }}
+                  title="Copiar link do designer desta etapa"
+                  className="px-2 shrink-0 text-[11px] text-gray-300 hover:text-white border-l border-white/10"
+                >
+                  {copiedStage === stage.id ? "✓ copiado" : "🔗 link"}
+                </button>
+              )}
+            </div>
 
             {!isCollapsed && (
               <div
