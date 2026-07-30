@@ -117,7 +117,7 @@ export default function KanbanBoard({
 
             {!isCollapsed && (
               <div
-                className={`rounded-b-lg p-1.5 space-y-1.5 min-h-[80px] flex-1 border transition-colors ${
+                className={`rounded-b-lg p-1.5 space-y-1.5 min-h-[80px] max-h-[calc(100vh-360px)] overflow-y-auto flex-1 border transition-colors ${
                   isOver ? "bg-white/[0.06] border-white/30" : "bg-[#141414] border-white/[0.06]"
                 }`}
               >
