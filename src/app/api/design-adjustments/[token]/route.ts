@@ -20,24 +20,30 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
       where: NEEDS_ADJUSTMENT,
       orderBy: [{ clientId: "asc" }, { order: "asc" }],
       select: {
-        id: true, title: true, caption: true, fileUrl: true, fileType: true, contentType: true, driveUrl: true,
+        id: true, title: true, caption: true, fileUrl: true, fileType: true, contentType: true, driveUrl: true, groupId: true,
         client: { select: { name: true } },
         approvalItem: { select: { status: true, clientComment: true } },
         internalReviewItem: { select: { status: true, comment: true } },
       },
     });
-    const contentItems = rows.map((i) => {
+    // Deduplica por grupo (carrossel = 1 entrada, não 1 por slide).
+    const seen = new Set<string>();
+    const contentItems = [];
+    for (const i of rows) {
+      const key = i.groupId ?? i.id;
+      if (seen.has(key)) continue;
+      seen.add(key);
       const a = i.approvalItem?.status;
       const r = i.internalReviewItem?.status;
       let ajuste: string | null = null;
       let fonte: "cliente" | "interno" | null = null;
       if (a === "ADJUSTMENT" || a === "REJECTED") { ajuste = i.approvalItem?.clientComment ?? null; fonte = "cliente"; }
       else if (r === "ADJUSTMENT" || r === "REJECTED") { ajuste = i.internalReviewItem?.comment ?? null; fonte = "interno"; }
-      return {
+      contentItems.push({
         id: i.id, title: i.title, caption: i.caption, fileUrl: i.fileUrl, fileType: i.fileType,
         contentType: i.contentType, driveUrl: i.driveUrl, client: i.client, ajuste, fonte,
-      };
-    });
+      });
+    }
     return NextResponse.json({ contentItems });
   } catch {
     return NextResponse.json({ error: "Erro ao buscar ajustes" }, { status: 500 });
