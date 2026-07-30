@@ -30,7 +30,6 @@ export default function ProgramarPage() {
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [dates, setDates] = useState<Record<string, string>>({});
   const [savingDateId, setSavingDateId] = useState<string | null>(null);
-  const [needDateId, setNeedDateId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -56,7 +55,6 @@ export default function ProgramarPage() {
   // Auto-save da data digitada no link (grava no post; carrossel = grupo todo).
   async function saveDate(postId: string, value: string) {
     setDates((prev) => ({ ...prev, [postId]: value }));
-    if (value) setNeedDateId((cur) => (cur === postId ? null : cur));
     setSavingDateId(postId);
     try {
       await fetch(`/api/programar/${clientId}`, {
@@ -73,8 +71,7 @@ export default function ProgramarPage() {
 
   async function markPosted(postId: string) {
     const date = dates[postId];
-    if (!date) { setNeedDateId(postId); return; }
-    setNeedDateId(null);
+    if (!date) return;
     setMarkingId(postId);
     try {
       const res = await fetch(`/api/programar/${clientId}`, {
@@ -155,14 +152,14 @@ export default function ProgramarPage() {
                     </div>
                     <button
                       onClick={() => markPosted(post.id)}
-                      disabled={markingId === post.id}
-                      className="shrink-0 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+                      disabled={markingId === post.id || !dates[post.id]}
+                      className="shrink-0 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium px-2.5 py-1.5 rounded-lg transition-colors"
                     >
                       {markingId === post.id ? "..." : "Agendado ✓"}
                     </button>
                   </div>
 
-                  {needDateId === post.id && !dates[post.id] && (
+                  {!dates[post.id] && (
                     <p className="text-xs text-amber-400 px-3 pb-2 -mt-1 text-right">⚠️ Complete a data do agendamento para agendar este post.</p>
                   )}
 
