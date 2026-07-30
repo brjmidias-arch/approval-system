@@ -45,6 +45,7 @@ type DashPost = {
   daysWaiting: number | null;
   roteiroAttached: boolean;
   asanaUrl: string | null;
+  postedAt: Date | null;
   adjustmentSource: "cliente" | "interno" | null;
   adjustmentComment: string | null;
 };
@@ -145,6 +146,7 @@ function distinctPosts(items: Item[], predicate: (item: Item) => boolean): DashP
       daysWaiting: daysSince(item.approvalItem?.reviewedAt ?? null),
       roteiroAttached: !!item.roteiroConteudoId,
       asanaUrl: item.asanaUrl,
+      postedAt: item.postedAt,
       adjustmentSource,
       adjustmentComment,
     });
@@ -181,7 +183,10 @@ function computeStagePosts(items: Item[]): Record<StageId, DashPost[]> {
     aprovarCapa: distinctPosts(items, STAGE_PREDICATES.aprovarCapa),
     readyToSchedule: distinctPosts(items, STAGE_PREDICATES.readyToSchedule),
     scheduled: distinctPosts(items, STAGE_PREDICATES.scheduled),
-    published: distinctPosts(items, STAGE_PREDICATES.published),
+    // Concluídos: mais recentes primeiro (por data de conclusão).
+    published: distinctPosts(items, STAGE_PREDICATES.published).sort(
+      (a, b) => (b.postedAt?.getTime() ?? 0) - (a.postedAt?.getTime() ?? 0)
+    ),
     draft: distinctPosts(items, STAGE_PREDICATES.draft),
   };
 }
@@ -272,6 +277,8 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
       }
     }
   }
+  // Concluídos no kanban: mais recentes primeiro (globalmente, entre todos os clientes).
+  kanban.published.sort((a, b) => (b.postedAt?.getTime() ?? 0) - (a.postedAt?.getTime() ?? 0));
 
   return (
     <div className="space-y-5">
