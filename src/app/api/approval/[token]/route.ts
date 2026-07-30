@@ -49,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
   // evergreen aprove um post que já voltou para revisão interna / rascunho / publicado.
   const item = await prisma.contentItem.findFirst({
     where: { id: contentItemId, clientId: client.id, status: { in: ["CLIENT_REVIEW", "APPROVED"] } },
-    select: { id: true, title: true, client: { select: { name: true } } },
+    select: { id: true, title: true, groupId: true, order: true, client: { select: { name: true } } },
   });
   if (!item) return NextResponse.json({ error: "Item não disponível para aprovação" }, { status: 404 });
 
@@ -66,17 +66,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     });
     await syncRoteiroStatus(contentItemId);
 
-    // Aviso no Telegram (best-effort).
-    const nome = tgEscape(item.client?.name);
-    const post = tgEscape(item.title || "(sem título)");
-    const com = tgEscape(clientComment);
-    const designerPost = `\n\n✏️ Post p/ o designer: ${process.env.NEXTAUTH_URL || ""}/post/${contentItemId}`;
-    if (status === "APPROVED") {
-      await notifyNextStep(contentItemId, "✅ Cliente aprovou");
-    } else if (status === "ADJUSTMENT") {
-      await notifyTelegram(`✏️ <b>Cliente pediu ajuste</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nAjuste: ${com}` : ""}${designerPost}`);
-    } else {
-      await notifyTelegram(`❌ <b>Cliente reprovou</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nMotivo: ${com}` : ""}${designerPost}`);
+    // Aviso no Telegram (best-effort) — só uma vez por grupo (slide de menor order).
+    const isRep = item.groupId
+      ? !(await prisma.contentItem.findFirst({ where: { groupId: item.groupId, order: { lt: item.order } }, select: { id: true } }))
+      : true;
+    if (isRep) {
+      const nome = tgEscape(item.client?.name);
+      const post = tgEscape(item.title || "(sem título)");
+      const com = tgEscape(clientComment);
+      const designerPost = `\n\n✏️ Post p/ o designer: ${process.env.NEXTAUTH_URL || ""}/post/${contentItemId}`;
+      if (status === "APPROVED") {
+        await notifyNextStep(contentItemId, "✅ Cliente aprovou");
+      } else if (status === "ADJUSTMENT") {
+        await notifyTelegram(`✏️ <b>Cliente pediu ajuste</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nAjuste: ${com}` : ""}${designerPost}`);
+      } else {
+        await notifyTelegram(`❌ <b>Cliente reprovou</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nMotivo: ${com}` : ""}${designerPost}`);
+      }
     }
 
     return NextResponse.json({ success: true });

@@ -46,7 +46,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
   // (INTERNAL_REVIEW, ou INTERNAL_DONE para permitir reabrir a decisão interna).
   const item = await prisma.contentItem.findFirst({
     where: { id: contentItemId, clientId: client.id, status: { in: ["INTERNAL_REVIEW", "INTERNAL_DONE"] } },
-    select: { id: true, title: true, client: { select: { name: true } } },
+    select: { id: true, title: true, groupId: true, order: true, client: { select: { name: true } } },
   });
   if (!item) return NextResponse.json({ error: "Item não disponível para revisão" }, { status: 404 });
 
@@ -75,15 +75,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
 
     await syncRoteiroStatus(contentItemId);
 
-    // Aviso no Telegram (best-effort).
+    // Aviso no Telegram (best-effort) — só uma vez por grupo (slide de menor order).
+    const isRep = item.groupId
+      ? !(await prisma.contentItem.findFirst({ where: { groupId: item.groupId, order: { lt: item.order } }, select: { id: true } }))
+      : true;
     const nome = tgEscape(item.client?.name);
     const post = tgEscape(item.title || "(sem título)");
     const com = tgEscape(comment);
     const designerPost = `\n\n✏️ Post p/ o designer: ${process.env.NEXTAUTH_URL || ""}/post/${contentItemId}`;
     // Revisão interna APROVADA não gera aviso (fora do escopo). Só ajuste/reprovação.
-    if (status === "ADJUSTMENT") {
+    if (isRep && status === "ADJUSTMENT") {
       await notifyTelegram(`✏️ <b>Revisão interna pediu ajuste</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nAjuste: ${com}` : ""}${designerPost}`);
-    } else if (status === "REJECTED") {
+    } else if (isRep && status === "REJECTED") {
       await notifyTelegram(`❌ <b>Revisão interna reprovou</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nMotivo: ${com}` : ""}${designerPost}`);
     }
 

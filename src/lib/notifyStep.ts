@@ -135,6 +135,7 @@ type DigestItem = {
   coverWaived: boolean;
   coverApproved: boolean;
   clientId: string | null;
+  groupId: string | null;
   client: { name: string; token: string | null; internalToken: string | null; coverToken: string | null } | null;
   approvalItem: { status: string } | null;
   internalReviewItem: { status: string } | null;
@@ -146,16 +147,27 @@ type DigestItem = {
  */
 export async function sendPendingDigest(): Promise<number> {
   try {
-    const items = (await prisma.contentItem.findMany({
+    const rows = (await prisma.contentItem.findMany({
       where: { status: { in: ["INTERNAL_REVIEW", "INTERNAL_DONE", "CLIENT_REVIEW", "APPROVED"] } },
+      orderBy: [{ clientId: "asc" }, { order: "asc" }],
       select: {
         id: true, title: true, status: true, contentType: true, fileType: true,
-        coverDriveUrl: true, coverWaived: true, coverApproved: true, clientId: true,
+        coverDriveUrl: true, coverWaived: true, coverApproved: true, clientId: true, groupId: true,
         client: { select: { name: true, token: true, internalToken: true, coverToken: true } },
         approvalItem: { select: { status: true } },
         internalReviewItem: { select: { status: true } },
       },
     })) as DigestItem[];
+
+    // Deduplica por grupo (carrossel = 1 post, não 1 por slide).
+    const seenGroup = new Set<string>();
+    const items: DigestItem[] = [];
+    for (const it of rows) {
+      const key = it.groupId ?? it.id;
+      if (seenGroup.has(key)) continue;
+      seenGroup.add(key);
+      items.push(it);
+    }
 
     const byLabel = new Map<string, DigestItem[]>();
     for (const it of items) {
