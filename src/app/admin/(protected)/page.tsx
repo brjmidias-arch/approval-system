@@ -50,7 +50,7 @@ type DashPost = {
   adjustmentComment: string | null;
 };
 
-type StageId = "adjustment" | "internal" | "clientReview" | "criarCapa" | "aprovarCapa" | "readyToSchedule" | "scheduled" | "published" | "draft";
+type StageId = "adjustment" | "internal" | "clientReview" | "criarCapa" | "aprovarCapa" | "readyToSchedule" | "published" | "draft";
 
 /** Formata a data agendada como DD/MM (UTC, pois é gravada em T12:00:00Z). */
 function fmtScheduled(d: Date | null): string | null {
@@ -105,10 +105,9 @@ const STAGE_PREDICATES: Record<StageId, (i: Item) => boolean> = {
   // Vídeo com capa adicionada, aguardando aprovação da capa → "Aprovar capa".
   aprovarCapa: (i) => i.status === "APPROVED" && needsCoverApproval(i),
   // Aprovado pelo cliente (capa aprovada/dispensada, ou não-vídeo) → prontos p/ programar.
-  // Só vai para "Posts programados" quando o social clica "Agendado" (status SCHEDULED).
   readyToSchedule: (i) => i.status === "APPROVED" && !needsCover(i) && !needsCoverApproval(i),
-  scheduled: (i) => i.status === "SCHEDULED",
-  published: (i) => i.status === "PUBLISHED",
+  // "Agendado" com data já conclui o post. SCHEDULED legado também cai em Concluído.
+  published: (i) => i.status === "PUBLISHED" || i.status === "SCHEDULED",
   draft: (i) => i.status === "DRAFT",
 };
 
@@ -161,7 +160,6 @@ const STAGES: { id: StageId; label: string; icon: string; color: string; dot: st
   { id: "criarCapa", label: "Criar capa", icon: "🎨", color: "text-pink-400", dot: "bg-pink-500", bg: "bg-pink-900/20 border-pink-500/30" },
   { id: "aprovarCapa", label: "Aprovar capa", icon: "🖼️", color: "text-fuchsia-400", dot: "bg-fuchsia-500", bg: "bg-fuchsia-900/20 border-fuchsia-500/30" },
   { id: "readyToSchedule", label: "Prontos p/ programar", icon: "📅", color: "text-sky-400", dot: "bg-sky-500", bg: "bg-sky-900/20 border-sky-500/30" },
-  { id: "scheduled", label: "Posts programados", icon: "🗓️", color: "text-indigo-400", dot: "bg-indigo-500", bg: "bg-indigo-900/20 border-indigo-500/30" },
   { id: "published", label: "Concluído", icon: "✅", color: "text-teal-400", dot: "bg-teal-500", bg: "bg-teal-900/20 border-teal-500/30" },
   { id: "draft", label: "Rascunho", icon: "📝", color: "text-gray-400", dot: "bg-gray-500", bg: "bg-[#1a1a1a] border-white/10" },
 ];
@@ -182,7 +180,6 @@ function computeStagePosts(items: Item[]): Record<StageId, DashPost[]> {
     criarCapa: distinctPosts(items, STAGE_PREDICATES.criarCapa),
     aprovarCapa: distinctPosts(items, STAGE_PREDICATES.aprovarCapa),
     readyToSchedule: distinctPosts(items, STAGE_PREDICATES.readyToSchedule),
-    scheduled: distinctPosts(items, STAGE_PREDICATES.scheduled),
     // Concluídos: mais recentes primeiro (por data de conclusão).
     published: distinctPosts(items, STAGE_PREDICATES.published).sort(
       (a, b) => (b.postedAt?.getTime() ?? 0) - (a.postedAt?.getTime() ?? 0)
@@ -254,7 +251,6 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     criarCapa: 0,
     aprovarCapa: 0,
     readyToSchedule: 0,
-    scheduled: 0,
     published: 0,
     draft: 0,
   };
