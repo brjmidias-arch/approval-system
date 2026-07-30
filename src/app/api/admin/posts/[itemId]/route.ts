@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
 import { refreshGroupMediaFromDrive } from "@/lib/driveMedia";
+import { notifyTelegram, tgEscape } from "@/lib/telegram";
 
 // ids de todos os itens do "post" (grupo do carrossel, ou o próprio item)
 async function postItemIds(itemId: string): Promise<string[]> {
@@ -143,6 +144,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "SCHEDULED", postedAt: null } });
     } else if (action === "mark-published") {
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "PUBLISHED", postedAt: new Date() } });
+    }
+
+    // Aviso no Telegram (best-effort) quando o post é agendado ou concluído.
+    // !skipSync => só 1 aviso por post (carrossel manda skipSync nos slides extras).
+    if (!skipSync && (action === "mark-scheduled" || action === "mark-published")) {
+      try {
+        const meta = await prisma.contentItem.findUnique({
+          where: { id: params.itemId },
+          select: { title: true, scheduledDate: true, client: { select: { name: true } } },
+        });
+        const dataTxt = meta?.scheduledDate
+          ? meta.scheduledDate.toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric" })
+          : null;
+        const nome = tgEscape(meta?.client?.name);
+        const post = tgEscape(meta?.title || "(sem título)");
+        if (action === "mark-scheduled") {
+          await notifyTelegram(`🗓️ <b>Post agendado</b>\nCliente: ${nome}\nPost: ${post}${dataTxt ? `\n📅 Programado para ${dataTxt}` : ""}`);
+        } else {
+          await notifyTelegram(`✅ <b>Post concluído</b>\nCliente: ${nome}\nPost: ${post}${dataTxt ? `\n📅 Data: ${dataTxt}` : ""}`);
+        }
+      } catch { /* best-effort */ }
     }
 
     // Espelha o estado no Roteirização (paralelo; best-effort). Em edições de
