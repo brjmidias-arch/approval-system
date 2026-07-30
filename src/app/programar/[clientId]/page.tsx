@@ -152,9 +152,6 @@ export default function ProgramarPage() {
                         />
                         {savingDateId === post.id && <span className="text-[11px] text-gray-500">salvando…</span>}
                       </div>
-                      {needDateId === post.id && !dates[post.id] && (
-                        <p className="text-[11px] text-amber-400 pt-1">⚠️ Complete a data do agendamento para agendar este post.</p>
-                      )}
                     </div>
                     <button
                       onClick={() => markPosted(post.id)}
@@ -164,6 +161,10 @@ export default function ProgramarPage() {
                       {markingId === post.id ? "..." : "Agendado ✓"}
                     </button>
                   </div>
+
+                  {needDateId === post.id && !dates[post.id] && (
+                    <p className="text-xs text-amber-400 px-3 pb-2 -mt-1 text-right">⚠️ Complete a data do agendamento para agendar este post.</p>
+                  )}
 
                   {hasDriveLinks && (
                     <div className="border-t border-white/5 px-3 py-2 flex flex-wrap gap-2">
