@@ -7,7 +7,7 @@ import DashboardClientRow from "@/components/admin/DashboardClientRow";
 import KanbanBoard from "@/components/admin/KanbanBoard";
 import DashboardUploadButton from "@/components/admin/DashboardUploadButton";
 import CopyDesignerCoverLink from "@/components/admin/CopyDesignerCoverLink";
-import { designerCoverToken } from "@/lib/designerToken";
+import { designerCoverToken, designerAdjustToken } from "@/lib/designerToken";
 
 type Item = {
   id: string;
@@ -310,6 +310,13 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
             ⚙️ Responsáveis
           </Link>
           <CopyDesignerCoverLink token={designerCoverToken()} />
+          <CopyDesignerCoverLink
+            token={designerAdjustToken()}
+            path="ajustes"
+            label="✏️ Link designer (ajustes)"
+            title="Link com todos os posts que precisam de ajuste — envie para o designer"
+            color="amber"
+          />
           <DashboardUploadButton clients={clientOptions} />
           <Link
             href="/admin/clients"

@@ -9,3 +9,9 @@ export function designerCoverToken(): string {
   const secret = process.env.NEXTAUTH_SECRET || "brj-fallback-secret";
   return createHash("sha256").update(`${secret}:cover-designer`).digest("hex").slice(0, 40);
 }
+
+/** Token global para o link do designer com TODOS os ajustes pedidos (todos os clientes). */
+export function designerAdjustToken(): string {
+  const secret = process.env.NEXTAUTH_SECRET || "brj-fallback-secret";
+  return createHash("sha256").update(`${secret}:adjust-designer`).digest("hex").slice(0, 40);
+}
