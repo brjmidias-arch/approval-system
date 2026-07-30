@@ -86,6 +86,32 @@ function linkLine(label: string, c: LinkCtx): string {
   }
 }
 
+type RespCfg = Record<string, string>;
+
+/** Carrega o config de responsáveis por fase (chave → nome). */
+export async function loadResponsaveis(): Promise<RespCfg> {
+  try {
+    const rows = await prisma.responsavelRoteiro.findMany();
+    const cfg: RespCfg = {};
+    for (const r of rows) if (r.nome) cfg[r.chave] = r.nome;
+    return cfg;
+  } catch {
+    return {};
+  }
+}
+
+/** Responsável da etapa (para o vídeo, o ajuste vai para ajusteVideo; senão ajusteOutro). */
+function responsavelFor(cfg: RespCfg, label: string, isVideo: boolean): string | null {
+  switch (label) {
+    case L_INTERNA: return cfg.revisaoInterna || null;
+    case L_CRIAR_CAPA: return cfg.criarCapa || null;
+    case L_APROVAR_CAPA: return cfg.criarCapa || null;
+    case L_PROGRAMAR: return cfg.prontoProgramar || null;
+    case L_AJUSTE: return (isVideo ? cfg.ajusteVideo : cfg.ajusteOutro) || null;
+    default: return null;
+  }
+}
+
 /**
  * Avisa no Telegram o PRÓXIMO PASSO de um post, já com o link certo (aprovação do
  * cliente, revisão interna, criar/aprovar capa, programar). `prefix` descreve o que
@@ -109,6 +135,9 @@ export async function notifyNextStep(contentItemId: string, prefix?: string): Pr
     const head = [prefix, label].filter(Boolean).join(" → ");
     let msg = `${head}\nCliente: ${tgEscape(i.client?.name)}\nPost: ${tgEscape(i.title || "(sem título)")}`;
     if (label) {
+      const isVideo = i.contentType === "REELS" || i.fileType === "VIDEO";
+      const resp = responsavelFor(await loadResponsaveis(), label, isVideo);
+      if (resp) msg += `\nResponsável: ${tgEscape(resp)}`;
       const line = linkLine(label, {
         clientId: i.clientId ?? "",
         itemId: i.id,
@@ -184,21 +213,24 @@ export async function sendPendingDigest(): Promise<number> {
     const labels = ORDER.filter((l) => byLabel.has(l));
     const designerCover = await designerCoverToken();
     const designerAdjust = await designerAdjustToken();
+    const resp = await loadResponsaveis();
     let msg = "⏰ <b>Lembrete diário — pendências</b>";
 
     for (const label of labels) {
       const group = byLabel.get(label)!;
-      msg += `\n\n${label}: <b>${group.length}</b>`;
+      const catResp = label !== L_AJUSTE ? responsavelFor(resp, label, false) : null;
+      msg += `\n\n${label}: <b>${group.length}</b>${catResp ? ` — Resp.: ${tgEscape(catResp)}` : ""}`;
 
       if (label === L_CRIAR_CAPA) {
         // Link único do designer com todos os vídeos que precisam de capa.
         const nomes = Array.from(new Set(group.map((g) => g.client?.name || "?"))).map(tgEscape).join(", ");
         msg += `\n${BASE}/criar-capa/${designerCover}\nClientes: ${nomes}`;
       } else if (label === L_AJUSTE) {
-        // Link único do designer com todos os ajustes + lista dos posts.
+        // Link único do designer com todos os ajustes + lista dos posts (com responsável).
         msg += `\n${BASE}/ajustes/${designerAdjust}`;
         for (const it of group) {
-          msg += `\n• ${tgEscape(it.client?.name)} — ${tgEscape(it.title || "(sem título)")}`;
+          const r = responsavelFor(resp, L_AJUSTE, it.contentType === "REELS" || it.fileType === "VIDEO");
+          msg += `\n• ${tgEscape(it.client?.name)} — ${tgEscape(it.title || "(sem título)")}${r ? ` (${tgEscape(r)})` : ""}`;
         }
       } else {
         // Um link por cliente.

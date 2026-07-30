@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
-import { notifyNextStep } from "@/lib/notifyStep";
+import { notifyNextStep, loadResponsaveis } from "@/lib/notifyStep";
 
 const POST_SELECT = {
   id: true, fileUrl: true, fileType: true, contentType: true, title: true, caption: true,
@@ -49,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
   // evergreen aprove um post que já voltou para revisão interna / rascunho / publicado.
   const item = await prisma.contentItem.findFirst({
     where: { id: contentItemId, clientId: client.id, status: { in: ["CLIENT_REVIEW", "APPROVED"] } },
-    select: { id: true, title: true, groupId: true, order: true, client: { select: { name: true } } },
+    select: { id: true, title: true, groupId: true, order: true, contentType: true, fileType: true, client: { select: { name: true } } },
   });
   if (!item) return NextResponse.json({ error: "Item não disponível para aprovação" }, { status: 404 });
 
@@ -77,10 +77,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
       const designerPost = `\n\n✏️ Post p/ o designer: ${process.env.NEXTAUTH_URL || ""}/post/${contentItemId}`;
       if (status === "APPROVED") {
         await notifyNextStep(contentItemId, "✅ Cliente aprovou");
-      } else if (status === "ADJUSTMENT") {
-        await notifyTelegram(`✏️ <b>Cliente pediu ajuste</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nAjuste: ${com}` : ""}${designerPost}`);
       } else {
-        await notifyTelegram(`❌ <b>Cliente reprovou</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nMotivo: ${com}` : ""}${designerPost}`);
+        const cfg = await loadResponsaveis();
+        const isVideo = item.contentType === "REELS" || item.fileType === "VIDEO";
+        const respName = isVideo ? cfg.ajusteVideo : cfg.ajusteOutro;
+        const respLine = respName ? `\nResponsável: ${tgEscape(respName)}` : "";
+        if (status === "ADJUSTMENT") {
+          await notifyTelegram(`✏️ <b>Cliente pediu ajuste</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nAjuste: ${com}` : ""}${respLine}${designerPost}`);
+        } else {
+          await notifyTelegram(`❌ <b>Cliente reprovou</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nMotivo: ${com}` : ""}${respLine}${designerPost}`);
+        }
       }
     }
 

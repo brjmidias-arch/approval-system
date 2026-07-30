@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
+import { loadResponsaveis } from "@/lib/notifyStep";
 
 const POST_SELECT = {
   id: true, fileUrl: true, fileType: true, contentType: true, title: true, caption: true,
@@ -46,7 +47,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
   // (INTERNAL_REVIEW, ou INTERNAL_DONE para permitir reabrir a decisão interna).
   const item = await prisma.contentItem.findFirst({
     where: { id: contentItemId, clientId: client.id, status: { in: ["INTERNAL_REVIEW", "INTERNAL_DONE"] } },
-    select: { id: true, title: true, groupId: true, order: true, client: { select: { name: true } } },
+    select: { id: true, title: true, groupId: true, order: true, contentType: true, fileType: true, client: { select: { name: true } } },
   });
   if (!item) return NextResponse.json({ error: "Item não disponível para revisão" }, { status: 404 });
 
@@ -83,11 +84,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     const post = tgEscape(item.title || "(sem título)");
     const com = tgEscape(comment);
     const designerPost = `\n\n✏️ Post p/ o designer: ${process.env.NEXTAUTH_URL || ""}/post/${contentItemId}`;
+    const cfg = isRep && status !== "APPROVED" ? await loadResponsaveis() : {};
+    const isVideo = item.contentType === "REELS" || item.fileType === "VIDEO";
+    const respName = isVideo ? cfg.ajusteVideo : cfg.ajusteOutro;
+    const respLine = respName ? `\nResponsável: ${tgEscape(respName)}` : "";
     // Revisão interna APROVADA não gera aviso (fora do escopo). Só ajuste/reprovação.
     if (isRep && status === "ADJUSTMENT") {
-      await notifyTelegram(`✏️ <b>Revisão interna pediu ajuste</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nAjuste: ${com}` : ""}${designerPost}`);
+      await notifyTelegram(`✏️ <b>Revisão interna pediu ajuste</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nAjuste: ${com}` : ""}${respLine}${designerPost}`);
     } else if (isRep && status === "REJECTED") {
-      await notifyTelegram(`❌ <b>Revisão interna reprovou</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nMotivo: ${com}` : ""}${designerPost}`);
+      await notifyTelegram(`❌ <b>Revisão interna reprovou</b>\nCliente: ${nome}\nPost: ${post}${com ? `\nMotivo: ${com}` : ""}${respLine}${designerPost}`);
     }
 
     return NextResponse.json({ success: true });
