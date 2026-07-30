@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
-import { designerCoverToken } from "@/lib/designerToken";
+import { designerCoverToken, designerAdjustToken } from "@/lib/designerToken";
 
 const BASE = process.env.NEXTAUTH_URL || "";
 
@@ -54,6 +54,7 @@ type LinkCtx = {
   token: string | null;
   internalToken: string | null;
   coverToken: string | null;
+  designerCover: string;
 };
 
 /** Só a URL da etapa. */
@@ -61,7 +62,7 @@ function stepUrl(label: string, c: LinkCtx): string {
   switch (label) {
     case L_CLIENTE: return `${BASE}/aprovar/${c.token}`;
     case L_INTERNA: return `${BASE}/revisar/${c.internalToken}`;
-    case L_CRIAR_CAPA: return `${BASE}/criar-capa/${designerCoverToken()}`;
+    case L_CRIAR_CAPA: return `${BASE}/criar-capa/${c.designerCover}`;
     case L_APROVAR_CAPA: return `${BASE}/capa/${c.coverToken}`;
     case L_PROGRAMAR: return `${BASE}/programar/${c.clientId}`;
     case L_AJUSTE: return `${BASE}/post/${c.itemId}`;
@@ -114,6 +115,7 @@ export async function notifyNextStep(contentItemId: string, prefix?: string): Pr
         token: i.client?.token ?? null,
         internalToken: i.client?.internalToken ?? null,
         coverToken: i.client?.coverToken ?? null,
+        designerCover: await designerCoverToken(),
       });
       if (line) msg += `\n\n${line}`;
     }
@@ -180,6 +182,8 @@ export async function sendPendingDigest(): Promise<number> {
     if (byLabel.size === 0) return 0;
 
     const labels = ORDER.filter((l) => byLabel.has(l));
+    const designerCover = await designerCoverToken();
+    const designerAdjust = await designerAdjustToken();
     let msg = "⏰ <b>Lembrete diário — pendências</b>";
 
     for (const label of labels) {
@@ -189,11 +193,12 @@ export async function sendPendingDigest(): Promise<number> {
       if (label === L_CRIAR_CAPA) {
         // Link único do designer com todos os vídeos que precisam de capa.
         const nomes = Array.from(new Set(group.map((g) => g.client?.name || "?"))).map(tgEscape).join(", ");
-        msg += `\n${BASE}/criar-capa/${designerCoverToken()}\nClientes: ${nomes}`;
+        msg += `\n${BASE}/criar-capa/${designerCover}\nClientes: ${nomes}`;
       } else if (label === L_AJUSTE) {
-        // Por post (link do designer para aquele post).
+        // Link único do designer com todos os ajustes + lista dos posts.
+        msg += `\n${BASE}/ajustes/${designerAdjust}`;
         for (const it of group) {
-          msg += `\n• ${tgEscape(it.client?.name)} — ${tgEscape(it.title || "(sem título)")}: ${BASE}/post/${it.id}`;
+          msg += `\n• ${tgEscape(it.client?.name)} — ${tgEscape(it.title || "(sem título)")}`;
         }
       } else {
         // Um link por cliente.
@@ -208,6 +213,7 @@ export async function sendPendingDigest(): Promise<number> {
             token: it.client?.token ?? null,
             internalToken: it.client?.internalToken ?? null,
             coverToken: it.client?.coverToken ?? null,
+            designerCover,
           });
           msg += `\n• ${tgEscape(it.client?.name)}: ${url}`;
         }

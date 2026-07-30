@@ -14,7 +14,7 @@ const NEEDS_ADJUSTMENT = {
 };
 
 export async function GET(_req: NextRequest, { params }: { params: { token: string } }) {
-  if (params.token !== designerAdjustToken()) return NextResponse.json({ error: "Link não encontrado" }, { status: 404 });
+  if (params.token !== (await designerAdjustToken())) return NextResponse.json({ error: "Link não encontrado" }, { status: 404 });
   try {
     const rows = await prisma.contentItem.findMany({
       where: NEEDS_ADJUSTMENT,
@@ -51,7 +51,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { token: string } }) {
-  if (params.token !== designerAdjustToken()) return NextResponse.json({ error: "Link não encontrado" }, { status: 404 });
+  if (params.token !== (await designerAdjustToken())) return NextResponse.json({ error: "Link não encontrado" }, { status: 404 });
 
   const body = await req.json();
   const { contentItemId, driveUrl } = body;

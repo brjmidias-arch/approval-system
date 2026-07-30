@@ -16,6 +16,12 @@ model User {
   createdAt DateTime @default(now())
 }
 
+// Config global chave/valor (ex.: tokens fixos dos links do designer).
+model Setting {
+  key   String @id
+  value String
+}
+
 model Client {
   id            String        @id @default(cuid())
   name          String

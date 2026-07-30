@@ -280,6 +280,9 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
   // Concluídos no kanban: mais recentes primeiro (globalmente, entre todos os clientes).
   kanban.published.sort((a, b) => (b.postedAt?.getTime() ?? 0) - (a.postedAt?.getTime() ?? 0));
 
+  const designerCover = await designerCoverToken();
+  const designerAdjust = await designerAdjustToken();
+
   return (
     <div className="space-y-5">
       <AutoRefresh intervalMs={30000} />
@@ -309,9 +312,9 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           >
             ⚙️ Responsáveis
           </Link>
-          <CopyDesignerCoverLink token={designerCoverToken()} />
+          <CopyDesignerCoverLink token={designerCover} />
           <CopyDesignerCoverLink
-            token={designerAdjustToken()}
+            token={designerAdjust}
             path="ajustes"
             label="✏️ Link designer (ajustes)"
             title="Link com todos os posts que precisam de ajuste — envie para o designer"
@@ -359,7 +362,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           </div>
 
           {view === "kanban" ? (
-            <KanbanBoard stages={STAGES} columns={kanban} designerToken={designerCoverToken()} adjustToken={designerAdjustToken()} />
+            <KanbanBoard stages={STAGES} columns={kanban} designerToken={designerCover} adjustToken={designerAdjust} />
           ) : (
           /* Lista: seções por etapa */
           <div className="space-y-5">
@@ -383,7 +386,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                         clientName={client.name}
                         clientToken={client.token}
                         clientInternalToken={client.internalToken}
-                        designerToken={designerCoverToken()}
+                        designerToken={designerCover}
                         posts={stagePosts[stage.id]}
                         stageColor={stage.color}
                         stageId={stage.id}
