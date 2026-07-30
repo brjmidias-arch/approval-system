@@ -30,6 +30,7 @@ export default function ProgramarPage() {
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [dates, setDates] = useState<Record<string, string>>({});
   const [savingDateId, setSavingDateId] = useState<string | null>(null);
+  const [needDateId, setNeedDateId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -55,6 +56,7 @@ export default function ProgramarPage() {
   // Auto-save da data digitada no link (grava no post; carrossel = grupo todo).
   async function saveDate(postId: string, value: string) {
     setDates((prev) => ({ ...prev, [postId]: value }));
+    if (value) setNeedDateId((cur) => (cur === postId ? null : cur));
     setSavingDateId(postId);
     try {
       await fetch(`/api/programar/${clientId}`, {
@@ -71,7 +73,8 @@ export default function ProgramarPage() {
 
   async function markPosted(postId: string) {
     const date = dates[postId];
-    if (!date) { alert("Escolha a data do agendamento primeiro."); return; }
+    if (!date) { setNeedDateId(postId); return; }
+    setNeedDateId(null);
     setMarkingId(postId);
     try {
       const res = await fetch(`/api/programar/${clientId}`, {
@@ -149,12 +152,14 @@ export default function ProgramarPage() {
                         />
                         {savingDateId === post.id && <span className="text-[11px] text-gray-500">salvando…</span>}
                       </div>
+                      {needDateId === post.id && !dates[post.id] && (
+                        <p className="text-[11px] text-amber-400 pt-1">⚠️ Complete a data do agendamento para agendar este post.</p>
+                      )}
                     </div>
                     <button
                       onClick={() => markPosted(post.id)}
-                      disabled={markingId === post.id || !dates[post.id]}
-                      title={!dates[post.id] ? "Escolha a data primeiro" : undefined}
-                      className="shrink-0 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+                      disabled={markingId === post.id}
+                      className="shrink-0 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-medium px-2.5 py-1.5 rounded-lg transition-colors"
                     >
                       {markingId === post.id ? "..." : "Agendado ✓"}
                     </button>
