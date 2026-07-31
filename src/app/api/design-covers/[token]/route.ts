@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
 import { designerCoverToken } from "@/lib/designerToken";
-import { notifyNextStep } from "@/lib/notifyStep";
+import { notifyApprovalStep } from "@/lib/notifyStep";
 
 // Posts que precisam de capa (etapa "Criar capa"), de TODOS os clientes.
 const NEEDS_COVER = {
@@ -59,7 +59,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
       },
     });
     await syncRoteiroStatus(contentItemId);
-    await notifyNextStep(contentItemId, "🖼️ Designer enviou a capa");
+    // Capa enviada pelo designer → só no grupo de aprovação (não no grupo principal).
+    await notifyApprovalStep(contentItemId, "🖼️ Designer enviou a capa");
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Erro ao enviar a capa" }, { status: 500 });
