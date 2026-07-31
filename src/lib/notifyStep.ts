@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { notifyTelegram, tgEscape } from "@/lib/telegram";
+import { notifyTelegram, notifyTelegramApprovals, tgEscape } from "@/lib/telegram";
 import { designerCoverToken, designerAdjustToken } from "@/lib/designerToken";
 
 const BASE = process.env.NEXTAUTH_URL || "";
@@ -117,38 +117,59 @@ function responsavelFor(cfg: RespCfg, label: string, isVideo: boolean): string |
  * cliente, revisão interna, criar/aprovar capa, programar). `prefix` descreve o que
  * acabou de acontecer (ex.: "✅ Cliente aprovou"). Best-effort.
  */
+async function buildStepPayload(contentItemId: string, prefix?: string): Promise<{ label: string | null; msg: string } | null> {
+  const i = await prisma.contentItem.findUnique({
+    where: { id: contentItemId },
+    select: {
+      id: true, title: true, status: true, contentType: true, fileType: true,
+      coverDriveUrl: true, coverWaived: true, coverApproved: true, clientId: true,
+      client: { select: { name: true, token: true, internalToken: true, coverToken: true } },
+      approvalItem: { select: { status: true } },
+      internalReviewItem: { select: { status: true } },
+    },
+  });
+  if (!i) return null;
+  const label = nextStepLabel(i);
+  if (!label && !prefix) return null;
+  const head = [prefix, label].filter(Boolean).join(" → ");
+  let msg = `${head}\nCliente: ${tgEscape(i.client?.name)}\nPost: ${tgEscape(i.title || "(sem título)")}`;
+  if (label) {
+    const isVideo = i.contentType === "REELS" || i.fileType === "VIDEO";
+    const resp = responsavelFor(await loadResponsaveis(), label, isVideo);
+    if (resp) msg += `\nResponsável: ${tgEscape(resp)}`;
+    const line = linkLine(label, {
+      clientId: i.clientId ?? "",
+      itemId: i.id,
+      token: i.client?.token ?? null,
+      internalToken: i.client?.internalToken ?? null,
+      coverToken: i.client?.coverToken ?? null,
+      designerCover: await designerCoverToken(),
+    });
+    if (line) msg += `\n\n${line}`;
+  }
+  return { label, msg };
+}
+
 export async function notifyNextStep(contentItemId: string, prefix?: string): Promise<void> {
   try {
-    const i = await prisma.contentItem.findUnique({
-      where: { id: contentItemId },
-      select: {
-        id: true, title: true, status: true, contentType: true, fileType: true,
-        coverDriveUrl: true, coverWaived: true, coverApproved: true, clientId: true,
-        client: { select: { name: true, token: true, internalToken: true, coverToken: true } },
-        approvalItem: { select: { status: true } },
-        internalReviewItem: { select: { status: true } },
-      },
-    });
-    if (!i) return;
-    const label = nextStepLabel(i);
-    if (!label && !prefix) return;
-    const head = [prefix, label].filter(Boolean).join(" → ");
-    let msg = `${head}\nCliente: ${tgEscape(i.client?.name)}\nPost: ${tgEscape(i.title || "(sem título)")}`;
-    if (label) {
-      const isVideo = i.contentType === "REELS" || i.fileType === "VIDEO";
-      const resp = responsavelFor(await loadResponsaveis(), label, isVideo);
-      if (resp) msg += `\nResponsável: ${tgEscape(resp)}`;
-      const line = linkLine(label, {
-        clientId: i.clientId ?? "",
-        itemId: i.id,
-        token: i.client?.token ?? null,
-        internalToken: i.client?.internalToken ?? null,
-        coverToken: i.client?.coverToken ?? null,
-        designerCover: await designerCoverToken(),
-      });
-      if (line) msg += `\n\n${line}`;
+    const p = await buildStepPayload(contentItemId, prefix);
+    if (p) await notifyTelegram(p.msg);
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Aviso no GRUPO DE APROVAÇÕES (segundo grupo). Só dispara quando o próximo passo é
+ * revisão interna ou aprovar capa — as duas coisas que esse grupo deve receber.
+ * Best-effort; no-op se o grupo de aprovações não estiver configurado.
+ */
+export async function notifyApprovalStep(contentItemId: string, prefix?: string): Promise<void> {
+  try {
+    const p = await buildStepPayload(contentItemId, prefix);
+    if (p && (p.label === L_INTERNA || p.label === L_APROVAR_CAPA)) {
+      await notifyTelegramApprovals(p.msg);
     }
-    await notifyTelegram(msg);
   } catch {
     // best-effort
   }

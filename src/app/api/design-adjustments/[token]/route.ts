@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
 import { refreshGroupMediaFromDrive } from "@/lib/driveMedia";
 import { designerAdjustToken } from "@/lib/designerToken";
-import { notifyNextStep } from "@/lib/notifyStep";
+import { notifyNextStep, notifyApprovalStep } from "@/lib/notifyStep";
 
 // Posts com ajuste pedido (cliente OU revisão interna), de TODOS os clientes.
 const NEEDS_ADJUSTMENT = {
@@ -93,6 +93,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     await refreshGroupMediaFromDrive(src?.driveUrl ?? null, groupItems);
     await Promise.all(ids.map((id) => syncRoteiroStatus(id)));
     await notifyNextStep(contentItemId, "🛠️ Designer fez o ajuste");
+    // Grupo de aprovações: post voltou para revisão interna.
+    await notifyApprovalStep(contentItemId, "🛠️ Ajuste feito");
 
     return NextResponse.json({ success: true });
   } catch {

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
 import { refreshGroupMediaFromDrive } from "@/lib/driveMedia";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
-import { notifyNextStep } from "@/lib/notifyStep";
+import { notifyNextStep, notifyApprovalStep } from "@/lib/notifyStep";
 
 // ids de todos os itens do "post" (grupo do carrossel, ou o próprio item)
 async function postItemIds(itemId: string): Promise<string[]> {
@@ -175,6 +175,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
     // Capa adicionada pelo dashboard → avisa no Telegram com o link de aprovar a capa.
     if (!action && coverJustAdded && !skipSync) {
       await notifyNextStep(params.itemId, "🖼️ Capa adicionada");
+    }
+
+    // Grupo de aprovações (segundo grupo): revisão interna e aprovar capa.
+    if (!skipSync) {
+      if (action === "send-internal" || action === "adjustment-done") {
+        await notifyApprovalStep(params.itemId);
+      } else if (!action && coverJustAdded) {
+        await notifyApprovalStep(params.itemId, "🖼️ Capa adicionada");
+      }
     }
 
     return NextResponse.json({ success: true });
