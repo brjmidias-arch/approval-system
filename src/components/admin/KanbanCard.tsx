@@ -100,19 +100,35 @@ export default function KanbanCard({
     await patchPost({ action: "mark-published" }, "Erro ao concluir o post. Tente novamente.");
   }
 
-  // "Criar capa": salva o link da capa (→ move para "Aprovar capa") e copia o
-  // link público de aprovação da capa.
-  function enviarCapa(e: React.MouseEvent) {
+  // "Criar capa": salva o link da capa (→ move para "Aprovar capa") e ENVIA a capa
+  // pelo bot para o grupo de aprovação (com o link de aprovar a capa).
+  async function enviarCapa(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     const link = coverLink.trim();
     const id = extractDriveId(link);
     if (!id) { alert("Cole um link válido da capa no Google Drive."); return; }
-    if (post.clientCoverToken) {
-      navigator.clipboard.writeText(`${origin}/capa/${post.clientCoverToken}`);
-      alert("Link de aprovação da capa copiado! O post foi para 'Aprovar capa'. Envie o link para aprovar a capa.");
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r1 = await fetch(`/api/admin/posts/${post.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coverDriveUrl: link, coverUrl: driveThumbUrl(id) }),
+      });
+      if (!r1.ok) throw new Error();
+      const r2 = await fetch(`/api/admin/posts/${post.id}/send-approval`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "cover" }),
+      });
+      if (!r2.ok) throw new Error();
+      router.refresh();
+    } catch {
+      alert("Erro ao enviar a capa para aprovação. Tente novamente.");
+    } finally {
+      setBusy(false);
     }
-    patchPost({ coverDriveUrl: link, coverUrl: driveThumbUrl(id) }, "Erro ao enviar a capa. Tente novamente.");
   }
 
   function openModal(e: React.MouseEvent) {
@@ -222,9 +238,9 @@ export default function KanbanCard({
                 onClick={enviarCapa}
                 disabled={busy || !coverLink.trim()}
                 className="text-[10px] px-2 py-1 rounded bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-medium disabled:opacity-40 transition-colors"
-                title="Salva a capa, envia para 'Aprovar capa' e copia o link de aprovação da capa"
+                title="Salva a capa e envia pelo bot para o grupo de aprovação de capa"
               >
-                📋 Copiar link de aprovação da capa
+                {busy ? "Enviando…" : "📤 Enviar capa para aprovação"}
               </button>
               <button
                 type="button"

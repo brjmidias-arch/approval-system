@@ -116,22 +116,31 @@ export default function FolderUploadModal({ campaignId, clientId, clientName, cl
   const [posts, setPosts] = useState<ParsedPost[]>([]);
   const [error, setError] = useState("");
   const [savedCount, setSavedCount] = useState(0);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [savedIds, setSavedIds] = useState<Record<string, string>>({});
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sentIds, setSentIds] = useState<Record<string, boolean>>({});
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const internalUrl = clientInternalToken ? `${origin}/revisar/${clientInternalToken}` : null;
 
-  function copyMsg(post: ParsedPost) {
-    const msg = buildAprovacaoMsg({
-      title: post.title,
-      clientName: clientName ?? "",
-      asanaUrl: post.asanaUrl,
-      connected: !!post.roteiroConteudoId,
-      internalUrl,
-    });
-    navigator.clipboard.writeText(msg);
-    setCopiedId(post.tempId);
-    setTimeout(() => setCopiedId(null), 2000);
+  // Envia, pelo bot, a mensagem de aprovação interna para o grupo de aprovações.
+  async function sendInternal(post: ParsedPost) {
+    const id = savedIds[post.tempId];
+    if (!id) { alert("Não consegui identificar o post salvo. Envie pelo dashboard (coluna Revisão interna)."); return; }
+    setSendingId(post.tempId);
+    try {
+      const res = await fetch(`/api/admin/posts/${id}/send-approval`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "internal" }),
+      });
+      if (!res.ok) throw new Error();
+      setSentIds((m) => ({ ...m, [post.tempId]: true }));
+    } catch {
+      alert("Erro ao enviar. Tente novamente.");
+    } finally {
+      setSendingId(null);
+    }
   }
 
   async function handleContinue() {
@@ -261,6 +270,7 @@ export default function FolderUploadModal({ campaignId, clientId, clientName, cl
     for (const post of posts) {
       const groupId = post.contentType === "CARROSSEL" ? uuidv4() : null;
       let postFailed = false;
+      let firstId: string | null = null;
 
       for (let i = 0; i < post.slides.length; i++) {
         const slide = post.slides[i];
@@ -293,6 +303,7 @@ export default function FolderUploadModal({ campaignId, clientId, clientName, cl
             }),
           });
           if (!res.ok) { postFailed = true; break; }
+          if (i === 0) { try { const created = await res.json(); firstId = created?.id ?? null; } catch { /* ignora */ } }
         } catch {
           postFailed = true;
           break;
@@ -300,7 +311,10 @@ export default function FolderUploadModal({ campaignId, clientId, clientName, cl
       }
 
       if (postFailed) failedPosts++;
-      else savedPosts++;
+      else {
+        savedPosts++;
+        if (firstId) setSavedIds((m) => ({ ...m, [post.tempId]: firstId as string }));
+      }
     }
 
     setSavedCount(savedPosts);
@@ -550,7 +564,7 @@ export default function FolderUploadModal({ campaignId, clientId, clientName, cl
               <p className="text-white font-medium mt-1">
                 {savedCount} {savedCount === 1 ? "post adicionado" : "posts adicionados"}!
               </p>
-              <p className="text-gray-500 text-xs mt-1">Copie a mensagem de cada post e cole no grupo de aprovação interna.</p>
+              <p className="text-gray-500 text-xs mt-1">Envie cada post para o grupo de aprovação interna (pelo bot).</p>
             </div>
             <div className="space-y-2 max-h-[55vh] overflow-y-auto">
               {posts.map((post) => {
@@ -565,10 +579,11 @@ export default function FolderUploadModal({ campaignId, clientId, clientName, cl
                   <div key={post.tempId} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3">
                     <pre className="text-gray-300 text-xs whitespace-pre-wrap font-sans mb-2 break-words">{msg}</pre>
                     <button
-                      onClick={() => copyMsg(post)}
-                      className="w-full py-2 rounded-lg text-sm bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-medium transition-colors"
+                      onClick={() => sendInternal(post)}
+                      disabled={sendingId === post.tempId || sentIds[post.tempId] || !savedIds[post.tempId]}
+                      className="w-full py-2 rounded-lg text-sm bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-50 text-white font-medium transition-colors"
                     >
-                      {copiedId === post.tempId ? "Copiado ✓" : "📋 Copiar mensagem"}
+                      {sentIds[post.tempId] ? "Enviado ✓" : sendingId === post.tempId ? "Enviando…" : "📤 Enviar post para aprovação interna"}
                     </button>
                   </div>
                 );

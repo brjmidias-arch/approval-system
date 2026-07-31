@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
-import { notifyApprovalStep } from "@/lib/notifyStep";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -42,9 +41,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     await prisma.internalReviewItem.create({ data: { contentItemId: item.id, status: "PENDING" } });
     // Se já nasceu conectado a um roteiro, espelha no Roteirização (best-effort).
     if (roteiroConteudoId) await syncRoteiroStatus(item.id);
-    // Grupo de aprovações: avisa que há post novo para revisão interna.
-    // Carrossel = 1 aviso (só o slide de menor order, o "rep").
-    if ((order ?? 0) === 0) await notifyApprovalStep(item.id, "🆕 Novo post");
     return NextResponse.json(item, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Erro ao criar post" }, { status: 500 });
