@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CONTENT_TYPE_LABELS } from "@/types";
 import type { ContentType } from "@/types";
@@ -67,6 +67,31 @@ export default function ApprovalPage() {
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [carouselSlide, setCarouselSlide] = useState<Record<string, number>>({});
   const [savingGroup, setSavingGroup] = useState<string | null>(null);
+  const [captions, setCaptions] = useState<Record<string, string>>({});
+  const [capState, setCapState] = useState<Record<string, "idle" | "saving" | "saved" | "error">>({});
+  const capTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  async function saveCaption(groupKey: string, value: string, items: ContentItem[]) {
+    setCapState((p) => ({ ...p, [groupKey]: "saving" }));
+    try {
+      const res = await fetch(`/api/approval/${token}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentItemId: items[0].id, action: "save-caption", caption: value }),
+      });
+      if (!res.ok) throw new Error();
+      setCapState((p) => ({ ...p, [groupKey]: "saved" }));
+      setTimeout(() => setCapState((p) => (p[groupKey] === "saved" ? { ...p, [groupKey]: "idle" } : p)), 1500);
+    } catch {
+      setCapState((p) => ({ ...p, [groupKey]: "error" }));
+    }
+  }
+  function onCaptionChange(groupKey: string, value: string, items: ContentItem[]) {
+    setCaptions((p) => ({ ...p, [groupKey]: value }));
+    setCapState((p) => ({ ...p, [groupKey]: "idle" }));
+    clearTimeout(capTimers.current[groupKey]);
+    capTimers.current[groupKey] = setTimeout(() => saveCaption(groupKey, value, items), 800);
+  }
 
   const fetchCampaign = useCallback(async () => {
     const res = await fetch(`/api/approval/${token}`);
@@ -77,6 +102,10 @@ export default function ApprovalPage() {
 
     const built = buildGroups(data.contentItems);
     setGroups(built);
+
+    const initCaps: Record<string, string> = {};
+    for (const g of built) initCaps[g.groupKey] = (g.type === "single" ? g.item : g.items[0]).caption ?? "";
+    setCaptions(initCaps);
 
     // Pre-fill from existing approvals
     const initial: Record<string, LocalReview> = {};
@@ -467,11 +496,21 @@ export default function ApprovalPage() {
                   </div>
                 )}
 
-                {currentItem.caption && (
-                  <div className="bg-black/30 rounded-lg p-3 mb-3">
-                    <p className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">{currentItem.caption}</p>
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-500">Legenda (editável — salva sozinha)</label>
+                    <span className="text-[11px] text-gray-500">
+                      {capState[group.groupKey] === "saving" ? "salvando…" : capState[group.groupKey] === "saved" ? "salvo ✓" : capState[group.groupKey] === "error" ? "erro ao salvar" : ""}
+                    </span>
                   </div>
-                )}
+                  <textarea
+                    value={captions[group.groupKey] ?? ""}
+                    onChange={(e) => onCaptionChange(group.groupKey, e.target.value, items)}
+                    rows={4}
+                    placeholder="Escreva a legenda…"
+                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-emerald-500 resize-y leading-relaxed"
+                  />
+                </div>
 
                 {/* Action buttons */}
                 {status === "PENDING" || isActive ? (

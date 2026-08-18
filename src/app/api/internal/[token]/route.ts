@@ -37,7 +37,25 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
   if (!client) return NextResponse.json({ error: "Link não encontrado" }, { status: 404 });
 
   const body = await req.json();
-  const { contentItemId, status, comment } = body;
+  const { contentItemId, status, comment, action, caption } = body;
+
+  // Editar a legenda (auto-save) sem pedir ajuste. Grava no grupo do carrossel.
+  if (action === "save-caption") {
+    if (!contentItemId) return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
+    const item = await prisma.contentItem.findFirst({
+      where: { id: contentItemId, clientId: client.id, status: { in: ["INTERNAL_REVIEW", "INTERNAL_DONE"] } },
+      select: { id: true, groupId: true },
+    });
+    if (!item) return NextResponse.json({ error: "Item não disponível" }, { status: 404 });
+    const capVal = typeof caption === "string" && caption.trim() ? caption : null;
+    const ids = item.groupId
+      ? (await prisma.contentItem.findMany({ where: { groupId: item.groupId }, select: { id: true } })).map((s) => s.id)
+      : [item.id];
+    await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { caption: capVal } });
+    await syncRoteiroStatus(item.id); // empurra a legenda ao Roteirização (best-effort)
+    return NextResponse.json({ success: true });
+  }
+
   const VALID = ["APPROVED", "ADJUSTMENT", "REJECTED"];
   if (!contentItemId || !status || !VALID.includes(status)) {
     return NextResponse.json({ error: "Campos obrigatórios faltando ou inválidos" }, { status: 400 });
