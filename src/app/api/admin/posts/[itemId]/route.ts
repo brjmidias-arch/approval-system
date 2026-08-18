@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus, pullRoteiroToItem } from "@/lib/syncRoteiro";
 import { refreshGroupMediaFromDrive } from "@/lib/driveMedia";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
+import { sendInternalApprovalToGroup } from "@/lib/notifyStep";
 
 // ids de todos os itens do "post" (grupo do carrossel, ou o próprio item)
 async function postItemIds(itemId: string): Promise<string[]> {
@@ -177,6 +178,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
     // Espelha o estado no Roteirização (paralelo; best-effort). Em edições de
     // carrossel, o cliente manda skipSync nos slides extras e sincroniza só 1x.
     if (!skipSync) await Promise.all(ids.map((id) => syncRoteiroStatus(id)));
+
+    // Ajuste feito → post volta para revisão interna: envia o roteiro ao grupo de aprovações.
+    if (!skipSync && action === "adjustment-done") await sendInternalApprovalToGroup(params.itemId);
 
     return NextResponse.json({ success: true });
   } catch {

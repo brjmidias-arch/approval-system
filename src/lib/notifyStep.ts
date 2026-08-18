@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { notifyTelegram, notifyTelegramApprovals, tgEscape } from "@/lib/telegram";
 import { designerCoverToken, designerAdjustToken } from "@/lib/designerToken";
+import { buildAprovacaoMsg } from "@/lib/aprovacaoMsg";
 
 const BASE = process.env.NEXTAUTH_URL || "";
 
@@ -170,6 +171,31 @@ export async function notifyApprovalStep(contentItemId: string, prefix?: string)
     if (p && (p.label === L_INTERNA || p.label === L_APROVAR_CAPA)) {
       await notifyTelegramApprovals(p.msg);
     }
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Envia ao GRUPO DE APROVAÇÕES a mensagem de aprovação interna (mesmo formato do
+ * botão "Enviar post para aprovação interna"). Usado no botão e quando um post
+ * ajustado volta para a revisão interna. Best-effort.
+ */
+export async function sendInternalApprovalToGroup(contentItemId: string): Promise<void> {
+  try {
+    const i = await prisma.contentItem.findUnique({
+      where: { id: contentItemId },
+      select: { title: true, asanaUrl: true, roteiroConteudoId: true, client: { select: { name: true, internalToken: true } } },
+    });
+    if (!i) return;
+    const msg = buildAprovacaoMsg({
+      title: i.title,
+      clientName: i.client?.name ?? "",
+      asanaUrl: i.asanaUrl,
+      connected: !!i.roteiroConteudoId,
+      internalUrl: i.client?.internalToken ? `${BASE}/revisar/${i.client.internalToken}` : null,
+    });
+    await notifyTelegramApprovals(tgEscape(msg));
   } catch {
     // best-effort
   }
