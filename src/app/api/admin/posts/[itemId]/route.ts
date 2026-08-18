@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { syncRoteiroStatus } from "@/lib/syncRoteiro";
+import { syncRoteiroStatus, pullRoteiroToItem } from "@/lib/syncRoteiro";
 import { refreshGroupMediaFromDrive } from "@/lib/driveMedia";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
 
@@ -26,12 +26,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
 
   const exists = await prisma.contentItem.findUnique({
     where: { id: params.itemId },
-    select: { id: true, status: true, coverDriveUrl: true, contentType: true, fileType: true },
+    select: { id: true, status: true, coverDriveUrl: true, contentType: true, fileType: true, roteiroConteudoId: true },
   });
   if (!exists) return NextResponse.json({ error: "Post não encontrado" }, { status: 404 });
 
   const body = await req.json();
   const { title, caption, scheduledDate, driveUrl, coverUrl, coverDriveUrl, fileUrl, fileType, contentType, roteiroConteudoId, asanaUrl, coverWaived, sentToProgramacao, action, skipSync } = body;
+
+  // Anexou a um roteiro (valor novo e diferente) → puxar legenda + data de previsão.
+  const connecting = roteiroConteudoId !== undefined && !!roteiroConteudoId && roteiroConteudoId !== exists.roteiroConteudoId;
 
   try {
     // 1) Edições de campos no item clicado
@@ -166,6 +169,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
         }
       } catch { /* best-effort */ }
     }
+
+    // Recém-conectado a um roteiro → puxa legenda + data de previsão (best-effort),
+    // antes do sync (que devolve a legenda ao Roteirização).
+    if (connecting) await pullRoteiroToItem(params.itemId);
 
     // Espelha o estado no Roteirização (paralelo; best-effort). Em edições de
     // carrossel, o cliente manda skipSync nos slides extras e sincroniza só 1x.

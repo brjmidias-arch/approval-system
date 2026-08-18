@@ -1,5 +1,45 @@
 import { prisma } from "@/lib/prisma";
-import { updateRoteiroScript } from "@/lib/roteirizacao";
+import { updateRoteiroScript, getConteudo } from "@/lib/roteirizacao";
+
+/** "YYYY-MM-DD..." → Date ao meio-dia UTC (evita virar o dia por fuso). null se inválido. */
+function parseRotDate(v: string | null): Date | null {
+  if (!v) return null;
+  const s = String(v).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  return new Date(`${s}T12:00:00.000Z`);
+}
+
+/**
+ * Ao ANEXAR um post a um roteiro: puxa do Roteirização a legenda → caption e a
+ * data de previsão de postagem (data_postagem) → scheduledDate (dia a agendar).
+ * Best-effort: NUNCA lança. Só sobrescreve quando o Roteirização tem o valor.
+ */
+export async function pullRoteiroToItem(contentItemId: string): Promise<void> {
+  try {
+    const item = await prisma.contentItem.findUnique({
+      where: { id: contentItemId },
+      select: { id: true, groupId: true, roteiroConteudoId: true },
+    });
+    if (!item?.roteiroConteudoId) return;
+    const c = await getConteudo(item.roteiroConteudoId);
+    if (!c) return;
+
+    // Legenda → caption (no item que carrega o roteiro).
+    if (c.legenda && c.legenda.trim()) {
+      await prisma.contentItem.update({ where: { id: item.id }, data: { caption: c.legenda } });
+    }
+    // Previsão de postagem → scheduledDate (grupo todo do carrossel).
+    const dt = parseRotDate(c.data_postagem);
+    if (dt) {
+      const ids = item.groupId
+        ? (await prisma.contentItem.findMany({ where: { groupId: item.groupId }, select: { id: true } })).map((s) => s.id)
+        : [item.id];
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { scheduledDate: dt } });
+    }
+  } catch (e) {
+    console.error("pullRoteiroToItem falhou (ignorado):", e);
+  }
+}
 
 /** Data de hoje no fuso de Brasília (YYYY-MM-DD). */
 function hojeBR(): string {

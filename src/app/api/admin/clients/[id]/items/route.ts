@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { syncRoteiroStatus } from "@/lib/syncRoteiro";
+import { syncRoteiroStatus, pullRoteiroToItem } from "@/lib/syncRoteiro";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -39,8 +39,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     });
     // Post nasce direto em Revisão interna: cria o registro de revisão (PENDING).
     await prisma.internalReviewItem.create({ data: { contentItemId: item.id, status: "PENDING" } });
-    // Se já nasceu conectado a um roteiro, espelha no Roteirização (best-effort).
-    if (roteiroConteudoId) await syncRoteiroStatus(item.id);
+    // Se já nasceu conectado a um roteiro: puxa legenda + data de previsão do
+    // Roteirização (best-effort) e depois espelha o estado de volta.
+    if (roteiroConteudoId) {
+      await pullRoteiroToItem(item.id);
+      await syncRoteiroStatus(item.id);
+    }
     return NextResponse.json(item, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Erro ao criar post" }, { status: 500 });

@@ -18,6 +18,7 @@ export type RotConteudo = {
   titulo: string | null;
   legenda: string | null;
   status: string | null;
+  data_postagem: string | null;
 };
 
 const CONCLUIDO = new Set(["concluido", "concluído"]);
@@ -29,8 +30,9 @@ function toConteudo(s: {
   titulo: string | null;
   legenda: string | null;
   script_tarefa: string | null;
+  data_postagem?: string | null;
 }): RotConteudo {
-  return { id: s.id, tipo: s.tipo, titulo: s.titulo, legenda: s.legenda, status: s.script_tarefa };
+  return { id: s.id, tipo: s.tipo, titulo: s.titulo, legenda: s.legenda, status: s.script_tarefa, data_postagem: s.data_postagem ?? null };
 }
 
 /** Lista os clientes do Roteirização (para vincular ao cliente do aprovação). */
@@ -58,7 +60,7 @@ export async function listConteudosDoCliente(rotClienteId: string): Promise<RotC
 export async function getConteudo(id: string): Promise<RotConteudo | null> {
   const { data, error } = await rot()
     .from("rot_scripts")
-    .select("id, tipo, titulo, legenda, script_tarefa")
+    .select("id, tipo, titulo, legenda, script_tarefa, data_postagem")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
