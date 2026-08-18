@@ -82,6 +82,7 @@ export default function InternalReviewPage() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [captions, setCaptions] = useState<Record<string, string>>({});
   const [capState, setCapState] = useState<Record<string, "idle" | "saving" | "saved" | "error">>({});
+  const [editingCap, setEditingCap] = useState<Record<string, boolean>>({});
   const capTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => setOrigin(window.location.origin), []);
@@ -478,18 +479,41 @@ export default function InternalReviewPage() {
 
                 <div className="mb-3">
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs text-gray-500">Legenda (editável — salva sozinha)</label>
+                    <label className="text-xs text-gray-500">Legenda</label>
                     <span className="text-[11px] text-gray-500">
                       {capState[group.groupKey] === "saving" ? "salvando…" : capState[group.groupKey] === "saved" ? "salvo ✓" : capState[group.groupKey] === "error" ? "erro ao salvar" : ""}
                     </span>
                   </div>
-                  <textarea
-                    value={captions[group.groupKey] ?? ""}
-                    onChange={(e) => onCaptionChange(group.groupKey, e.target.value, items)}
-                    rows={4}
-                    placeholder="Escreva a legenda…"
-                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-violet-500 resize-y leading-relaxed"
-                  />
+                  {editingCap[group.groupKey] ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={captions[group.groupKey] ?? ""}
+                        onChange={(e) => { onCaptionChange(group.groupKey, e.target.value, items); e.currentTarget.style.height = "auto"; e.currentTarget.style.height = e.currentTarget.scrollHeight + "px"; }}
+                        onFocus={(e) => { e.currentTarget.style.height = "auto"; e.currentTarget.style.height = e.currentTarget.scrollHeight + "px"; }}
+                        placeholder="Escreva a legenda…"
+                        autoFocus
+                        className="w-full bg-black/30 border border-violet-500/40 rounded-lg px-3 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-violet-500 resize-none leading-relaxed overflow-hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { clearTimeout(capTimers.current[group.groupKey]); saveCaption(group.groupKey, captions[group.groupKey] ?? "", items); setEditingCap((p) => ({ ...p, [group.groupKey]: false })); }}
+                        className="inline-flex items-center gap-1 text-xs bg-violet-600 hover:bg-violet-500 text-white px-3 py-1.5 rounded-lg transition-colors"
+                      >✓ Pronto</button>
+                    </div>
+                  ) : (
+                    <div className="bg-black/30 rounded-lg p-3">
+                      {captions[group.groupKey]?.trim() ? (
+                        <p className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">{captions[group.groupKey]}</p>
+                      ) : (
+                        <p className="text-sm text-gray-600 italic">Sem legenda</p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setEditingCap((p) => ({ ...p, [group.groupKey]: true }))}
+                        className="mt-2 inline-flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300"
+                      >✏️ Editar legenda</button>
+                    </div>
+                  )}
                 </div>
 
                 {(currentItem.driveUrl || currentItem.coverDriveUrl) && (
