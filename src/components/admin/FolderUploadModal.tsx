@@ -468,7 +468,11 @@ export default function FolderUploadModal({ campaignId, clientId, clientName, cl
                           clientId={clientId}
                           clientName={clientName}
                           current={post.roteiroConteudoId ?? ""}
-                          onPick={(c) => updatePost(post.tempId, "roteiroConteudoId", c?.id ?? "")}
+                          onPick={(c) => {
+                            updatePost(post.tempId, "roteiroConteudoId", c?.id ?? "");
+                            // Ao conectar, já traz a legenda do roteiro (só se tiver).
+                            if (c?.legenda && c.legenda.trim()) updatePost(post.tempId, "caption", c.legenda);
+                          }}
                         />
                       </div>
                     )}
@@ -483,7 +487,7 @@ export default function FolderUploadModal({ campaignId, clientId, clientName, cl
                         e.target.style.height = "auto";
                         e.target.style.height = e.target.scrollHeight + "px";
                       }}
-                      placeholder="Legenda (opcional)"
+                      placeholder={post.roteiroConteudoId ? "Post sem legenda, inclua uma legenda aqui" : "Legenda (opcional)"}
                       rows={4}
                       className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500 resize-none placeholder-gray-600 overflow-hidden"
                     />

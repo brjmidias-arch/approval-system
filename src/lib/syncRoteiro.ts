@@ -18,14 +18,15 @@ export async function pullRoteiroToItem(contentItemId: string): Promise<void> {
   try {
     const item = await prisma.contentItem.findUnique({
       where: { id: contentItemId },
-      select: { id: true, groupId: true, roteiroConteudoId: true },
+      select: { id: true, groupId: true, roteiroConteudoId: true, caption: true },
     });
     if (!item?.roteiroConteudoId) return;
     const c = await getConteudo(item.roteiroConteudoId);
     if (!c) return;
 
-    // Legenda → caption (no item que carrega o roteiro).
-    if (c.legenda && c.legenda.trim()) {
+    // Legenda → caption: só preenche se o post ainda estiver SEM legenda
+    // (não sobrescreve o que foi digitado/editado no modal ou depois).
+    if (c.legenda && c.legenda.trim() && !item.caption?.trim()) {
       await prisma.contentItem.update({ where: { id: item.id }, data: { caption: c.legenda } });
     }
     // Previsão de postagem → scheduledDate (grupo todo do carrossel).
