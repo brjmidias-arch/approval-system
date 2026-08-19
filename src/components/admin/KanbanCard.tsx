@@ -42,6 +42,16 @@ function postLabel(p: { title: string | null; caption: string | null }): string 
   return "(sem título)";
 }
 
+/** Previsão vencida ou a ≤1 dia (hoje/amanhã/passado) → urgência (vermelho). ymd = "YYYY-MM-DD". */
+function isPrevisaoUrgent(ymd: string): boolean {
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return false;
+  const target = Date.UTC(y, m - 1, d);
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((target - today) / 86400000) <= 1;
+}
+
 export default function KanbanCard({
   post,
   stageId,
@@ -187,6 +197,13 @@ export default function KanbanCard({
                 <span className="text-[9px] text-fuchsia-300 bg-fuchsia-900/30 border border-fuchsia-500/30 px-1 py-0.5 rounded shrink-0" title="Roteiro anexado ao Roteirização">🔗 Roteiro</span>
               )}
             </div>
+            {post.scheduledLabel ? (
+              <p className={`text-[10px] ${post.scheduledInput && isPrevisaoUrgent(post.scheduledInput) ? "text-red-400 font-semibold" : "text-gray-500"}`}>
+                🔮 Previsão: {post.scheduledLabel}
+              </p>
+            ) : (
+              <p className="text-[10px] text-gray-600 italic">Sem previsão de postagem</p>
+            )}
           </div>
         </div>
         {stageId === "readyToSchedule" && (
