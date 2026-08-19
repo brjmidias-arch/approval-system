@@ -18,7 +18,7 @@ export type RotConteudo = {
   titulo: string | null;
   legenda: string | null;
   status: string | null;
-  data_postagem: string | null;
+  previsao_postagem: string | null;
 };
 
 const CONCLUIDO = new Set(["concluido", "concluído"]);
@@ -30,9 +30,9 @@ function toConteudo(s: {
   titulo: string | null;
   legenda: string | null;
   script_tarefa: string | null;
-  data_postagem?: string | null;
+  previsao_postagem?: string | null;
 }): RotConteudo {
-  return { id: s.id, tipo: s.tipo, titulo: s.titulo, legenda: s.legenda, status: s.script_tarefa, data_postagem: s.data_postagem ?? null };
+  return { id: s.id, tipo: s.tipo, titulo: s.titulo, legenda: s.legenda, status: s.script_tarefa, previsao_postagem: s.previsao_postagem ?? null };
 }
 
 /** Lista os clientes do Roteirização (para vincular ao cliente do aprovação). */
@@ -56,14 +56,14 @@ export async function listConteudosDoCliente(rotClienteId: string): Promise<RotC
   return (data ?? []).filter((s) => naoConcluido(s.script_tarefa)).map(toConteudo);
 }
 
-/** Data de previsão (data_postagem) de vários roteiros de uma vez: { rotScriptId: "YYYY-MM-DD"|null }. */
-export async function getDataPostagemByIds(ids: string[]): Promise<Record<string, string | null>> {
+/** Previsão de postagem (previsao_postagem) de vários roteiros de uma vez: { rotScriptId: "YYYY-MM-DD"|null }. */
+export async function getPrevisaoByIds(ids: string[]): Promise<Record<string, string | null>> {
   const uniq = Array.from(new Set(ids));
   if (uniq.length === 0) return {};
-  const { data, error } = await rot().from("rot_scripts").select("id, data_postagem").in("id", uniq);
+  const { data, error } = await rot().from("rot_scripts").select("id, previsao_postagem").in("id", uniq);
   if (error) throw error;
   const map: Record<string, string | null> = {};
-  for (const r of data ?? []) map[r.id] = r.data_postagem ?? null;
+  for (const r of data ?? []) map[r.id] = r.previsao_postagem ?? null;
   return map;
 }
 
@@ -71,7 +71,7 @@ export async function getDataPostagemByIds(ids: string[]): Promise<Record<string
 export async function getConteudo(id: string): Promise<RotConteudo | null> {
   const { data, error } = await rot()
     .from("rot_scripts")
-    .select("id, tipo, titulo, legenda, script_tarefa, data_postagem")
+    .select("id, tipo, titulo, legenda, script_tarefa, previsao_postagem")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;

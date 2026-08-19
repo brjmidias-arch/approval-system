@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { updateRoteiroScript, getConteudo, getDataPostagemByIds } from "@/lib/roteirizacao";
+import { updateRoteiroScript, getConteudo, getPrevisaoByIds } from "@/lib/roteirizacao";
 
 /** "YYYY-MM-DD..." → Date ao meio-dia UTC (evita virar o dia por fuso). null se inválido. */
 function parseRotDate(v: string | null): Date | null {
@@ -30,7 +30,7 @@ export async function pullRoteiroToItem(contentItemId: string): Promise<void> {
       await prisma.contentItem.update({ where: { id: item.id }, data: { caption: c.legenda } });
     }
     // Previsão de postagem → scheduledDate (grupo todo do carrossel).
-    const dt = parseRotDate(c.data_postagem);
+    const dt = parseRotDate(c.previsao_postagem);
     if (dt) {
       const ids = item.groupId
         ? (await prisma.contentItem.findMany({ where: { groupId: item.groupId }, select: { id: true } })).map((s) => s.id)
@@ -55,7 +55,7 @@ export async function refreshPrevisaoForItems(
   try {
     const connected = items.filter((i) => i.roteiroConteudoId);
     if (connected.length === 0) return eff;
-    const map = await getDataPostagemByIds(connected.map((i) => i.roteiroConteudoId!));
+    const map = await getPrevisaoByIds(connected.map((i) => i.roteiroConteudoId!));
     for (const it of connected) {
       const dp = parseRotDate(map[it.roteiroConteudoId!] ?? null);
       if (!dp) continue; // Roteirização sem data → mantém a previsão atual.

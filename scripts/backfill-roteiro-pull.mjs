@@ -49,15 +49,15 @@ let capUpd = 0, dateUpd = 0, semRoteiro = 0, shown = 0;
 for (const it of items) {
   let c = cache.get(it.roteiroConteudoId);
   if (c === undefined) {
-    const { data } = await rot.from("rot_scripts").select("legenda, data_postagem").eq("id", it.roteiroConteudoId).maybeSingle();
+    const { data } = await rot.from("rot_scripts").select("legenda, previsao_postagem").eq("id", it.roteiroConteudoId).maybeSingle();
     c = data ?? null;
     cache.set(it.roteiroConteudoId, c);
   }
   if (!c) { semRoteiro++; continue; }
 
   const newCap = c.legenda && c.legenda.trim() ? c.legenda : null;
-  const capWillChange = newCap != null && newCap !== it.caption;
-  const dt = parseRotDate(c.data_postagem);
+  const capWillChange = newCap != null && !(it.caption && it.caption.trim()); // só preenche se vazio
+  const dt = parseRotDate(c.previsao_postagem);
   const dateWillChange = dt != null && ymd(dt) !== ymd(it.scheduledDate);
 
   if (capWillChange || dateWillChange) {
