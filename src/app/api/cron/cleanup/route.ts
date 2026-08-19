@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { refreshPrevisaoForItems } from "@/lib/syncRoteiro";
 
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -7,6 +8,15 @@ export async function GET(req: NextRequest) {
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Reflete no aprovação a PREVISÃO de postagem atualizada no Roteirização (best-effort).
+  try {
+    const connected = await prisma.contentItem.findMany({
+      where: { roteiroConteudoId: { not: null }, status: { not: "PUBLISHED" } },
+      select: { id: true, roteiroConteudoId: true, scheduledDate: true },
+    });
+    await refreshPrevisaoForItems(connected);
+  } catch { /* best-effort */ }
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 

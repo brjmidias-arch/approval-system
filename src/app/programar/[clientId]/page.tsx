@@ -37,10 +37,10 @@ export default function ProgramarPage() {
       if (!res.ok) { setNotFound(true); return; }
       const json: Data = await res.json();
       setData(json);
-      // Semeia o campo de data com o que já veio do dashboard (formato YYYY-MM-DD).
+      // Semeia o campo com a data de AGENDAMENTO já preenchida (não a previsão).
       const seed: Record<string, string> = {};
       for (const c of json.campaigns ?? []) for (const p of c.posts) {
-        seed[p.id] = p.scheduledDate ? new Date(p.scheduledDate).toISOString().slice(0, 10) : "";
+        seed[p.id] = p.agendadoDate ? new Date(p.agendadoDate).toISOString().slice(0, 10) : "";
       }
       setDates(seed);
     } catch {
@@ -60,7 +60,7 @@ export default function ProgramarPage() {
       await fetch(`/api/programar/${clientId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentItemId: postId, scheduledDate: value || null, action: "set-date" }),
+        body: JSON.stringify({ contentItemId: postId, agendadoDate: value || null, action: "set-date" }),
       });
     } catch {
       // best-effort: a data também é reenviada ao clicar em "Agendado".
@@ -77,7 +77,7 @@ export default function ProgramarPage() {
       const res = await fetch(`/api/programar/${clientId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentItemId: postId, scheduledDate: date }),
+        body: JSON.stringify({ contentItemId: postId, agendadoDate: date }),
       });
       if (!res.ok) throw new Error();
       setData((prev) =>
@@ -138,6 +138,14 @@ export default function ProgramarPage() {
                           {CONTENT_TYPE_LABELS[post.contentType] ?? post.contentType}
                         </span>
                       </div>
+                      {post.scheduledDate && (
+                        <div className="text-[11px] text-gray-400 pt-0.5">
+                          🔮 Previsão de postagem:{" "}
+                          <span className="text-gray-200 font-medium">
+                            {new Date(post.scheduledDate).toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric" })}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 pt-0.5">
                         <label className="text-[11px] text-gray-400 shrink-0">📅 Data do agendamento:</label>
                         <input

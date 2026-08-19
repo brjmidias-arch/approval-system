@@ -14,7 +14,8 @@ export interface SchedulablePost {
   caption: string | null;
   driveUrl: string | null;
   groupId: string | null;
-  scheduledDate: string | null;
+  scheduledDate: string | null; // = previsão de postagem (vem do Roteirização)
+  agendadoDate?: string | null; // = data em que foi agendada (preenchida no /programar)
   postedAt: string | null;
   approvedAt: string | null;
 }

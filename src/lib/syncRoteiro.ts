@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { updateRoteiroScript, getConteudo } from "@/lib/roteirizacao";
+import { updateRoteiroScript, getConteudo, getDataPostagemByIds } from "@/lib/roteirizacao";
 
 /** "YYYY-MM-DD..." → Date ao meio-dia UTC (evita virar o dia por fuso). null se inválido. */
 function parseRotDate(v: string | null): Date | null {
@@ -42,6 +42,35 @@ export async function pullRoteiroToItem(contentItemId: string): Promise<void> {
   }
 }
 
+/**
+ * Atualiza a PREVISÃO (scheduledDate) dos posts conectados a partir da data_postagem
+ * atual no Roteirização — para refletir mudanças feitas lá. Batched (1 consulta).
+ * Best-effort. Retorna a previsão efetiva por id de post ({ postId: Date|null }).
+ */
+export async function refreshPrevisaoForItems(
+  items: { id: string; roteiroConteudoId: string | null; scheduledDate: Date | null }[]
+): Promise<Record<string, Date | null>> {
+  const eff: Record<string, Date | null> = {};
+  for (const it of items) eff[it.id] = it.scheduledDate;
+  try {
+    const connected = items.filter((i) => i.roteiroConteudoId);
+    if (connected.length === 0) return eff;
+    const map = await getDataPostagemByIds(connected.map((i) => i.roteiroConteudoId!));
+    for (const it of connected) {
+      const dp = parseRotDate(map[it.roteiroConteudoId!] ?? null);
+      if (!dp) continue; // Roteirização sem data → mantém a previsão atual.
+      const same = dp.getTime() === (it.scheduledDate?.getTime() ?? NaN);
+      if (!same) {
+        await prisma.contentItem.update({ where: { id: it.id }, data: { scheduledDate: dp } });
+        eff[it.id] = dp;
+      }
+    }
+  } catch (e) {
+    console.error("refreshPrevisaoForItems falhou (ignorado):", e);
+  }
+  return eff;
+}
+
 /** Data de hoje no fuso de Brasília (YYYY-MM-DD). */
 function hojeBR(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
@@ -74,6 +103,7 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
         contentType: true,
         fileType: true,
         scheduledDate: true,
+        agendadoDate: true,
         driveUrl: true,
         caption: true,
         coverDriveUrl: true,
@@ -142,7 +172,9 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
       }
     } else if (item.status === "SCHEDULED" || item.status === "PUBLISHED") {
       fields.script_tarefa = "Concluído";
-      if (item.scheduledDate) fields.data_postagem = item.scheduledDate.toISOString().slice(0, 10);
+      // data_postagem = data agendada de fato (agendadoDate); se não houver, a previsão.
+      const dataFinal = item.agendadoDate ?? item.scheduledDate;
+      if (dataFinal) fields.data_postagem = dataFinal.toISOString().slice(0, 10);
     }
 
     // Fora de ajuste: limpa a descrição (só mexe se estamos sincronizando esta fase).

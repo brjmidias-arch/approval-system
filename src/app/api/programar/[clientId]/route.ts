@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { syncRoteiroStatus } from "@/lib/syncRoteiro";
+import { syncRoteiroStatus, refreshPrevisaoForItems } from "@/lib/syncRoteiro";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
 
 export async function GET(_req: NextRequest, { params }: { params: { clientId: string } }) {
@@ -26,10 +26,15 @@ export async function GET(_req: NextRequest, { params }: { params: { clientId: s
       select: {
         id: true, contentType: true, groupId: true, title: true, caption: true,
         fileUrl: true, fileType: true, coverUrl: true, coverDriveUrl: true, driveUrl: true,
-        scheduledDate: true,
+        scheduledDate: true, agendadoDate: true, roteiroConteudoId: true,
         approvalItem: { select: { reviewedAt: true } },
       },
     });
+
+    // Atualiza a PREVISÃO a partir do Roteirização (reflete mudanças feitas lá).
+    const previsao = await refreshPrevisaoForItems(
+      items.map((i) => ({ id: i.id, roteiroConteudoId: i.roteiroConteudoId, scheduledDate: i.scheduledDate }))
+    );
 
     // Carrossel = 1 post (representado pelo primeiro slide por order)
     const seen = new Set<string>();
@@ -51,7 +56,8 @@ export async function GET(_req: NextRequest, { params }: { params: { clientId: s
         caption: it.caption,
         driveUrl: it.driveUrl,
         groupId: it.groupId,
-        scheduledDate: it.scheduledDate ? it.scheduledDate.toISOString() : null,
+        scheduledDate: previsao[it.id] ? previsao[it.id]!.toISOString() : null, // = previsão
+        agendadoDate: it.agendadoDate ? it.agendadoDate.toISOString() : null,
         postedAt: null,
         approvedAt: it.approvalItem?.reviewedAt ? it.approvalItem.reviewedAt.toISOString() : null,
       });
@@ -69,7 +75,7 @@ export async function GET(_req: NextRequest, { params }: { params: { clientId: s
 
 export async function PATCH(req: NextRequest, { params }: { params: { clientId: string } }) {
   try {
-    const { contentItemId, scheduledDate, action } = await req.json();
+    const { contentItemId, agendadoDate, action } = await req.json();
     if (!contentItemId) {
       return NextResponse.json({ error: "Campo obrigatório faltando" }, { status: 400 });
     }
@@ -83,7 +89,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { clientId: 
         postedAt: null,
         contentType: { not: "TEXTO" },
       },
-      select: { id: true, groupId: true, contentType: true, title: true, scheduledDate: true, client: { select: { name: true } } },
+      select: { id: true, groupId: true, contentType: true, title: true, agendadoDate: true, client: { select: { name: true } } },
     });
     if (!item) {
       return NextResponse.json({ error: "Item não disponível para agendamento" }, { status: 404 });
@@ -98,19 +104,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { clientId: 
     const parseDate = (s: unknown) =>
       typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T12:00:00.000Z`) : null;
 
-    // Ação "salvar data": grava a data agendada no grupo (auto-save no link) e para por aqui.
+    // Ação "salvar data": grava a DATA DE AGENDAMENTO no grupo (auto-save no link).
     if (action === "set-date") {
-      const dt = parseDate(scheduledDate);
-      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { scheduledDate: dt } });
-      return NextResponse.json({ success: true, scheduledDate: dt ? dt.toISOString() : null });
+      const dt = parseDate(agendadoDate);
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { agendadoDate: dt } });
+      return NextResponse.json({ success: true, agendadoDate: dt ? dt.toISOString() : null });
     }
 
-    // Conclusão (clique em "Agendado"): a data é OBRIGATÓRIA. Se veio no corpo, salva antes.
-    const dtBody = parseDate(scheduledDate);
+    // Conclusão (clique em "Agendado"): a data de agendamento é OBRIGATÓRIA.
+    const dtBody = parseDate(agendadoDate);
     if (dtBody) {
-      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { scheduledDate: dtBody } });
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { agendadoDate: dtBody } });
     }
-    const dataAgendada = dtBody ?? item.scheduledDate;
+    const dataAgendada = dtBody ?? item.agendadoDate;
     if (!dataAgendada) {
       return NextResponse.json({ error: "Escolha a data do agendamento antes de marcar como agendado." }, { status: 400 });
     }
