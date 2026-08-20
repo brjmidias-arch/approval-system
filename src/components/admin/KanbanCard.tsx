@@ -121,18 +121,14 @@ export default function KanbanCard({
     if (busy) return;
     setBusy(true);
     try {
+      // Salva a capa → post vai para "Aprovar capa"; o aviso ao grupo de aprovações
+      // é disparado automaticamente pelo servidor (coverJustAdded).
       const r1 = await fetch(`/api/admin/posts/${post.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ coverDriveUrl: link, coverUrl: driveThumbUrl(id) }),
       });
       if (!r1.ok) throw new Error();
-      const r2 = await fetch(`/api/admin/posts/${post.id}/send-approval`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "cover" }),
-      });
-      if (!r2.ok) throw new Error();
       router.refresh();
     } catch {
       alert("Erro ao enviar a capa para aprovação. Tente novamente.");

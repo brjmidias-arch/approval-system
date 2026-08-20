@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus, pullRoteiroToItem } from "@/lib/syncRoteiro";
 import { refreshGroupMediaFromDrive } from "@/lib/driveMedia";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
-import { sendInternalApprovalToGroup } from "@/lib/notifyStep";
+import { sendInternalApprovalToGroup, notifyApprovalStep } from "@/lib/notifyStep";
 
 // ids de todos os itens do "post" (grupo do carrossel, ou o próprio item)
 async function postItemIds(itemId: string): Promise<string[]> {
@@ -181,6 +181,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
 
     // Ajuste feito → post volta para revisão interna: envia o roteiro ao grupo de aprovações.
     if (!skipSync && action === "adjustment-done") await sendInternalApprovalToGroup(params.itemId);
+
+    // Capa recém-adicionada → post entra em "Aprovar capa": avisa no grupo de aprovações.
+    if (!skipSync && !action && coverJustAdded) await notifyApprovalStep(params.itemId, "🖼️ Capa para aprovação");
 
     return NextResponse.json({ success: true });
   } catch {
