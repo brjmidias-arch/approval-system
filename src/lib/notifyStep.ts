@@ -220,10 +220,10 @@ type DigestItem = {
 };
 
 /**
- * Digest diário no Telegram: pendências agrupadas por próximo passo, cada uma com
- * o link para acionar (cliente/designer/programação). Best-effort.
+ * Monta o texto do digest de pendências (agrupadas por próximo passo, com os links).
+ * Retorna null se não houver pendências. Usado no lembrete diário e no comando /pendencias.
  */
-export async function sendPendingDigest(): Promise<number> {
+export async function buildPendingDigest(): Promise<string | null> {
   try {
     const rows = (await prisma.contentItem.findMany({
       where: { status: { in: ["INTERNAL_REVIEW", "INTERNAL_DONE", "CLIENT_REVIEW", "APPROVED"] } },
@@ -255,7 +255,7 @@ export async function sendPendingDigest(): Promise<number> {
       arr.push(it);
       byLabel.set(label, arr);
     }
-    if (byLabel.size === 0) return 0;
+    if (byLabel.size === 0) return null;
 
     const labels = ORDER.filter((l) => byLabel.has(l));
     const designerCover = await designerCoverToken();
@@ -299,9 +299,16 @@ export async function sendPendingDigest(): Promise<number> {
       }
     }
 
-    await notifyTelegram(msg);
-    return labels.length;
+    return msg;
   } catch {
-    return 0;
+    return null;
   }
+}
+
+/** Envia o digest de pendências ao grupo principal (lembrete diário). Best-effort. */
+export async function sendPendingDigest(): Promise<number> {
+  const msg = await buildPendingDigest();
+  if (!msg) return 0;
+  await notifyTelegram(msg);
+  return 1;
 }
