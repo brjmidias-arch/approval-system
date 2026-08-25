@@ -16,7 +16,8 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
     const client = await prisma.client.findUnique({ where: { internalToken: params.token }, select: { id: true, name: true, token: true, internalToken: true } });
     if (client) {
       const contentItems = await prisma.contentItem.findMany({
-        where: { clientId: client.id, status: "INTERNAL_REVIEW" },
+        // Some do link quando o INTERNO pediu ajuste/reprovação (fica com o designer).
+        where: { clientId: client.id, status: "INTERNAL_REVIEW", internalReviewItem: { status: { notIn: ["ADJUSTMENT", "REJECTED"] } } },
         orderBy: { order: "asc" },
         select: POST_SELECT,
       });
