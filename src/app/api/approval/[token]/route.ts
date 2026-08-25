@@ -10,6 +10,30 @@ const POST_SELECT = {
   approvalItem: { select: { status: true, clientComment: true, clientCommentResolved: true } },
 } as const;
 
+/** Resumo da última rodada de aprovação do cliente: aprovados x enviados para ajuste. */
+async function lastRoundSummary(clientId: string): Promise<{ approved: number; adjustment: number } | null> {
+  const rows = await prisma.contentItem.findMany({
+    where: { clientId, approvalItem: { reviewedAt: { not: null } } },
+    select: { id: true, groupId: true, approvalItem: { select: { status: true, reviewedAt: true } } },
+  });
+  // Carrossel = 1 post (dedup por grupo).
+  const seen = new Set<string>();
+  const items = rows.filter((r) => { const k = r.groupId ?? r.id; if (seen.has(k)) return false; seen.add(k); return true; });
+  const dated = items.filter((i) => i.approvalItem?.reviewedAt);
+  if (dated.length === 0) return null;
+  // "Última rodada" = revisões dentro de 24h da revisão mais recente.
+  const maxTs = Math.max(...dated.map((i) => i.approvalItem!.reviewedAt!.getTime()));
+  const windowStart = maxTs - 24 * 60 * 60 * 1000;
+  let approved = 0, adjustment = 0;
+  for (const i of dated) {
+    if (i.approvalItem!.reviewedAt!.getTime() < windowStart) continue;
+    const s = i.approvalItem!.status;
+    if (s === "APPROVED") approved++;
+    else if (s === "ADJUSTMENT" || s === "REJECTED") adjustment++;
+  }
+  return approved + adjustment > 0 ? { approved, adjustment } : null;
+}
+
 export async function GET(_req: NextRequest, { params }: { params: { token: string } }) {
   try {
     // Novo: token de cliente
@@ -21,7 +45,8 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
         orderBy: { order: "asc" },
         select: POST_SELECT,
       });
-      return NextResponse.json({ id: client.id, name: client.name, token: client.token, status: "OPEN", client: { name: client.name }, contentItems });
+      const lastRound = contentItems.length === 0 ? await lastRoundSummary(client.id) : null;
+      return NextResponse.json({ id: client.id, name: client.name, token: client.token, status: "OPEN", client: { name: client.name }, contentItems, lastRound });
     }
     // Legado: token de campanha → redireciona pro link do cliente
     const campaign = await prisma.campaign.findUnique({ where: { token: params.token }, select: { client: { select: { token: true } } } });

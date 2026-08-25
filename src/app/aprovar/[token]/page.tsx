@@ -28,6 +28,7 @@ interface Campaign {
   status: string;
   client: { name: string };
   contentItems: ContentItem[];
+  lastRound?: { approved: number; adjustment: number } | null;
 }
 
 type LocalReview = { status: Status; comment: string };
@@ -208,11 +209,24 @@ export default function ApprovalPage() {
   if (!campaign) return null;
 
   if (campaign && groups.length === 0) {
+    const lr = campaign.lastRound;
+    const hasLr = !!lr && lr.approved + lr.adjustment > 0;
     return (
       <div className="min-h-screen bg-[#0f0f0f] text-white flex items-center justify-center p-8">
-        <div className="text-center">
-          <p className="text-3xl mb-2">✅</p>
-          <p className="text-gray-300">Tudo aprovado! Nenhum post pendente no momento.</p>
+        <div className="text-center max-w-sm">
+          <p className="text-4xl mb-3">✅</p>
+          {hasLr ? (
+            <>
+              <p className="text-white font-medium">Sua última aprovação</p>
+              <div className="mt-3 space-y-1.5">
+                <p className="text-emerald-400 text-sm">✅ <b>{lr!.approved}</b> {lr!.approved === 1 ? "post aprovado" : "posts aprovados"}</p>
+                <p className="text-amber-400 text-sm">✏️ <b>{lr!.adjustment}</b> {lr!.adjustment === 1 ? "post enviado para ajuste" : "posts enviados para ajuste"}</p>
+              </div>
+              <p className="text-gray-500 text-xs mt-4">Nenhum post pendente no momento.</p>
+            </>
+          ) : (
+            <p className="text-gray-300">Tudo aprovado! Nenhum post pendente no momento.</p>
+          )}
         </div>
       </div>
     );
@@ -661,13 +675,18 @@ export default function ApprovalPage() {
         )}
 
         {/* Completion state */}
-        {allDone && (
-          <div className="bg-emerald-900/20 border border-emerald-500/30 rounded-xl p-6 text-center">
-            <div className="text-4xl mb-3">✅</div>
-            <p className="text-emerald-400 font-semibold text-lg mb-1">Revisão concluída!</p>
-            <p className="text-gray-400 text-sm">Obrigado! A equipe da BRJ Mídias já foi notificada.</p>
-          </div>
-        )}
+        {allDone && (() => {
+          const ap = needsReview.filter((g) => reviews[g.groupKey]?.status === "APPROVED").length;
+          const aj = needsReview.filter((g) => { const s = reviews[g.groupKey]?.status; return s === "ADJUSTMENT" || s === "REJECTED"; }).length;
+          return (
+            <div className="bg-emerald-900/20 border border-emerald-500/30 rounded-xl p-6 text-center">
+              <div className="text-4xl mb-3">✅</div>
+              <p className="text-emerald-400 font-semibold text-lg mb-1">Revisão concluída!</p>
+              <p className="text-gray-300 text-sm mb-1">✅ {ap} {ap === 1 ? "aprovado" : "aprovados"} · ✏️ {aj} para ajuste</p>
+              <p className="text-gray-400 text-sm">Obrigado! A equipe da BRJ Mídias já foi notificada.</p>
+            </div>
+          );
+        })()}
       </main>
 
       <footer className="text-center py-8 text-gray-700 text-xs">
