@@ -201,6 +201,29 @@ export async function sendInternalApprovalToGroup(contentItemId: string): Promis
   }
 }
 
+/**
+ * Aviso de "Refazer capa" no grupo principal, com a observação do que mudar +
+ * link do designer para criar a capa. Best-effort.
+ */
+export async function notifyCoverRedo(contentItemId: string, note?: string | null): Promise<void> {
+  try {
+    const i = await prisma.contentItem.findUnique({
+      where: { id: contentItemId },
+      select: { title: true, client: { select: { name: true } } },
+    });
+    if (!i) return;
+    const resp = (await loadResponsaveis()).criarCapa;
+    const link = `${BASE}/criar-capa/${await designerCoverToken()}`;
+    let msg = `↩️ <b>Capa reprovada (refazer)</b>\nCliente: ${tgEscape(i.client?.name)}\nPost: ${tgEscape(i.title || "(sem título)")}`;
+    if (note && note.trim()) msg += `\n📝 Observação: ${tgEscape(note)}`;
+    if (resp) msg += `\nResponsável: ${tgEscape(resp)}`;
+    msg += `\n\n🎨 Refazer a capa: ${link}`;
+    await notifyTelegram(msg);
+  } catch {
+    // best-effort
+  }
+}
+
 const ORDER = [L_AJUSTE, L_CRIAR_CAPA, L_APROVAR_CAPA, L_INTERNA, L_CLIENTE, L_PROGRAMAR, L_PROGRAMADO];
 
 type DigestItem = {

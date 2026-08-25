@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
-import { notifyNextStep } from "@/lib/notifyStep";
+import { notifyNextStep, notifyCoverRedo } from "@/lib/notifyStep";
 
 const POST_SELECT = {
   id: true, fileUrl: true, fileType: true, contentType: true, title: true, caption: true,
@@ -37,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
   if (!client) return NextResponse.json({ error: "Link não encontrado" }, { status: 404 });
 
   const body = await req.json();
-  const { contentItemId, action } = body;
+  const { contentItemId, action, note } = body;
   if (!contentItemId || !["approve", "reject"].includes(action)) {
     return NextResponse.json({ error: "Campos obrigatórios faltando ou inválidos" }, { status: 400 });
   }
@@ -53,14 +53,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     if (action === "approve") {
       // Capa aprovada → vai para "Prontos p/ programar".
       await prisma.contentItem.update({ where: { id: contentItemId }, data: { coverApproved: true } });
+      await syncRoteiroStatus(contentItemId);
+      await notifyNextStep(contentItemId, "✅ Capa aprovada");
     } else {
-      // Reprovada → remove a capa e volta para "Criar capa".
-      await prisma.contentItem.update({ where: { id: contentItemId }, data: { coverDriveUrl: null, coverUrl: null, coverApproved: false } });
+      // Reprovada → remove a capa, guarda a observação e volta para "Criar capa".
+      const obs = typeof note === "string" && note.trim() ? note : null;
+      await prisma.contentItem.update({ where: { id: contentItemId }, data: { coverDriveUrl: null, coverUrl: null, coverApproved: false, coverRedoNote: obs } });
+      await syncRoteiroStatus(contentItemId);
+      await notifyCoverRedo(contentItemId, obs);
     }
-    await syncRoteiroStatus(contentItemId);
-
-    // Aviso no Telegram (best-effort) com o próximo passo.
-    await notifyNextStep(contentItemId, action === "approve" ? "✅ Capa aprovada" : "↩️ Capa reprovada (refazer)");
 
     return NextResponse.json({ success: true });
   } catch {

@@ -80,6 +80,7 @@ model ContentItem {
   asanaUrl           String?             // link da tarefa no Asana (opcional)
   coverWaived        Boolean             @default(false) // vídeo liberado p/ programar sem capa
   coverApproved      Boolean             @default(false) // capa aprovada na etapa "Aprovar capa"
+  coverRedoNote      String?             // observação do "Refazer capa" (o que o designer deve mudar)
   createdAt          DateTime            @default(now())
   approvalItem       ApprovalItem?
   internalReviewItem InternalReviewItem?

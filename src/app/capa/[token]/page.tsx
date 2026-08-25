@@ -37,13 +37,17 @@ export default function CoverApprovalPage({ params }: { params: { token: string 
   useEffect(() => { load(); }, [load]);
 
   async function act(id: string, action: "approve" | "reject") {
-    if (action === "reject" && !confirm("Pedir uma nova capa? A capa atual será removida e o vídeo volta para a etapa de criar capa.")) return;
+    let note: string | null = null;
+    if (action === "reject") {
+      note = window.prompt("O que precisa mudar na capa? (observações para o designer)", "");
+      if (note === null) return; // cancelou
+    }
     setBusyId(id);
     try {
       const res = await fetch(`/api/cover/${params.token}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentItemId: id, action }),
+        body: JSON.stringify({ contentItemId: id, action, note }),
       });
       if (!res.ok) throw new Error();
       await load();

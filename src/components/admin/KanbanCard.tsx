@@ -31,6 +31,7 @@ export interface KanbanCardData {
   asanaUrl?: string | null;
   adjustmentSource?: "cliente" | "interno" | null;
   adjustmentComment?: string | null;
+  coverRedoNote?: string | null;
 }
 
 function postLabel(p: { title: string | null; caption: string | null }): string {
@@ -237,6 +238,11 @@ export default function KanbanCard({
         )}
         {stageId === "criarCapa" && (
           <div className="mt-1.5 space-y-1.5" onClick={(e) => e.preventDefault()}>
+            {post.coverRedoNote && (
+              <div className="text-[10px] text-amber-400 bg-amber-900/20 border border-amber-500/20 rounded px-2 py-1 whitespace-pre-wrap">
+                ↩️ Refazer capa: {post.coverRedoNote}
+              </div>
+            )}
             <input
               type="text"
               value={coverLink}
@@ -293,9 +299,9 @@ export default function KanbanCard({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (confirm("Refazer a capa? A capa atual será removida e o vídeo volta para 'Criar capa'.")) {
-                  patchPost({ action: "redo-cover" }, "Erro ao mover. Tente novamente.");
-                }
+                const nota = window.prompt("Observações para o designer refazer a capa (o que mudar):", "");
+                if (nota === null) return; // cancelou
+                patchPost({ action: "redo-cover", coverRedoNote: nota }, "Erro ao mover. Tente novamente.");
               }}
               disabled={busy}
               className="text-[10px] px-2 py-1 rounded bg-amber-900/40 hover:bg-amber-900/60 text-amber-300 border border-amber-500/30 disabled:opacity-50 transition-colors"

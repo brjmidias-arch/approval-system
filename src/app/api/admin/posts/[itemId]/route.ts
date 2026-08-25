@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus, pullRoteiroToItem } from "@/lib/syncRoteiro";
 import { refreshGroupMediaFromDrive } from "@/lib/driveMedia";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
-import { sendInternalApprovalToGroup, notifyApprovalStep } from "@/lib/notifyStep";
+import { sendInternalApprovalToGroup, notifyApprovalStep, notifyCoverRedo } from "@/lib/notifyStep";
 
 // ids de todos os itens do "post" (grupo do carrossel, ou o próprio item)
 async function postItemIds(itemId: string): Promise<string[]> {
@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
   if (!exists) return NextResponse.json({ error: "Post não encontrado" }, { status: 404 });
 
   const body = await req.json();
-  const { title, caption, scheduledDate, driveUrl, coverUrl, coverDriveUrl, fileUrl, fileType, contentType, roteiroConteudoId, asanaUrl, coverWaived, sentToProgramacao, action, skipSync } = body;
+  const { title, caption, scheduledDate, driveUrl, coverUrl, coverDriveUrl, fileUrl, fileType, contentType, roteiroConteudoId, asanaUrl, coverWaived, sentToProgramacao, action, skipSync, coverRedoNote } = body;
 
   // Anexou a um roteiro (valor novo e diferente) → puxar legenda + data de previsão.
   const connecting = roteiroConteudoId !== undefined && !!roteiroConteudoId && roteiroConteudoId !== exists.roteiroConteudoId;
@@ -71,7 +71,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
     // "Aprovar capa" (não volta para a Revisão interna, evitando confusão).
     const coverJustAdded = coverDriveUrl !== undefined && !!coverDriveUrl && !exists.coverDriveUrl;
     if (!action && coverJustAdded) {
-      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { coverApproved: false } });
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { coverApproved: false, coverRedoNote: null } });
     }
 
     // 2) Transições de etapa (propagam ao grupo)
@@ -136,8 +136,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
       // Aprova a capa → sai de "Aprovar capa" e vai para "Prontos p/ programar".
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { coverApproved: true } });
     } else if (action === "redo-cover") {
-      // Refazer capa → limpa a capa e volta para "Criar capa".
-      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { coverDriveUrl: null, coverUrl: null, coverApproved: false } });
+      // Refazer capa → limpa a capa, guarda a observação e volta para "Criar capa".
+      const obs = typeof coverRedoNote === "string" && coverRedoNote.trim() ? coverRedoNote : null;
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { coverDriveUrl: null, coverUrl: null, coverApproved: false, coverRedoNote: obs } });
     } else if (action === "mark-approved") {
       // Volta para "Prontos p/ programar" (mantém a data planejada, se houver).
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "APPROVED", postedAt: null } });
@@ -184,6 +185,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
 
     // Capa recém-adicionada → post entra em "Aprovar capa": avisa no grupo de aprovações.
     if (!skipSync && !action && coverJustAdded) await notifyApprovalStep(params.itemId, "🖼️ Capa para aprovação");
+
+    // Refazer capa → volta para "Criar capa": avisa no Telegram com a observação.
+    if (!skipSync && action === "redo-cover") await notifyCoverRedo(params.itemId, typeof coverRedoNote === "string" ? coverRedoNote : null);
 
     return NextResponse.json({ success: true });
   } catch {
