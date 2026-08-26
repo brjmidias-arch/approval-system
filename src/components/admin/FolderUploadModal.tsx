@@ -76,6 +76,24 @@ function mimeToFileType(mimeType: string): string {
   return "IMAGE";
 }
 
+/** POST com nova tentativa: evita carrossel incompleto por falha transitória. */
+async function postWithRetry(url: string, body: unknown, tries = 3): Promise<Response | null> {
+  for (let t = 0; t < tries; t++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) return res;
+    } catch {
+      // rede falhou — tenta de novo
+    }
+    if (t < tries - 1) await new Promise((r) => setTimeout(r, 400 * (t + 1)));
+  }
+  return null;
+}
+
 function detectCoverAndType(files: DriveFile[]): {
   slides: DriveFile[];
   coverFileId?: string;
@@ -282,32 +300,23 @@ export default function FolderUploadModal({ campaignId, clientId, clientName, cl
         const coverUrl = post.coverFileId ? driveThumbUrl(post.coverFileId) : null;
         const coverDriveUrl = post.coverDriveUrl || (post.coverFileId ? driveFileViewUrl(post.coverFileId) : null);
 
-        try {
-          const res = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              fileUrl,
-              fileType: mimeToFileType(slide.mimeType),
-              title: post.title || null,
-              caption: post.caption || null,
-              scheduledDate: post.scheduledDate || null,
-              driveUrl,
-              contentType: post.contentType,
-              groupId,
-              order: baseOrder++,
-              coverUrl: i === 0 ? coverUrl : null,
-              coverDriveUrl: i === 0 ? coverDriveUrl : null,
-              asanaUrl: i === 0 ? (post.asanaUrl || null) : null,
-              roteiroConteudoId: i === 0 ? (post.roteiroConteudoId || null) : null,
-            }),
-          });
-          if (!res.ok) { postFailed = true; break; }
-          if (i === 0) { try { const created = await res.json(); firstId = created?.id ?? null; } catch { /* ignora */ } }
-        } catch {
-          postFailed = true;
-          break;
-        }
+        const res = await postWithRetry(endpoint, {
+          fileUrl,
+          fileType: mimeToFileType(slide.mimeType),
+          title: post.title || null,
+          caption: post.caption || null,
+          scheduledDate: post.scheduledDate || null,
+          driveUrl,
+          contentType: post.contentType,
+          groupId,
+          order: baseOrder++,
+          coverUrl: i === 0 ? coverUrl : null,
+          coverDriveUrl: i === 0 ? coverDriveUrl : null,
+          asanaUrl: i === 0 ? (post.asanaUrl || null) : null,
+          roteiroConteudoId: i === 0 ? (post.roteiroConteudoId || null) : null,
+        });
+        if (!res) { postFailed = true; break; }
+        if (i === 0) { try { const created = await res.json(); firstId = created?.id ?? null; } catch { /* ignora */ } }
       }
 
       if (postFailed) failedPosts++;
