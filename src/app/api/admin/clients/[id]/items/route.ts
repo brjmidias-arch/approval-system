@@ -12,12 +12,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!client) return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
 
   const body = await req.json();
-  const { fileUrl, fileType, title, caption, scheduledDate, driveUrl, coverUrl, coverDriveUrl, contentType, groupId, order, asanaUrl, roteiroConteudoId } = body;
+  const { fileUrl, fileType, title, caption, scheduledDate, driveUrl, coverUrl, coverDriveUrl, contentType, groupId, asanaUrl, roteiroConteudoId } = body;
   if (!fileUrl || !fileType || !contentType) {
     return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
   }
 
   try {
+    // Ordem definida no servidor = maior order do cliente + 1. Robusto contra
+    // exclusões/contagem defasada (evita colisão/embaralhamento com itens existentes).
+    // Uploads mandam os slides em sequência (await), então cada POST pega o próximo.
+    const agg = await prisma.contentItem.aggregate({ where: { clientId: client.id }, _max: { order: true } });
+    const nextOrder = (agg._max.order ?? 0) + 1;
+
     const item = await prisma.contentItem.create({
       data: {
         clientId: client.id,
@@ -32,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         coverDriveUrl: coverDriveUrl || null,
         contentType,
         groupId: groupId || null,
-        order: order ?? 0,
+        order: nextOrder,
         asanaUrl: asanaUrl || null,
         roteiroConteudoId: roteiroConteudoId || null,
       },

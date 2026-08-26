@@ -41,7 +41,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
     if (client) {
       const contentItems = await prisma.contentItem.findMany({
         // Some do link quando o CLIENTE pediu ajuste/reprovação (fica com o designer).
-        where: { clientId: client.id, status: "CLIENT_REVIEW", approvalItem: { status: { notIn: ["ADJUSTMENT", "REJECTED"] } } },
+        where: { clientId: client.id, status: "CLIENT_REVIEW", NOT: { approvalItem: { status: { in: ["ADJUSTMENT", "REJECTED"] } } } },
         orderBy: { order: "asc" },
         select: POST_SELECT,
       });

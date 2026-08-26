@@ -11,13 +11,24 @@ function naturalSort(items: DriveItem[]): DriveItem[] {
   return [...items].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
 }
 
-async function listFolder(folderId: string, apiKey: string) {
+async function listFolder(folderId: string, apiKey: string): Promise<{ files: DriveItem[]; error?: { message: string } }> {
   const query = encodeURIComponent(`'${folderId}' in parents and trashed = false`);
-  const fields = encodeURIComponent("files(id,name,mimeType)");
-  const res = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${query}&key=${apiKey}&fields=${fields}&pageSize=100`
-  );
-  return res.json();
+  const fields = encodeURIComponent("nextPageToken,files(id,name,mimeType)");
+  const files: DriveItem[] = [];
+  let pageToken = "";
+  // Pagina até trazer TODOS os arquivos (Drive limita cada página; sem isso, pastas
+  // com muitos arquivos ficavam capadas em 100 → cards sumiam).
+  do {
+    const tokenParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "";
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${query}&key=${apiKey}&fields=${fields}&pageSize=1000${tokenParam}`
+    );
+    const data = await res.json();
+    if (data.error) return { files, error: data.error };
+    files.push(...((data.files as DriveItem[]) || []));
+    pageToken = data.nextPageToken || "";
+  } while (pageToken);
+  return { files };
 }
 
 export async function POST(req: NextRequest) {
