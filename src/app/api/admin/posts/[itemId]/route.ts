@@ -27,7 +27,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
 
   const exists = await prisma.contentItem.findUnique({
     where: { id: params.itemId },
-    select: { id: true, status: true, coverDriveUrl: true, contentType: true, fileType: true, roteiroConteudoId: true },
+    select: { id: true, status: true, coverDriveUrl: true, contentType: true, fileType: true, roteiroConteudoId: true, driveUrl: true },
   });
   if (!exists) return NextResponse.json({ error: "Post não encontrado" }, { status: 404 });
 
@@ -58,6 +58,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
     });
 
     const ids = await postItemIds(params.itemId);
+
+    // Trocou o link do Drive numa edição normal → re-busca a arte (previews) do novo
+    // link. Para carrossel, use o link da PASTA (atualiza todos os slides na ordem).
+    if (!action && driveUrl !== undefined && !!driveUrl && driveUrl !== exists.driveUrl) {
+      const groupItems = await prisma.contentItem.findMany({ where: { id: { in: ids } }, orderBy: { order: "asc" }, select: { id: true, fileType: true } });
+      await refreshGroupMediaFromDrive(driveUrl, groupItems);
+    }
 
     // Data e programação propagam ao grupo
     if (scheduledDate !== undefined) {
