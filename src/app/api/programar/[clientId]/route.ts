@@ -63,6 +63,14 @@ export async function GET(_req: NextRequest, { params }: { params: { clientId: s
       });
     }
 
+    // Ordena por PREVISÃO de postagem (mais próxima em cima); sem previsão vai pro fim.
+    posts.sort((a, b) => {
+      if (!a.scheduledDate && !b.scheduledDate) return 0;
+      if (!a.scheduledDate) return 1;
+      if (!b.scheduledDate) return -1;
+      return a.scheduledDate.localeCompare(b.scheduledDate);
+    });
+
     const result = posts.length > 0
       ? [{ campaignId: params.clientId, campaignName: client.name, posts }]
       : [];
