@@ -32,6 +32,7 @@ export interface KanbanCardData {
   adjustmentSource?: "cliente" | "interno" | null;
   adjustmentComment?: string | null;
   coverRedoNote?: string | null;
+  clientWaitDays?: number | null;
 }
 
 function postLabel(p: { title: string | null; caption: string | null }): string {
@@ -203,6 +204,17 @@ export default function KanbanCard({
             )}
           </div>
         </div>
+        {stageId === "clientReview" && post.clientWaitDays != null && (
+          <div className="mt-1.5" onClick={(e) => e.preventDefault()}>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+              post.clientWaitDays >= 7 ? "bg-red-900/30 text-red-400"
+              : post.clientWaitDays >= 3 ? "bg-amber-900/30 text-amber-400"
+              : "bg-emerald-900/20 text-emerald-400"
+            }`}>
+              ⏳ {post.clientWaitDays === 0 ? "entrou hoje" : `há ${post.clientWaitDays} ${post.clientWaitDays === 1 ? "dia" : "dias"} aguardando`}
+            </span>
+          </div>
+        )}
         {stageId === "readyToSchedule" && (
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <PostDatePicker postId={post.id} value={post.scheduledInput ?? null} label={post.scheduledLabel ?? null} />
