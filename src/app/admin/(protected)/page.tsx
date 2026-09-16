@@ -17,7 +17,7 @@ type Item = {
   sentToProgramacaoAt: Date | null;
   scheduledDate: Date | null;
   postedAt: Date | null;
-  clientReviewAt: Date | null;
+  stageSince: Date | null;
   title: string | null;
   caption: string | null;
   fileType: string;
@@ -51,7 +51,7 @@ type DashPost = {
   adjustmentSource: "cliente" | "interno" | null;
   adjustmentComment: string | null;
   coverRedoNote: string | null;
-  clientWaitDays: number | null;
+  stageDays: number | null;
 };
 
 type StageId = "adjustment" | "internal" | "clientReview" | "criarCapa" | "aprovarCapa" | "readyToSchedule" | "published" | "draft";
@@ -153,7 +153,7 @@ function distinctPosts(items: Item[], predicate: (item: Item) => boolean): DashP
       adjustmentSource,
       adjustmentComment,
       coverRedoNote: item.coverRedoNote,
-      clientWaitDays: daysSince(item.clientReviewAt ?? null),
+      stageDays: daysSince(item.stageSince ?? null),
     });
   }
   return out;
@@ -227,7 +227,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
           driveUrl: true,
           coverDriveUrl: true,
           coverRedoNote: true,
-          clientReviewAt: true,
+          stageSince: true,
           roteiroConteudoId: true,
           asanaUrl: true,
           coverWaived: true,

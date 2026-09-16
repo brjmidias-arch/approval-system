@@ -82,6 +82,44 @@ function somaDias(ymd: string, dias: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
+type StageInput = {
+  status: string;
+  contentType: string;
+  fileType: string;
+  coverDriveUrl: string | null;
+  coverWaived: boolean;
+  coverApproved: boolean;
+  approvalItem: { status: string } | null;
+  internalReviewItem: { status: string } | null;
+};
+
+/** Etapa atual computada (mesma lógica do dashboard). */
+function computeStageKey(i: StageInput): string {
+  const a = i.approvalItem?.status;
+  const r = i.internalReviewItem?.status;
+  if (a === "ADJUSTMENT" || a === "REJECTED" || r === "ADJUSTMENT" || r === "REJECTED") return "adjustment";
+  const isVideo = i.contentType === "REELS" || i.fileType === "VIDEO";
+  switch (i.status) {
+    case "INTERNAL_REVIEW":
+    case "INTERNAL_DONE":
+      return "internal";
+    case "CLIENT_REVIEW":
+      return "clientReview";
+    case "APPROVED": {
+      const needsCover = isVideo && !i.coverDriveUrl && !i.coverWaived;
+      const needsCoverApproval = isVideo && !!i.coverDriveUrl && !i.coverApproved && !i.coverWaived;
+      if (needsCover) return "criarCapa";
+      if (needsCoverApproval) return "aprovarCapa";
+      return "readyToSchedule";
+    }
+    case "SCHEDULED":
+    case "PUBLISHED":
+      return "published";
+    default:
+      return "draft";
+  }
+}
+
 /**
  * Espelha a fase do post no roteiro vinculado (rot_scripts). Best-effort: NUNCA lança.
  *
@@ -109,11 +147,21 @@ export async function syncRoteiroStatus(contentItemId: string): Promise<void> {
         coverDriveUrl: true,
         coverWaived: true,
         coverApproved: true,
+        stageKey: true,
         approvalItem: { select: { status: true, clientComment: true } },
         internalReviewItem: { select: { status: true, comment: true } },
       },
     });
-    if (!item?.roteiroConteudoId) return;
+    if (!item) return;
+
+    // "Dias na etapa": grava quando a etapa muda (vale para TODOS os posts, com ou
+    // sem roteiro vinculado). Só reseta o relógio quando a etapa realmente muda.
+    const stageKey = computeStageKey(item);
+    if (stageKey !== item.stageKey) {
+      await prisma.contentItem.update({ where: { id: contentItemId }, data: { stageKey, stageSince: new Date() } });
+    }
+
+    if (!item.roteiroConteudoId) return;
 
     const a = item.approvalItem?.status;
     const r = item.internalReviewItem?.status;

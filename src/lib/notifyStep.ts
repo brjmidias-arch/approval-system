@@ -237,7 +237,7 @@ type DigestItem = {
   coverApproved: boolean;
   clientId: string | null;
   groupId: string | null;
-  clientReviewAt: Date | null;
+  stageSince: Date | null;
   client: { name: string; token: string | null; internalToken: string | null; coverToken: string | null } | null;
   approvalItem: { status: string } | null;
   internalReviewItem: { status: string } | null;
@@ -254,7 +254,7 @@ export async function buildPendingDigest(): Promise<string | null> {
       orderBy: [{ clientId: "asc" }, { order: "asc" }],
       select: {
         id: true, title: true, status: true, contentType: true, fileType: true,
-        coverDriveUrl: true, coverWaived: true, coverApproved: true, clientId: true, groupId: true, clientReviewAt: true,
+        coverDriveUrl: true, coverWaived: true, coverApproved: true, clientId: true, groupId: true, stageSince: true,
         client: { select: { name: true, token: true, internalToken: true, coverToken: true } },
         approvalItem: { select: { status: true } },
         internalReviewItem: { select: { status: true } },
@@ -292,29 +292,39 @@ export async function buildPendingDigest(): Promise<string | null> {
       const catResp = label !== L_AJUSTE ? responsavelFor(resp, label, false) : null;
       msg += `\n\n${label}: <b>${group.length}</b>${catResp ? ` — Resp.: ${tgEscape(catResp)}` : ""}`;
 
+      // Dias na etapa atual (a partir de stageSince): por post e por cliente (mais antigo).
+      const diasTxt = (ms: number | null | undefined) => {
+        if (ms == null) return "";
+        const d = Math.floor((Date.now() - ms) / 86400000);
+        return d <= 0 ? " — ⏳ hoje" : ` — ⏳ há ${d} ${d === 1 ? "dia" : "dias"}`;
+      };
+      const clientMin: Record<string, number> = {};
+      for (const it of group) {
+        const cid = it.clientId ?? it.id;
+        const t = it.stageSince ? it.stageSince.getTime() : null;
+        if (t == null) continue;
+        if (clientMin[cid] === undefined || t < clientMin[cid]) clientMin[cid] = t;
+      }
+
       if (label === L_CRIAR_CAPA) {
-        // Link único do designer com todos os vídeos que precisam de capa.
-        const nomes = Array.from(new Set(group.map((g) => g.client?.name || "?"))).map(tgEscape).join(", ");
-        msg += `\n${BASE}/criar-capa/${designerCover}\nClientes: ${nomes}`;
+        // Link único do designer + clientes (com dias na etapa).
+        msg += `\n${BASE}/criar-capa/${designerCover}`;
+        const seen = new Set<string>();
+        for (const it of group) {
+          const cid = it.clientId ?? it.id;
+          if (seen.has(cid)) continue;
+          seen.add(cid);
+          msg += `\n• ${tgEscape(it.client?.name)}${diasTxt(clientMin[cid])}`;
+        }
       } else if (label === L_AJUSTE) {
-        // Link único do designer com todos os ajustes + lista dos posts (com responsável).
+        // Link único do designer + lista dos posts (responsável + dias na etapa).
         msg += `\n${BASE}/ajustes/${designerAdjust}`;
         for (const it of group) {
           const r = responsavelFor(resp, L_AJUSTE, it.contentType === "REELS" || it.fileType === "VIDEO");
-          msg += `\n• ${tgEscape(it.client?.name)} — ${tgEscape(it.title || "(sem título)")}${r ? ` (${tgEscape(r)})` : ""}`;
+          msg += `\n• ${tgEscape(it.client?.name)} — ${tgEscape(it.title || "(sem título)")}${r ? ` (${tgEscape(r)})` : ""}${diasTxt(it.stageSince ? it.stageSince.getTime() : null)}`;
         }
       } else {
-        // Um link por cliente. Em "Aguardando cliente", mostra há quantos dias o
-        // post MAIS ANTIGO do cliente está esperando (para controle de cobrança).
-        const minReview: Record<string, number> = {};
-        if (label === L_CLIENTE) {
-          for (const it of group) {
-            const cid = it.clientId ?? it.id;
-            const t = it.clientReviewAt ? it.clientReviewAt.getTime() : null;
-            if (t == null) continue;
-            if (minReview[cid] === undefined || t < minReview[cid]) minReview[cid] = t;
-          }
-        }
+        // Um link por cliente, com há quantos dias o post mais antigo está na etapa.
         const seen = new Set<string>();
         for (const it of group) {
           const cid = it.clientId ?? it.id;
@@ -328,12 +338,7 @@ export async function buildPendingDigest(): Promise<string | null> {
             coverToken: it.client?.coverToken ?? null,
             designerCover,
           });
-          let suffix = "";
-          if (label === L_CLIENTE && minReview[cid] !== undefined) {
-            const dias = Math.floor((Date.now() - minReview[cid]) / 86400000);
-            suffix = dias <= 0 ? " — entrou hoje" : ` — ⏳ há ${dias} ${dias === 1 ? "dia" : "dias"} aguardando`;
-          }
-          msg += `\n• ${tgEscape(it.client?.name)}: ${url}${suffix}`;
+          msg += `\n• ${tgEscape(it.client?.name)}: ${url}${diasTxt(clientMin[cid])}`;
         }
       }
     }
