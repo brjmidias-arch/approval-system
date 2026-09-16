@@ -71,6 +71,7 @@ model ContentItem {
   coverDriveUrl      String?
   order              Int                 @default(0)
   postedAt           DateTime?
+  clientReviewAt     DateTime?           // quando o post (re)entrou na etapa "aguardando aprovação do cliente"
   agendadoDate       DateTime?           // data em que a postagem foi agendada (preenchida no /programar; scheduledDate = previsão)
   sentToProgramacaoAt DateTime?
   clientId           String?

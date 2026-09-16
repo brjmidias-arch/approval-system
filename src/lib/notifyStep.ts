@@ -237,6 +237,7 @@ type DigestItem = {
   coverApproved: boolean;
   clientId: string | null;
   groupId: string | null;
+  clientReviewAt: Date | null;
   client: { name: string; token: string | null; internalToken: string | null; coverToken: string | null } | null;
   approvalItem: { status: string } | null;
   internalReviewItem: { status: string } | null;
@@ -253,7 +254,7 @@ export async function buildPendingDigest(): Promise<string | null> {
       orderBy: [{ clientId: "asc" }, { order: "asc" }],
       select: {
         id: true, title: true, status: true, contentType: true, fileType: true,
-        coverDriveUrl: true, coverWaived: true, coverApproved: true, clientId: true, groupId: true,
+        coverDriveUrl: true, coverWaived: true, coverApproved: true, clientId: true, groupId: true, clientReviewAt: true,
         client: { select: { name: true, token: true, internalToken: true, coverToken: true } },
         approvalItem: { select: { status: true } },
         internalReviewItem: { select: { status: true } },
@@ -303,7 +304,17 @@ export async function buildPendingDigest(): Promise<string | null> {
           msg += `\n• ${tgEscape(it.client?.name)} — ${tgEscape(it.title || "(sem título)")}${r ? ` (${tgEscape(r)})` : ""}`;
         }
       } else {
-        // Um link por cliente.
+        // Um link por cliente. Em "Aguardando cliente", mostra há quantos dias o
+        // post MAIS ANTIGO do cliente está esperando (para controle de cobrança).
+        const minReview: Record<string, number> = {};
+        if (label === L_CLIENTE) {
+          for (const it of group) {
+            const cid = it.clientId ?? it.id;
+            const t = it.clientReviewAt ? it.clientReviewAt.getTime() : null;
+            if (t == null) continue;
+            if (minReview[cid] === undefined || t < minReview[cid]) minReview[cid] = t;
+          }
+        }
         const seen = new Set<string>();
         for (const it of group) {
           const cid = it.clientId ?? it.id;
@@ -317,7 +328,12 @@ export async function buildPendingDigest(): Promise<string | null> {
             coverToken: it.client?.coverToken ?? null,
             designerCover,
           });
-          msg += `\n• ${tgEscape(it.client?.name)}: ${url}`;
+          let suffix = "";
+          if (label === L_CLIENTE && minReview[cid] !== undefined) {
+            const dias = Math.floor((Date.now() - minReview[cid]) / 86400000);
+            suffix = dias <= 0 ? " — entrou hoje" : ` — ⏳ há ${dias} ${dias === 1 ? "dia" : "dias"} aguardando`;
+          }
+          msg += `\n• ${tgEscape(it.client?.name)}: ${url}${suffix}`;
         }
       }
     }

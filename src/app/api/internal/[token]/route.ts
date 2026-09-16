@@ -80,7 +80,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
     if (status === "APPROVED") {
       // Aprovado internamente → passa AUTOMATICAMENTE para a aprovação do cliente
       // (cria/reseta a aprovação pendente para o post aparecer no link do cliente).
-      await prisma.contentItem.update({ where: { id: contentItemId }, data: { status: "CLIENT_REVIEW" } });
+      await prisma.contentItem.update({ where: { id: contentItemId }, data: { status: "CLIENT_REVIEW", clientReviewAt: new Date() } });
       await prisma.approvalItem.upsert({
         where: { contentItemId },
         // Mantém o comentário do ajuste que o cliente pediu (marca como resolvido)

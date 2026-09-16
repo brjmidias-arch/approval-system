@@ -92,7 +92,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
         });
       }
     } else if (action === "send-client") {
-      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "CLIENT_REVIEW", sentToProgramacaoAt: null } });
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "CLIENT_REVIEW", sentToProgramacaoAt: null, clientReviewAt: new Date() } });
       for (const id of ids) {
         await prisma.approvalItem.upsert({
           where: { contentItemId: id },
