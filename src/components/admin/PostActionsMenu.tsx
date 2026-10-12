@@ -12,6 +12,7 @@ export default function PostActionsMenu({
   postId,
   clientId,
   clientToken,
+  internalToken,
   internalMsg,
   needsAdjustment,
   canReopenAdjustment,
@@ -22,6 +23,7 @@ export default function PostActionsMenu({
   postId: string;
   clientId: string;
   clientToken?: string | null;
+  internalToken?: string | null;
   internalMsg?: string;
   needsAdjustment?: boolean;
   canReopenAdjustment?: boolean;
@@ -91,6 +93,12 @@ export default function PostActionsMenu({
     alert("Mensagem de aprovação interna copiada! Cole no grupo de aprovação interna.");
   }
 
+  function openInternalLink() {
+    setOpen(false);
+    if (!internalToken) return;
+    window.open(`/revisar/${internalToken}`, "_blank", "noopener");
+  }
+
   function ajusteFeito() {
     if (internalMsg) navigator.clipboard.writeText(internalMsg);
     run(patch({ action: "adjustment-done" }));
@@ -101,6 +109,7 @@ export default function PostActionsMenu({
     ...(coverPending ? [{ label: "↩️ Refazer capa (volta p/ Criar capa)", onClick: () => run(patch({ action: "redo-cover" }), "Remover a capa atual e voltar para Criar capa?") }] : []),
     ...(needsAdjustment ? [{ label: "✅ Ajuste feito → revisão interna (copia msg)", onClick: ajusteFeito }] : []),
     ...(canReopenAdjustment && !needsAdjustment ? [{ label: "↩️ Voltar para ajuste (desfazer)", onClick: () => run(patch({ action: "undo-adjustment-done" })) }] : []),
+    ...(internalToken ? [{ label: "🔎 Abrir link de aprovação interna", onClick: openInternalLink }] : []),
     ...(internalMsg ? [{ label: "📋 Copiar msg de aprovação interna", onClick: copyInternalMsg }] : []),
     { label: "🔍 Enviar p/ revisão interna", onClick: () => run(patch({ action: "send-internal" })) },
     { label: "👤 Enviar p/ cliente", onClick: () => run(patch({ action: "send-client" })) },

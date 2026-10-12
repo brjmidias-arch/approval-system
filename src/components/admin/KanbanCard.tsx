@@ -364,6 +364,7 @@ export default function KanbanCard({
           postId={post.id}
           clientId={post.clientId}
           clientToken={post.clientToken}
+          internalToken={post.clientInternalToken}
           internalMsg={modalMsg}
           needsAdjustment={!!post.adjustmentSource}
           canReopenAdjustment={stageId === "internal" || stageId === "clientReview"}
