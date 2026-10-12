@@ -54,6 +54,24 @@ export default function DesignerCoverPage({ params }: { params: { token: string 
     }
   }
 
+  async function programarSemCapa(id: string) {
+    if (!confirm("Programar este vídeo SEM capa? Ele pula a aprovação de capa e vai direto para 'Prontos p/ programar'.")) return;
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/design-covers/${params.token}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentItemId: id, action: "waive" }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error); }
+      await load();
+    } catch (e) {
+      alert(e instanceof Error && e.message ? e.message : "Erro ao programar sem capa. Tente novamente.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
       <div className="max-w-2xl mx-auto px-4 py-8">
@@ -112,6 +130,14 @@ export default function DesignerCoverPage({ params }: { params: { token: string 
                         {busyId === it.id ? "Enviando…" : "Enviar capa"}
                       </button>
                     </div>
+                    <button
+                      onClick={() => programarSemCapa(it.id)}
+                      disabled={busyId === it.id}
+                      className="mt-2 inline-flex items-center gap-1.5 py-2 px-3 rounded-lg bg-sky-900/40 hover:bg-sky-900/60 text-sky-300 border border-sky-500/30 text-sm font-medium transition-colors disabled:opacity-50"
+                      title="Dispensa a capa: pula a aprovação de capa e vai direto para Prontos p/ programar"
+                    >
+                      📅 Programar sem capa
+                    </button>
                   </div>
                 </div>
               </div>

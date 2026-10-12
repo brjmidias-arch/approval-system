@@ -39,15 +39,32 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
   if (params.token !== (await designerCoverToken())) return NextResponse.json({ error: "Link não encontrado" }, { status: 404 });
 
   const body = await req.json();
-  const { contentItemId, coverDriveUrl } = body;
-  const id = typeof coverDriveUrl === "string" ? extractDriveId(coverDriveUrl.trim()) : null;
-  if (!contentItemId || !id) {
-    return NextResponse.json({ error: "Link da capa inválido." }, { status: 400 });
-  }
+  const { contentItemId, coverDriveUrl, action } = body;
+  if (!contentItemId) return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
 
   // Gate: item precisa estar realmente na etapa "Criar capa".
-  const item = await prisma.contentItem.findFirst({ where: { id: contentItemId, ...NEEDS_COVER }, select: { id: true } });
+  const item = await prisma.contentItem.findFirst({ where: { id: contentItemId, ...NEEDS_COVER }, select: { id: true, groupId: true } });
   if (!item) return NextResponse.json({ error: "Post não disponível." }, { status: 404 });
+
+  const ids = item.groupId
+    ? (await prisma.contentItem.findMany({ where: { groupId: item.groupId }, select: { id: true } })).map((s) => s.id)
+    : [item.id];
+
+  // Programar sem capa: designer dispensa a capa → pula "Aprovar capa" e vai pra programar.
+  if (action === "waive") {
+    try {
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { coverWaived: true } });
+      await Promise.all(ids.map((id) => syncRoteiroStatus(id)));
+      return NextResponse.json({ success: true });
+    } catch {
+      return NextResponse.json({ error: "Erro ao programar sem capa" }, { status: 500 });
+    }
+  }
+
+  const id = typeof coverDriveUrl === "string" ? extractDriveId(coverDriveUrl.trim()) : null;
+  if (!id) {
+    return NextResponse.json({ error: "Link da capa inválido." }, { status: 400 });
+  }
 
   try {
     await prisma.contentItem.update({
