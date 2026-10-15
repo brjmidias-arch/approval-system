@@ -15,6 +15,7 @@ interface ContentItem {
   scheduledDate: string | null;
   contentType: ContentType;
   groupId: string | null;
+  order: number;
   coverUrl: string | null;
   driveUrl: string | null;
   approvalItem: { status: Status; clientComment: string | null; clientCommentResolved?: boolean } | null;
@@ -129,21 +130,23 @@ export default function ApprovalPage() {
   async function saveGroupReview(groupKey: string, review: LocalReview, groupItems: ContentItem[]) {
     setSavingGroup(groupKey);
     try {
-      for (const item of groupItems) {
-        const res = await fetch(`/api/approval/${token}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contentItemId: item.id,
-            status: review.status,
-            clientComment: review.comment || null,
-          }),
-        });
-        if (!res.ok) throw new Error("Erro ao salvar avaliação. Tente novamente.");
-      }
+      // 1 requisição só: o servidor aplica a decisão em todos os slides do carrossel.
+      // Envia o slide de menor ordem (é ele que dispara o aviso no Telegram).
+      const rep = groupItems.reduce((a, b) => (b.order < a.order ? b : a));
+      const res = await fetch(`/api/approval/${token}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentItemId: rep.id,
+          status: review.status,
+          clientComment: review.comment || null,
+        }),
+      });
+      if (!res.ok) throw new Error("Erro ao salvar avaliação. Tente novamente.");
     } catch (err) {
       setSavingGroup(null);
       alert(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
+      fetchCampaign(); // volta a tela para o estado real (não deixa "aprovado" falso)
       throw err;
     }
     setSavingGroup(null);

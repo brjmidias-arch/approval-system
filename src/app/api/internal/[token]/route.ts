@@ -71,29 +71,43 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
   if (!item) return NextResponse.json({ error: "Item não disponível para revisão" }, { status: 404 });
 
   try {
-    await prisma.internalReviewItem.upsert({
-      where: { contentItemId },
-      update: { status, comment: comment || null, commentResolved: false, reviewedAt: new Date() },
-      create: { contentItemId, status, comment: comment || null, commentResolved: false, reviewedAt: new Date() },
-    });
+    // Carrossel: aplica a decisão em TODOS os slides do grupo numa única transação
+    // (antes era 1 requisição por slide e uma falha no meio deixava slides para trás).
+    const ids = item.groupId
+      ? (await prisma.contentItem.findMany({
+          where: { groupId: item.groupId, clientId: client.id, status: { in: ["INTERNAL_REVIEW", "INTERNAL_DONE"] } },
+          select: { id: true },
+        })).map((s) => s.id)
+      : [item.id];
+    const now = new Date();
+    await prisma.$transaction(
+      ids.flatMap((id) => [
+        prisma.internalReviewItem.upsert({
+          where: { contentItemId: id },
+          update: { status, comment: comment || null, commentResolved: false, reviewedAt: now },
+          create: { contentItemId: id, status, comment: comment || null, commentResolved: false, reviewedAt: now },
+        }),
+        ...(status === "APPROVED"
+          ? [
+              // Aprovado internamente → passa AUTOMATICAMENTE para a aprovação do cliente
+              // (cria/reseta a aprovação pendente para o post aparecer no link do cliente).
+              prisma.contentItem.update({ where: { id }, data: { status: "CLIENT_REVIEW", clientReviewAt: now } }),
+              prisma.approvalItem.upsert({
+                where: { contentItemId: id },
+                // Mantém o comentário do ajuste que o cliente pediu (marca como resolvido)
+                // para ele ver "o que pedi (já resolvido)" ao reavaliar.
+                update: { status: "PENDING", clientCommentResolved: true, reviewedAt: null },
+                create: { contentItemId: id, status: "PENDING" },
+              }),
+            ]
+          : [
+              // Ajuste/reprovação → continua na revisão interna
+              prisma.contentItem.update({ where: { id }, data: { status: "INTERNAL_REVIEW" } }),
+            ]),
+      ]),
+    );
 
-    if (status === "APPROVED") {
-      // Aprovado internamente → passa AUTOMATICAMENTE para a aprovação do cliente
-      // (cria/reseta a aprovação pendente para o post aparecer no link do cliente).
-      await prisma.contentItem.update({ where: { id: contentItemId }, data: { status: "CLIENT_REVIEW", clientReviewAt: new Date() } });
-      await prisma.approvalItem.upsert({
-        where: { contentItemId },
-        // Mantém o comentário do ajuste que o cliente pediu (marca como resolvido)
-        // para ele ver "o que pedi (já resolvido)" ao reavaliar.
-        update: { status: "PENDING", clientCommentResolved: true, reviewedAt: null },
-        create: { contentItemId, status: "PENDING" },
-      });
-    } else {
-      // Ajuste/reprovação → continua na revisão interna
-      await prisma.contentItem.update({ where: { id: contentItemId }, data: { status: "INTERNAL_REVIEW" } });
-    }
-
-    await syncRoteiroStatus(contentItemId);
+    for (const id of ids) await syncRoteiroStatus(id);
 
     // Aviso no Telegram (best-effort) — só uma vez por grupo (slide de menor order).
     const isRep = item.groupId

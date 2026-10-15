@@ -98,17 +98,30 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
   if (!item) return NextResponse.json({ error: "Item não disponível para aprovação" }, { status: 404 });
 
   try {
-    await prisma.approvalItem.upsert({
-      where: { contentItemId },
-      update: { status, clientComment: clientComment || null, clientCommentResolved: false, reviewedAt: new Date() },
-      create: { contentItemId, status, clientComment: clientComment || null, clientCommentResolved: false, reviewedAt: new Date() },
-    });
-    // Move o status do post: aprovado sai do link; ajuste/reprovação continua em CLIENT_REVIEW
-    await prisma.contentItem.update({
-      where: { id: contentItemId },
-      data: { status: status === "APPROVED" ? "APPROVED" : "CLIENT_REVIEW" },
-    });
-    await syncRoteiroStatus(contentItemId);
+    // Carrossel: aplica a decisão em TODOS os slides do grupo numa única transação
+    // (antes era 1 requisição por slide e uma falha no meio deixava slides para trás).
+    const ids = item.groupId
+      ? (await prisma.contentItem.findMany({
+          where: { groupId: item.groupId, clientId: client.id, status: { in: ["CLIENT_REVIEW", "APPROVED"] } },
+          select: { id: true },
+        })).map((s) => s.id)
+      : [item.id];
+    const now = new Date();
+    await prisma.$transaction(
+      ids.flatMap((id) => [
+        prisma.approvalItem.upsert({
+          where: { contentItemId: id },
+          update: { status, clientComment: clientComment || null, clientCommentResolved: false, reviewedAt: now },
+          create: { contentItemId: id, status, clientComment: clientComment || null, clientCommentResolved: false, reviewedAt: now },
+        }),
+        // Move o status do post: aprovado sai do link; ajuste/reprovação continua em CLIENT_REVIEW
+        prisma.contentItem.update({
+          where: { id },
+          data: { status: status === "APPROVED" ? "APPROVED" : "CLIENT_REVIEW" },
+        }),
+      ]),
+    );
+    for (const id of ids) await syncRoteiroStatus(id);
 
     // Aviso no Telegram (best-effort) — só uma vez por grupo (slide de menor order).
     const isRep = item.groupId
