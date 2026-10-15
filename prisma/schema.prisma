@@ -29,8 +29,10 @@ model Client {
   whatsapp      String?
   createdAt     DateTime      @default(now())
   token         String?       @unique @default(uuid())
-  internalToken String?       @unique @default(dbgenerated("gen_random_uuid()"))
-  coverToken    String?       @unique @default(dbgenerated("gen_random_uuid()"))
+  // uuid() é gerado pelo Prisma: as colunas foram criadas sem DEFAULT no banco
+  // (dbgenerated deixava clientes novos sem link de revisão interna / capas).
+  internalToken String?       @unique @default(uuid())
+  coverToken    String?       @unique @default(uuid())
   roteiroClienteId String?    // id do rot_clientes no sistema de Roteirização
   campaigns     Campaign[]
   contentItems  ContentItem[]
