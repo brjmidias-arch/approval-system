@@ -10,6 +10,7 @@ import { buildAprovacaoMsg } from "@/lib/aprovacaoMsg";
 import { extractDriveId, driveThumbUrl, drivePreviewUrl, driveAssetsFromLink } from "@/lib/drive";
 import RoteiroClientLink from "@/components/admin/RoteiroClientLink";
 import AnexarRoteiroPicker, { type RotConteudoOpcao } from "@/components/admin/AnexarRoteiroPicker";
+import SendWeekPanel from "@/components/admin/SendWeekPanel";
 
 type PostStageStatus = "DRAFT" | "INTERNAL_REVIEW" | "INTERNAL_DONE" | "CLIENT_REVIEW" | "APPROVED" | "PUBLISHED";
 
@@ -52,6 +53,7 @@ interface Client {
   token: string;
   internalToken: string;
   roteiroClienteId: string | null;
+  approvalMode: string;
   contentItems: ContentItem[];
 }
 
@@ -64,6 +66,7 @@ interface GroupedPost {
 const STATUS_SECTIONS: { key: PostStageStatus; label: string }[] = [
   { key: "DRAFT", label: "Rascunho" },
   { key: "INTERNAL_REVIEW", label: "Revisão interna" },
+  { key: "INTERNAL_DONE", label: "📦 Pronto p/ cliente (aguardando envio da semana)" },
   { key: "CLIENT_REVIEW", label: "Aguardando cliente" },
   { key: "APPROVED", label: "Aprovado" },
   { key: "PUBLISHED", label: "Publicado" },
@@ -473,6 +476,18 @@ export default function ClientWorkspacePage() {
             {copiedWhich === "internal" ? "Copiado!" : "Copiar link revisão interna"}
           </button>
         </div>
+      </div>
+
+      {/* Envio p/ aprovação: automático x por semana + semanas prontas para enviar */}
+      <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4">
+        <SendWeekPanel
+          key={client.contentItems.filter((i) => i.status === "INTERNAL_DONE").length}
+          clientId={client.id}
+          clientToken={client.token}
+          approvalMode={client.approvalMode}
+          showMode
+          onChanged={fetchClient}
+        />
       </div>
 
       {/* Folder Upload Modal */}

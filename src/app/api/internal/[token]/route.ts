@@ -34,7 +34,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { token: string } }) {
-  const client = await prisma.client.findUnique({ where: { internalToken: params.token }, select: { id: true } });
+  const client = await prisma.client.findUnique({ where: { internalToken: params.token }, select: { id: true, approvalMode: true } });
   if (!client) return NextResponse.json({ error: "Link não encontrado" }, { status: 404 });
 
   const body = await req.json();
@@ -80,6 +80,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
         })).map((s) => s.id)
       : [item.id];
     const now = new Date();
+    // Cliente com envio por semana: o aprovado espera em "Pronto p/ cliente" (INTERNAL_DONE)
+    // até o admin enviar a semana dele (/api/admin/clients/[id]/send-week).
+    const holdForWeek = status === "APPROVED" && client.approvalMode === "WEEKLY";
     await prisma.$transaction(
       ids.flatMap((id) => [
         prisma.internalReviewItem.upsert({
@@ -87,7 +90,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { token: str
           update: { status, comment: comment || null, commentResolved: false, reviewedAt: now },
           create: { contentItemId: id, status, comment: comment || null, commentResolved: false, reviewedAt: now },
         }),
-        ...(status === "APPROVED"
+        ...(holdForWeek
+          ? [prisma.contentItem.update({ where: { id }, data: { status: "INTERNAL_DONE" } })]
+          : status === "APPROVED"
           ? [
               // Aprovado internamente → passa AUTOMATICAMENTE para a aprovação do cliente
               // (cria/reseta a aprovação pendente para o post aparecer no link do cliente).

@@ -9,6 +9,7 @@ import PostThumbnail from "@/components/admin/PostThumbnail";
 import PostNameEditor from "@/components/admin/PostNameEditor";
 import PostDatePicker from "@/components/admin/PostDatePicker";
 import CopyProgLinkButton from "@/components/admin/CopyProgLinkButton";
+import SendWeekPanel from "@/components/admin/SendWeekPanel";
 
 interface DashPost {
   id: string;
@@ -221,6 +222,12 @@ export default function DashboardClientRow({
               </div>
             );
           })}
+
+          {stageId === "readyForClient" && (
+            <div className="pt-1">
+              <SendWeekPanel key={posts.length} clientId={clientId} clientToken={clientToken} onChanged={() => router.refresh()} />
+            </div>
+          )}
 
           <Link
             href={`/admin/clients/${clientId}`}

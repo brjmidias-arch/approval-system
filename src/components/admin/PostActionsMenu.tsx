@@ -112,6 +112,7 @@ export default function PostActionsMenu({
     ...(internalToken ? [{ label: "🔎 Abrir link de aprovação interna", onClick: openInternalLink }] : []),
     ...(internalMsg ? [{ label: "📋 Copiar msg de aprovação interna", onClick: copyInternalMsg }] : []),
     { label: "🔍 Enviar p/ revisão interna", onClick: () => run(patch({ action: "send-internal" })) },
+    { label: "📦 Pronto p/ cliente (envio por semana)", onClick: () => run(patch({ action: "mark-ready-client" })) },
     { label: "👤 Enviar p/ cliente", onClick: () => run(patch({ action: "send-client" })) },
     { label: "📅 Prontos p/ programar", onClick: () => run(patch({ action: "mark-approved" })) },
     ...(clientToken ? [{ label: "💬 Copiar mensagem p/ cliente", onClick: copyClientMsg }] : []),

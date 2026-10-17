@@ -54,7 +54,7 @@ type DashPost = {
   stageDays: number | null;
 };
 
-type StageId = "adjustment" | "internal" | "clientReview" | "criarCapa" | "aprovarCapa" | "readyToSchedule" | "published" | "draft";
+type StageId = "adjustment" | "internal" | "readyForClient" | "clientReview" | "criarCapa" | "aprovarCapa" | "readyToSchedule" | "published" | "draft";
 
 /** Formata a data agendada como DD/MM (UTC, pois é gravada em T12:00:00Z). */
 function fmtScheduled(d: Date | null): string | null {
@@ -100,9 +100,9 @@ function needsCoverApproval(i: Item): boolean {
 
 const STAGE_PREDICATES: Record<StageId, (i: Item) => boolean> = {
   adjustment: needsAdjustment,
-  // INTERNAL_DONE (legado do modelo por-campanha) cai aqui como fallback: no fluxo
-  // por-post a aprovação interna já pula direto para CLIENT_REVIEW.
-  internal: (i) => (i.status === "INTERNAL_REVIEW" || i.status === "INTERNAL_DONE") && !needsAdjustment(i),
+  internal: (i) => i.status === "INTERNAL_REVIEW" && !needsAdjustment(i),
+  // Aprovado internamente, aguardando o envio da semana (clientes com envio por semana).
+  readyForClient: (i) => i.status === "INTERNAL_DONE" && !needsAdjustment(i),
   clientReview: (i) => i.status === "CLIENT_REVIEW" && !needsAdjustment(i),
   // Aprovado pelo cliente mas é vídeo SEM capa → vai para "Criar capa" (design).
   criarCapa: (i) => i.status === "APPROVED" && needsCover(i),
@@ -162,6 +162,7 @@ function distinctPosts(items: Item[], predicate: (item: Item) => boolean): DashP
 const STAGES: { id: StageId; label: string; icon: string; color: string; dot: string; bg: string }[] = [
   { id: "adjustment", label: "Ajustes", icon: "✏️", color: "text-amber-400", dot: "bg-amber-500", bg: "bg-amber-900/20 border-amber-500/30" },
   { id: "internal", label: "Revisão interna", icon: "🔍", color: "text-violet-400", dot: "bg-violet-500", bg: "bg-violet-900/20 border-violet-500/30" },
+  { id: "readyForClient", label: "Pronto p/ cliente", icon: "📦", color: "text-indigo-300", dot: "bg-indigo-400", bg: "bg-indigo-900/20 border-indigo-400/30" },
   { id: "clientReview", label: "Aguardando cliente", icon: "👤", color: "text-emerald-400", dot: "bg-emerald-500", bg: "bg-emerald-900/20 border-emerald-500/30" },
   { id: "criarCapa", label: "Criar capa", icon: "🎨", color: "text-pink-400", dot: "bg-pink-500", bg: "bg-pink-900/20 border-pink-500/30" },
   { id: "aprovarCapa", label: "Aprovar capa", icon: "🖼️", color: "text-fuchsia-400", dot: "bg-fuchsia-500", bg: "bg-fuchsia-900/20 border-fuchsia-500/30" },
@@ -182,6 +183,7 @@ function computeStagePosts(items: Item[]): Record<StageId, DashPost[]> {
   return {
     adjustment: distinctPosts(items, STAGE_PREDICATES.adjustment),
     internal: distinctPosts(items, STAGE_PREDICATES.internal),
+    readyForClient: distinctPosts(items, STAGE_PREDICATES.readyForClient),
     clientReview: distinctPosts(items, STAGE_PREDICATES.clientReview),
     criarCapa: distinctPosts(items, STAGE_PREDICATES.criarCapa),
     aprovarCapa: distinctPosts(items, STAGE_PREDICATES.aprovarCapa),
@@ -255,6 +257,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
   const totals: Record<StageId, number> = {
     adjustment: 0,
     internal: 0,
+    readyForClient: 0,
     clientReview: 0,
     criarCapa: 0,
     aprovarCapa: 0,

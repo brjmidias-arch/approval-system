@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CONTENT_TYPE_LABELS } from "@/types";
 import type { ContentType } from "@/types";
+import ClientCalendar, { type CalendarEntry } from "@/components/ClientCalendar";
+import { weekKey, weekLabel, weekRelative, compareWeekKeys, NO_DATE } from "@/lib/weeks";
 
 type Status = "PENDING" | "APPROVED" | "ADJUSTMENT" | "REJECTED";
 
@@ -30,6 +32,7 @@ interface Campaign {
   client: { name: string };
   contentItems: ContentItem[];
   lastRound?: { approved: number; adjustment: number } | null;
+  calendar?: CalendarEntry[];
 }
 
 type LocalReview = { status: Status; comment: string };
@@ -73,6 +76,8 @@ export default function ApprovalPage() {
   const [capState, setCapState] = useState<Record<string, "idle" | "saving" | "saved" | "error">>({});
   const [editingCap, setEditingCap] = useState<Record<string, boolean>>({});
   const capTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [tab, setTab] = useState<"aprovar" | "calendario">("aprovar");
+  const tabChosen = useRef(false);
 
   async function saveCaption(groupKey: string, value: string, items: ContentItem[]) {
     setCapState((p) => ({ ...p, [groupKey]: "saving" }));
@@ -122,6 +127,12 @@ export default function ApprovalPage() {
       }
     }
     setReviews(initial);
+    // 1ª carga: abre em "Aprovar" se há algo pendente; senão, no calendário.
+    if (!tabChosen.current) {
+      tabChosen.current = true;
+      const hasPending = built.some((g) => (g.type === "single" ? g.item : g.items[0]).approvalItem?.status !== "APPROVED");
+      setTab(hasPending ? "aprovar" : "calendario");
+    }
     setLoading(false);
   }, [token]);
 
@@ -211,7 +222,7 @@ export default function ApprovalPage() {
 
   if (!campaign) return null;
 
-  if (campaign && groups.length === 0) {
+  if (campaign && groups.length === 0 && !campaign.calendar?.length) {
     const lr = campaign.lastRound;
     const hasLr = !!lr && lr.approved + lr.adjustment > 0;
     return (
@@ -246,6 +257,31 @@ export default function ApprovalPage() {
   const progress = total > 0 ? Math.round((reviewedCount / total) * 100) : 0;
   const allDone = reviewedCount === total && total > 0;
 
+  // Posts a revisar agrupados por semana de postagem (sem data por último).
+  const groupWeek = (g: Group) => weekKey((g.type === "single" ? g.item : g.items[0]).scheduledDate);
+  const weekSections = Array.from(new Set(needsReview.map(groupWeek)))
+    .sort(compareWeekKeys)
+    .map((week) => ({ week, groups: needsReview.filter((g) => groupWeek(g) === week) }));
+  const isPendingLocal = (g: Group) => !reviews[g.groupKey] || reviews[g.groupKey].status === "PENDING";
+
+  async function approveWeek(list: Group[], label: string) {
+    const pend = list.filter(isPendingLocal);
+    if (pend.length === 0) return;
+    if (!confirm(`Aprovar ${pend.length === 1 ? "o post pendente" : `os ${pend.length} posts pendentes`} ${label}?`)) return;
+    for (const g of pend) {
+      try {
+        await setGroupStatus(g.groupKey, "APPROVED", g.type === "single" ? [g.item] : g.items);
+      } catch {
+        return; // saveGroupReview já avisou e recarregou o estado real
+      }
+    }
+  }
+
+  function openPending(key: string) {
+    setTab("aprovar");
+    setTimeout(() => document.getElementById(`post-${key}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  }
+
   return (
     <div className="min-h-screen bg-[#0f0f0f]">
       {/* Header */}
@@ -262,10 +298,45 @@ export default function ApprovalPage() {
             <span className="text-xs text-gray-400 whitespace-nowrap">{reviewedCount}/{total}</span>
           </div>
         </div>
+        <div className={`${tab === "calendario" ? "max-w-5xl" : "max-w-3xl"} mx-auto px-4 pb-2 flex gap-1`}>
+          {([
+            { id: "aprovar", label: `📋 Aprovar${total - reviewedCount > 0 ? ` (${total - reviewedCount})` : ""}` },
+            { id: "calendario", label: "📅 Calendário" },
+          ] as const).map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`flex-1 sm:flex-none text-sm px-4 py-1.5 rounded-lg transition-colors ${
+                tab === t.id ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </header>
 
+      {tab === "calendario" && (
+        <main className="max-w-5xl mx-auto px-4 py-6 space-y-4">
+          <p className="text-gray-400 text-sm">
+            Veja quando cada post vai ao ar. Toque num post <span className="text-amber-300">aguardando você</span> para aprovar.
+          </p>
+          <ClientCalendar entries={campaign.calendar ?? []} onOpenPending={openPending} />
+        </main>
+      )}
+
+      {tab === "aprovar" && (
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
-        {alreadyApproved.length > 0 && needsReview.length > 0 ? (
+        {needsReview.length === 0 ? (
+          <div className="text-center py-10">
+            <p className="text-4xl mb-3">✅</p>
+            <p className="text-gray-300">Nenhum post pendente no momento.</p>
+            <button type="button" onClick={() => setTab("calendario")} className="mt-3 text-sm text-emerald-400 hover:text-emerald-300">
+              Ver o calendário de postagens →
+            </button>
+          </div>
+        ) : alreadyApproved.length > 0 ? (
           <p className="text-gray-400 text-sm">
             Fizemos os ajustes solicitados. Revise os itens abaixo e aprove ou solicite novos ajustes.
           </p>
@@ -275,7 +346,34 @@ export default function ApprovalPage() {
           </p>
         )}
 
-        {needsReview.map((group, gi) => {
+        {weekSections.map((sec) => {
+          const secDone = sec.groups.filter((g) => !isPendingLocal(g)).length;
+          const secPending = sec.groups.length - secDone;
+          const rel = weekRelative(sec.week);
+          const secLabel = sec.week === NO_DATE ? "sem data" : `da semana de ${weekLabel(sec.week)}`;
+          return (
+          <section key={sec.week} className="space-y-4">
+            <div className="sticky top-[88px] z-[5] -mx-4 px-4 py-2 bg-[#0f0f0f]/95 backdrop-blur border-b border-white/5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-white text-sm font-semibold">
+                  {sec.week === NO_DATE ? "📭 Sem data definida" : `📅 Semana ${weekLabel(sec.week)}`}
+                </h2>
+                {rel && <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300">{rel}</span>}
+                <span className="text-[11px] text-gray-500">{secDone}/{sec.groups.length} avaliados</span>
+                {secPending > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => approveWeek(sec.groups, secLabel)}
+                    disabled={!!savingGroup}
+                    className="ml-auto text-xs px-3 py-1.5 rounded-lg border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50 transition-colors"
+                  >
+                    ✅ Aprovar todos ({secPending})
+                  </button>
+                )}
+              </div>
+            </div>
+        {sec.groups.map((group) => {
+          const gi = needsReview.indexOf(group);
           const review = reviews[group.groupKey];
           const status = review?.status || "PENDING";
           const isActive = activeGroup === group.groupKey;
@@ -288,7 +386,8 @@ export default function ApprovalPage() {
           return (
             <div
               key={group.groupKey}
-              className={`bg-[#1a1a1a] border rounded-xl overflow-hidden transition-all ${
+              id={`post-${group.groupKey}`}
+              className={`scroll-mt-36 bg-[#1a1a1a] border rounded-xl overflow-hidden transition-all ${
                 status === "APPROVED" ? "border-emerald-500/30"
                 : status === "ADJUSTMENT" ? "border-amber-500/30"
                 : status === "REJECTED" ? "border-red-500/30"
@@ -645,6 +744,9 @@ export default function ApprovalPage() {
             </div>
           );
         })}
+          </section>
+          );
+        })}
 
         {/* Already approved section */}
         {alreadyApproved.length > 0 && (
@@ -691,6 +793,7 @@ export default function ApprovalPage() {
           );
         })()}
       </main>
+      )}
 
       <footer className="text-center py-8 text-gray-700 text-xs">
         BRJ Mídias · Sistema de Aprovação de Conteúdo

@@ -21,6 +21,7 @@ const L_AJUSTE = "✏️ Precisa de ajuste";
 const L_CRIAR_CAPA = "🎨 Precisa criar a capa";
 const L_APROVAR_CAPA = "🖼️ Capa aguardando aprovação";
 const L_INTERNA = "🔍 Aguardando revisão interna";
+const L_PRONTO_CLIENTE = "📦 Pronto p/ enviar ao cliente (por semana)";
 const L_CLIENTE = "👤 Aguardando aprovação do cliente";
 const L_PROGRAMAR = "📅 Pronto para programar";
 const L_PROGRAMADO = "🗓️ Programado";
@@ -34,8 +35,9 @@ export function nextStepLabel(i: StepItem): string | null {
   if (needsAdjustment) return L_AJUSTE;
   switch (i.status) {
     case "INTERNAL_REVIEW":
-    case "INTERNAL_DONE":
       return L_INTERNA;
+    case "INTERNAL_DONE":
+      return L_PRONTO_CLIENTE;
     case "CLIENT_REVIEW":
       return L_CLIENTE;
     case "APPROVED":
@@ -63,6 +65,7 @@ function stepUrl(label: string, c: LinkCtx): string {
   switch (label) {
     case L_CLIENTE: return `${BASE}/aprovar/${c.token}`;
     case L_INTERNA: return `${BASE}/revisar/${c.internalToken}`;
+    case L_PRONTO_CLIENTE: return `${BASE}/admin/clients/${c.clientId}`;
     case L_CRIAR_CAPA: return `${BASE}/criar-capa/${c.designerCover}`;
     case L_APROVAR_CAPA: return `${BASE}/capa/${c.coverToken}`;
     case L_PROGRAMAR: return `${BASE}/programar/${c.clientId}`;
@@ -224,7 +227,7 @@ export async function notifyCoverRedo(contentItemId: string, note?: string | nul
   }
 }
 
-const ORDER = [L_AJUSTE, L_CRIAR_CAPA, L_APROVAR_CAPA, L_INTERNA, L_CLIENTE, L_PROGRAMAR, L_PROGRAMADO];
+const ORDER = [L_AJUSTE, L_CRIAR_CAPA, L_APROVAR_CAPA, L_INTERNA, L_PRONTO_CLIENTE, L_CLIENTE, L_PROGRAMAR, L_PROGRAMADO];
 
 type DigestItem = {
   id: string;

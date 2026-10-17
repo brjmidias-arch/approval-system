@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import KanbanCard, { type KanbanCardData } from "@/components/admin/KanbanCard";
+import SendWeekPanel from "@/components/admin/SendWeekPanel";
 
 interface Stage {
   id: string;
@@ -19,6 +20,7 @@ const DROP_ACTION: Record<string, string | null> = {
   criarCapa: null, // etapa computada (vídeo aprovado sem capa) — não é destino
   aprovarCapa: null, // etapa computada (capa aguardando aprovação) — não é destino
   internal: "send-internal",
+  readyForClient: "mark-ready-client",
   clientReview: "send-client",
   readyToSchedule: "mark-approved",
   scheduled: "mark-scheduled",
@@ -42,6 +44,12 @@ export default function KanbanBoard({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ published: true });
   const [busy, setBusy] = useState(false);
   const [copiedStage, setCopiedStage] = useState<string | null>(null);
+  const [sendingWeeks, setSendingWeeks] = useState(false);
+
+  // Clientes com posts em "Pronto p/ cliente" (para o envio por semana).
+  const readyClients = Array.from(
+    new Map((columns.readyForClient ?? []).map((c) => [c.clientId, c] as const)).values(),
+  );
 
   function stageDesignerLink(stageId: string): string | null {
     if (stageId === "adjustment" && adjustToken) return `/ajustes/${adjustToken}`;
@@ -72,6 +80,25 @@ export default function KanbanBoard({
   }
 
   return (
+    <>
+    {sendingWeeks && (
+      <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 overflow-y-auto py-8 px-4" onClick={() => { setSendingWeeks(false); router.refresh(); }}>
+        <div className="bg-[#111] border border-white/10 rounded-2xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+            <h2 className="text-white font-semibold text-base">📤 Enviar semana para o cliente</h2>
+            <button onClick={() => { setSendingWeeks(false); router.refresh(); }} className="text-gray-500 hover:text-white text-xl leading-none">×</button>
+          </div>
+          <div className="p-5 space-y-5">
+            {readyClients.map((c) => (
+              <div key={c.clientId} className="space-y-2">
+                <p className="text-sm font-medium text-white">{c.clientName}</p>
+                <SendWeekPanel clientId={c.clientId} clientToken={c.clientToken} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
     <div className={`flex gap-3 overflow-x-auto pb-3 ${busy ? "opacity-70" : ""}`}>
       {stages.map((stage) => {
         const cards = columns[stage.id] ?? [];
@@ -113,6 +140,16 @@ export default function KanbanBoard({
                   {copiedStage === stage.id ? "✓ copiado" : "🔗 link"}
                 </button>
               )}
+              {stage.id === "readyForClient" && cards.length > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setSendingWeeks(true); }}
+                  title="Enviar os posts prontos ao cliente, por semana"
+                  className="px-2 shrink-0 text-[11px] text-gray-300 hover:text-white border-l border-white/10"
+                >
+                  📤 enviar semana
+                </button>
+              )}
             </div>
 
             {!isCollapsed && (
@@ -132,5 +169,6 @@ export default function KanbanBoard({
         );
       })}
     </div>
+    </>
   );
 }

@@ -47,7 +47,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  const { name, email, whatsapp, roteiroClienteId } = body;
+  const { name, email, whatsapp, roteiroClienteId, approvalMode } = body;
+  if (approvalMode !== undefined && approvalMode !== "AUTO" && approvalMode !== "WEEKLY") {
+    return NextResponse.json({ error: "Modo de envio inválido" }, { status: 400 });
+  }
   try {
     const client = await prisma.client.update({
       where: { id: params.id },
@@ -56,6 +59,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         ...(email !== undefined && { email }),
         ...(whatsapp !== undefined && { whatsapp }),
         ...(roteiroClienteId !== undefined && { roteiroClienteId: roteiroClienteId || null }),
+        ...(approvalMode !== undefined && { approvalMode }),
       },
     });
     return NextResponse.json(client);

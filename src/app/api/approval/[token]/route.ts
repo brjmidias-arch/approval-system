@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { syncRoteiroStatus } from "@/lib/syncRoteiro";
 import { notifyTelegram, tgEscape } from "@/lib/telegram";
 import { notifyNextStep, loadResponsaveis } from "@/lib/notifyStep";
+import { weekKey } from "@/lib/weeks";
 
 const POST_SELECT = {
   id: true, fileUrl: true, fileType: true, contentType: true, title: true, caption: true,
@@ -34,6 +35,51 @@ async function lastRoundSummary(clientId: string): Promise<{ approved: number; a
   return approved + adjustment > 0 ? { approved, adjustment } : null;
 }
 
+/**
+ * Calendário de postagens do cliente (a partir da semana passada): o que ele já
+ * viu — pendente, aprovado, em ajuste ou publicado. Carrossel = 1 entrada.
+ * Posts que ainda estão só com a equipe (rascunho/revisão interna) não aparecem.
+ */
+async function clientCalendar(clientId: string) {
+  const from = new Date(`${weekKey(new Date())}T00:00:00.000Z`);
+  from.setUTCDate(from.getUTCDate() - 7);
+  const rows = await prisma.contentItem.findMany({
+    where: {
+      clientId,
+      OR: [
+        // Pendente com o cliente aparece sempre (mesmo com data já passada).
+        { status: "CLIENT_REVIEW" },
+        { scheduledDate: { gte: from }, status: { in: ["APPROVED", "SCHEDULED", "PUBLISHED"] } },
+        // Voltou para a equipe depois de o cliente pedir ajuste.
+        { scheduledDate: { gte: from }, status: { in: ["INTERNAL_REVIEW", "INTERNAL_DONE"] }, approvalItem: { isNot: null } },
+      ],
+    },
+    orderBy: [{ scheduledDate: "asc" }, { order: "asc" }],
+    select: {
+      id: true, groupId: true, contentType: true, fileType: true, fileUrl: true, coverUrl: true,
+      caption: true, scheduledDate: true, status: true,
+      approvalItem: { select: { status: true } },
+    },
+  });
+  const byKey = new Map<string, { key: string; contentType: string; fileType: string; fileUrl: string; coverUrl: string | null; caption: string | null; scheduledDate: Date | null; slides: number; state: string }>();
+  for (const r of rows) {
+    const key = r.contentType === "CARROSSEL" && r.groupId ? r.groupId : r.id;
+    const prev = byKey.get(key);
+    if (prev) { prev.slides++; continue; }
+    const a = r.approvalItem?.status;
+    const state =
+      r.status === "PUBLISHED" ? "published"
+      : r.status === "APPROVED" || r.status === "SCHEDULED" ? "approved"
+      : r.status === "CLIENT_REVIEW" && a !== "ADJUSTMENT" && a !== "REJECTED" ? "pending"
+      : "adjustment";
+    byKey.set(key, {
+      key, contentType: r.contentType, fileType: r.fileType, fileUrl: r.fileUrl, coverUrl: r.coverUrl,
+      caption: r.caption, scheduledDate: r.scheduledDate, slides: 1, state,
+    });
+  }
+  return Array.from(byKey.values());
+}
+
 export async function GET(_req: NextRequest, { params }: { params: { token: string } }) {
   try {
     // Novo: token de cliente
@@ -46,7 +92,8 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
         select: POST_SELECT,
       });
       const lastRound = contentItems.length === 0 ? await lastRoundSummary(client.id) : null;
-      return NextResponse.json({ id: client.id, name: client.name, token: client.token, status: "OPEN", client: { name: client.name }, contentItems, lastRound });
+      const calendar = await clientCalendar(client.id);
+      return NextResponse.json({ id: client.id, name: client.name, token: client.token, status: "OPEN", client: { name: client.name }, contentItems, lastRound, calendar });
     }
     // Legado: token de campanha → redireciona pro link do cliente
     const campaign = await prisma.campaign.findUnique({ where: { token: params.token }, select: { client: { select: { token: true } } } });

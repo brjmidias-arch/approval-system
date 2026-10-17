@@ -204,7 +204,7 @@ export default function KanbanCard({
             )}
           </div>
         </div>
-        {["adjustment", "internal", "clientReview", "criarCapa", "aprovarCapa"].includes(stageId ?? "") && post.stageDays != null && (
+        {["adjustment", "internal", "readyForClient", "clientReview", "criarCapa", "aprovarCapa"].includes(stageId ?? "") && post.stageDays != null && (
           <div className="mt-1.5" onClick={(e) => e.preventDefault()}>
             <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
               post.stageDays >= 7 ? "bg-red-900/30 text-red-400"

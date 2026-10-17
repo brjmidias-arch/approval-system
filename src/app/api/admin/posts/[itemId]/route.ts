@@ -91,6 +91,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { itemId: st
           create: { contentItemId: id, status: "PENDING" },
         });
       }
+    } else if (action === "mark-ready-client") {
+      // "Pronto p/ cliente": aprovado internamente, aguardando o envio da semana.
+      await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "INTERNAL_DONE" } });
     } else if (action === "send-client") {
       await prisma.contentItem.updateMany({ where: { id: { in: ids } }, data: { status: "CLIENT_REVIEW", sentToProgramacaoAt: null, clientReviewAt: new Date() } });
       for (const id of ids) {

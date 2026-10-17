@@ -101,8 +101,9 @@ function computeStageKey(i: StageInput): string {
   const isVideo = i.contentType === "REELS" || i.fileType === "VIDEO";
   switch (i.status) {
     case "INTERNAL_REVIEW":
-    case "INTERNAL_DONE":
       return "internal";
+    case "INTERNAL_DONE":
+      return "readyForClient";
     case "CLIENT_REVIEW":
       return "clientReview";
     case "APPROVED": {

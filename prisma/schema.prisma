@@ -34,6 +34,9 @@ model Client {
   internalToken String?       @unique @default(uuid())
   coverToken    String?       @unique @default(uuid())
   roteiroClienteId String?    // id do rot_clientes no sistema de Roteirização
+  // AUTO = aprovado na revisão interna vai direto p/ o cliente;
+  // WEEKLY = fica em "Pronto p/ cliente" (INTERNAL_DONE) até o envio da semana.
+  approvalMode  String        @default("AUTO")
   campaigns     Campaign[]
   contentItems  ContentItem[]
 }
