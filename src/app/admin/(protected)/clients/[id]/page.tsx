@@ -11,6 +11,7 @@ import { extractDriveId, driveThumbUrl, drivePreviewUrl, driveAssetsFromLink } f
 import RoteiroClientLink from "@/components/admin/RoteiroClientLink";
 import AnexarRoteiroPicker, { type RotConteudoOpcao } from "@/components/admin/AnexarRoteiroPicker";
 import SendWeekPanel from "@/components/admin/SendWeekPanel";
+import CopyFeedLinkButton from "@/components/admin/CopyFeedLinkButton";
 
 type PostStageStatus = "DRAFT" | "INTERNAL_REVIEW" | "INTERNAL_DONE" | "CLIENT_REVIEW" | "APPROVED" | "PUBLISHED";
 
@@ -103,6 +104,8 @@ export default function ClientWorkspacePage() {
   const { id } = useParams<{ id: string }>();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const [showFolderUpload, setShowFolderUpload] = useState(false);
   const [copiedWhich, setCopiedWhich] = useState<"client" | "internal" | "message" | null>(null);
@@ -120,11 +123,14 @@ export default function ClientWorkspacePage() {
   const fetchClient = useCallback(async () => {
     try {
       const res = await fetch(`/api/admin/clients/${id}`, { cache: "no-store" });
+      if (res.status === 404) { setNotFound(true); return; }
       if (!res.ok) throw new Error();
       const data = await res.json();
       setClient(data);
+      setLoadError(false);
     } catch {
-      // keep current state on refresh failure
+      // mantém o estado atual se for só um refresh; na 1ª carga mostra "erro ao carregar"
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -408,7 +414,20 @@ export default function ClientWorkspacePage() {
   }
 
   if (loading) return <div className="text-gray-400 p-8">Carregando...</div>;
-  if (!client) return <div className="text-red-400 p-8">Cliente não encontrado.</div>;
+  if (!client) {
+    if (notFound || !loadError) return <div className="text-red-400 p-8">Cliente não encontrado.</div>;
+    return (
+      <div className="p-8 space-y-3">
+        <p className="text-amber-400">Erro ao carregar o cliente (falha momentânea no servidor).</p>
+        <button
+          onClick={() => { setLoading(true); fetchClient(); }}
+          className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-200 rounded-lg transition-colors"
+        >
+          Tentar de novo
+        </button>
+      </div>
+    );
+  }
 
   const groups = buildGroups(client.contentItems);
   const sections = STATUS_SECTIONS.map((section) => ({
@@ -475,6 +494,13 @@ export default function ClientWorkspacePage() {
           >
             {copiedWhich === "internal" ? "Copiado!" : "Copiar link revisão interna"}
           </button>
+          <CopyFeedLinkButton token={client.token} />
+          <Link
+            href={`/admin/feed?client=${client.id}`}
+            className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors"
+          >
+            Ver prévia do feed
+          </Link>
         </div>
       </div>
 
