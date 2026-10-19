@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { CONTENT_TYPE_LABELS } from "@/types";
 import type { ContentType } from "@/types";
 import ClientCalendar, { type CalendarEntry } from "@/components/ClientCalendar";
+import FeedView from "@/components/FeedView";
+import type { FeedEntry } from "@/lib/feed";
 import { weekKey, weekLabel, weekRelative, compareWeekKeys, NO_DATE } from "@/lib/weeks";
 
 type Status = "PENDING" | "APPROVED" | "ADJUSTMENT" | "REJECTED";
@@ -76,8 +78,19 @@ export default function ApprovalPage() {
   const [capState, setCapState] = useState<Record<string, "idle" | "saving" | "saved" | "error">>({});
   const [editingCap, setEditingCap] = useState<Record<string, boolean>>({});
   const capTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const [tab, setTab] = useState<"aprovar" | "calendario">("aprovar");
+  const [tab, setTab] = useState<"aprovar" | "calendario" | "feed">("aprovar");
   const tabChosen = useRef(false);
+  const [feed, setFeed] = useState<FeedEntry[] | null>(null);
+  const [feedError, setFeedError] = useState(false);
+
+  // Prévia do feed: só carrega quando o cliente abre a aba.
+  useEffect(() => {
+    if (tab !== "feed" || feed) return;
+    fetch(`/api/approval/${token}/feed`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => setFeed(d.entries ?? []))
+      .catch(() => setFeedError(true));
+  }, [tab, feed, token]);
 
   async function saveCaption(groupKey: string, value: string, items: ContentItem[]) {
     setCapState((p) => ({ ...p, [groupKey]: "saving" }));
@@ -302,6 +315,7 @@ export default function ApprovalPage() {
           {([
             { id: "aprovar", label: `📋 Aprovar${total - reviewedCount > 0 ? ` (${total - reviewedCount})` : ""}` },
             { id: "calendario", label: "📅 Calendário" },
+            { id: "feed", label: "📱 Feed" },
           ] as const).map((t) => (
             <button
               key={t.id}
@@ -323,6 +337,21 @@ export default function ApprovalPage() {
             Veja quando cada post vai ao ar. Toque num post <span className="text-amber-300">aguardando você</span> para aprovar.
           </p>
           <ClientCalendar entries={campaign.calendar ?? []} onOpenPending={openPending} />
+        </main>
+      )}
+
+      {tab === "feed" && (
+        <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+          <p className="text-gray-400 text-sm">
+            Veja como o seu perfil vai ficar com os posts planejados. Toque num post para ver a legenda.
+          </p>
+          {feedError ? (
+            <p className="text-red-400 text-sm text-center py-10">Não foi possível carregar o feed. Tente novamente.</p>
+          ) : feed === null ? (
+            <p className="text-gray-500 text-sm text-center py-10">Carregando…</p>
+          ) : (
+            <FeedView entries={feed} profileName={campaign.client.name} onGoApprove={openPending} />
+          )}
         </main>
       )}
 
