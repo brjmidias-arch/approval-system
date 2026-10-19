@@ -35,7 +35,7 @@ function Thumb({ e }: { e: CalendarEntry }) {
   );
 }
 
-function PostChip({ e, onOpen }: { e: CalendarEntry; onOpen: (key: string) => void }) {
+function PostChip({ e, onOpen, onOpenAny }: { e: CalendarEntry; onOpen: (key: string) => void; onOpenAny?: (key: string) => void }) {
   const b = STATE_BADGE[e.state];
   const clickable = e.state === "pending";
   const body = (
@@ -51,6 +51,14 @@ function PostChip({ e, onOpen }: { e: CalendarEntry; onOpen: (key: string) => vo
     </>
   );
   const cls = "w-full flex md:flex-col gap-2 p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06]";
+  // Abrir qualquer post (link do calendário): clicável, mas sem nenhum indicativo visual.
+  if (onOpenAny) {
+    return (
+      <div role="button" tabIndex={0} onClick={() => onOpenAny(e.key)} onKeyDown={(ev) => ev.key === "Enter" && onOpenAny(e.key)} className={`${cls} cursor-default`}>
+        {body}
+      </div>
+    );
+  }
   return clickable ? (
     <button type="button" onClick={() => onOpen(e.key)} className={`${cls} hover:border-amber-500/40 transition-colors`}>
       {body}
@@ -65,7 +73,15 @@ function PostChip({ e, onOpen }: { e: CalendarEntry; onOpen: (key: string) => vo
  * No celular vira uma lista dos dias com post; no computador, uma grade de 7 dias.
  * Tocar num post pendente abre ele para aprovar.
  */
-export default function ClientCalendar({ entries, onOpenPending }: { entries: CalendarEntry[]; onOpenPending: (key: string) => void }) {
+export default function ClientCalendar({
+  entries,
+  onOpenPending,
+  onOpenAny,
+}: {
+  entries: CalendarEntry[];
+  onOpenPending: (key: string) => void;
+  onOpenAny?: (key: string) => void;
+}) {
   const current = currentWeekKey();
   const byWeek = new Map<string, CalendarEntry[]>();
   for (const e of entries) {
@@ -101,7 +117,7 @@ export default function ClientCalendar({ entries, onOpenPending }: { entries: Ca
 
             {wk === NO_DATE ? (
               <div className="p-3 grid gap-2 md:grid-cols-4">
-                {list.map((e) => <PostChip key={e.key} e={e} onOpen={onOpenPending} />)}
+                {list.map((e) => <PostChip key={e.key} e={e} onOpen={onOpenPending} onOpenAny={onOpenAny} />)}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-7 md:divide-x divide-white/[0.06]">
@@ -118,7 +134,7 @@ export default function ClientCalendar({ entries, onOpenPending }: { entries: Ca
                         <p className="text-sm text-gray-300 font-medium">{date}</p>
                       </div>
                       <div className="flex-1 space-y-1.5">
-                        {posts.map((e) => <PostChip key={e.key} e={e} onOpen={onOpenPending} />)}
+                        {posts.map((e) => <PostChip key={e.key} e={e} onOpen={onOpenPending} onOpenAny={onOpenAny} />)}
                       </div>
                     </div>
                   );

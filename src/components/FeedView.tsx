@@ -101,7 +101,7 @@ function Tile({ e, showStatus, onOpen }: { e: FeedEntry; showStatus: boolean; on
   );
 }
 
-function PostModal({
+export function PostModal({
   e, onClose, onGoApprove,
 }: { e: FeedEntry; onClose: () => void; onGoApprove?: (key: string) => void }) {
   const [i, setI] = useState(0);

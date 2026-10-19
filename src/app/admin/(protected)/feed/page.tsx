@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import FeedView from "@/components/FeedView";
 import FeedClientPicker from "@/components/admin/FeedClientPicker";
 import CopyFeedLinkButton from "@/components/admin/CopyFeedLinkButton";
+import CopyCalendarLinks from "@/components/admin/CopyCalendarLinks";
 import { buildFeed, feedFromDate, FEED_SELECT } from "@/lib/feed";
 
 /** Prévia do feed do Instagram (interna): todos os posts planejados do cliente, inclusive internos. */
@@ -35,8 +36,9 @@ export default async function FeedPage({ searchParams }: { searchParams: { clien
           <h1 className="text-xl font-semibold text-white">📱 Prévia do feed</h1>
           <p className="text-xs text-gray-500 mt-0.5">Como o perfil vai ficar com os posts planejados (só visualização).</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <CopyFeedLinkButton token={current.token} />
+          <CopyCalendarLinks token={current.token} />
           <FeedClientPicker clients={clients} current={current.id} />
         </div>
       </div>

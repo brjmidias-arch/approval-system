@@ -12,6 +12,7 @@ import RoteiroClientLink from "@/components/admin/RoteiroClientLink";
 import AnexarRoteiroPicker, { type RotConteudoOpcao } from "@/components/admin/AnexarRoteiroPicker";
 import SendWeekPanel from "@/components/admin/SendWeekPanel";
 import CopyFeedLinkButton from "@/components/admin/CopyFeedLinkButton";
+import CopyCalendarLinks from "@/components/admin/CopyCalendarLinks";
 
 type PostStageStatus = "DRAFT" | "INTERNAL_REVIEW" | "INTERNAL_DONE" | "CLIENT_REVIEW" | "APPROVED" | "PUBLISHED";
 
@@ -495,6 +496,7 @@ export default function ClientWorkspacePage() {
             {copiedWhich === "internal" ? "Copiado!" : "Copiar link revisão interna"}
           </button>
           <CopyFeedLinkButton token={client.token} />
+          <CopyCalendarLinks token={client.token} />
           <Link
             href={`/admin/feed?client=${client.id}`}
             className="text-sm px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg transition-colors"
