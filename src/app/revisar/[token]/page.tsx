@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CONTENT_TYPE_LABELS } from "@/types";
+import { shortUrl } from "@/lib/shortLink";
 import type { ContentType } from "@/types";
 
 type Status = "PENDING" | "APPROVED" | "ADJUSTMENT" | "REJECTED";
@@ -233,7 +234,7 @@ export default function InternalReviewPage() {
   const anyApproved =
     alreadyApprovedGroups.length > 0 ||
     needsReviewGroups.some((g) => reviews[g.groupKey]?.status === "APPROVED");
-  const clientLink = origin ? `${origin}/aprovar/${campaign.token}` : "";
+  const clientLink = origin ? shortUrl(origin, "a", campaign.token) : "";
   const clientMessage = `Olá! 😊 Temos novos conteúdos prontos para a sua aprovação.\n\nÉ rápido: abra o link, veja cada post e toque em *Aprovar* ✅ ou peça um *Ajuste* ✏️.\n\n👉 ${clientLink}`;
 
   function copyMsg() {

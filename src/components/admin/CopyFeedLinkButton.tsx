@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { shortUrl } from "@/lib/shortLink";
 
-/** Copia o link público da prévia do feed do cliente (/feed/[token]). */
+/** Copia o link público da prévia do feed do cliente (link curto /f/<código>). */
 export default function CopyFeedLinkButton({ token, className }: { token: string | null; className?: string }) {
   const [copied, setCopied] = useState(false);
   if (!token) return null;
@@ -10,7 +11,7 @@ export default function CopyFeedLinkButton({ token, className }: { token: string
     <button
       type="button"
       onClick={() => {
-        navigator.clipboard.writeText(`${window.location.origin}/feed/${token}`);
+        navigator.clipboard.writeText(shortUrl(window.location.origin, "f", token));
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }}

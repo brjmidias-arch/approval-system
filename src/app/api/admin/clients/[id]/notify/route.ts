@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsApp } from "@/lib/whatsapp";
+import { shortUrl } from "@/lib/shortLink";
 import nodemailer from "nodemailer";
 
 function escapeHtml(str: string): string {
@@ -21,7 +22,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   if (!client.token) return NextResponse.json({ error: "Cliente sem link de aprovação" }, { status: 400 });
 
   const pending = await prisma.contentItem.count({ where: { clientId: client.id, status: "CLIENT_REVIEW" } });
-  const approvalUrl = `${process.env.NEXTAUTH_URL}/aprovar/${client.token}`;
+  const approvalUrl = shortUrl(process.env.NEXTAUTH_URL || "", "a", client.token);
   const nLabel = pending === 1 ? "1 post" : `${pending} posts`;
 
   const sent = { whatsapp: false, email: false };

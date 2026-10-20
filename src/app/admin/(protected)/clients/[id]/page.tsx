@@ -7,6 +7,7 @@ import { CONTENT_TYPE_LABELS, APPROVAL_STATUS_LABELS, APPROVAL_STATUS_COLORS } f
 import type { ContentType, ApprovalStatus } from "@/types";
 import FolderUploadModal from "@/components/admin/FolderUploadModal";
 import { buildAprovacaoMsg } from "@/lib/aprovacaoMsg";
+import { shortUrl } from "@/lib/shortLink";
 import { extractDriveId, driveThumbUrl, drivePreviewUrl, driveAssetsFromLink } from "@/lib/drive";
 import RoteiroClientLink from "@/components/admin/RoteiroClientLink";
 import AnexarRoteiroPicker, { type RotConteudoOpcao } from "@/components/admin/AnexarRoteiroPicker";
@@ -154,7 +155,7 @@ export default function ClientWorkspacePage() {
 
   function copyClientLink() {
     if (!client) return;
-    navigator.clipboard.writeText(`${window.location.origin}/aprovar/${client.token}`);
+    navigator.clipboard.writeText(shortUrl(window.location.origin, "a", client.token));
     setCopiedWhich("client");
     setTimeout(() => setCopiedWhich(null), 2000);
   }
@@ -194,7 +195,7 @@ export default function ClientWorkspacePage() {
       n++;
     }
     const nLabel = n === 1 ? "1 post" : `${n} posts`;
-    const url = `${window.location.origin}/aprovar/${client.token}`;
+    const url = shortUrl(window.location.origin, "a", client.token);
     const msg =
       `Olá! 👋 O conteúdo de vocês está pronto para aprovação.\n\n` +
       `Você tem *${nLabel}* aguardando revisão. É só acessar o link abaixo, olhar cada post e *aprovar* ✅ ou *pedir ajuste* ✏️ (com um comentário do que mudar):\n\n` +

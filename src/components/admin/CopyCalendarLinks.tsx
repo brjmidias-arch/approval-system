@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { currentWeekKey, weekLabel, weekRelative } from "@/lib/weeks";
+import { shortUrl } from "@/lib/shortLink";
 
 function shiftWeek(key: string, n: number): string {
   const d = new Date(`${key}T12:00:00.000Z`);
@@ -11,7 +12,7 @@ function shiftWeek(key: string, n: number): string {
 
 /**
  * Copiar o link público do calendário do cliente: completo ou só de uma semana
- * (/calendario/[token]?semana=YYYY-MM-DD).
+ * (link curto /c/<código>?semana=YYYY-MM-DD).
  */
 export default function CopyCalendarLinks({ token }: { token: string | null }) {
   const current = currentWeekKey();
@@ -21,7 +22,7 @@ export default function CopyCalendarLinks({ token }: { token: string | null }) {
   if (!token) return null;
 
   function copy(which: "all" | "week") {
-    const base = `${window.location.origin}/calendario/${token}`;
+    const base = shortUrl(window.location.origin, "c", token!);
     navigator.clipboard.writeText(which === "all" ? base : `${base}?semana=${week}`);
     setCopied(which);
     setTimeout(() => setCopied(null), 2000);

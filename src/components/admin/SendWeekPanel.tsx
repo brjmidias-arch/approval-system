@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { NO_DATE } from "@/lib/weeks";
+import { shortUrl } from "@/lib/shortLink";
 
 type WeekRow = { week: string; label: string; relative: string | null; count: number };
 
@@ -83,7 +84,7 @@ export default function SendWeekPanel({
       });
       if (!res.ok) throw new Error();
       if (clientToken) {
-        const link = `${window.location.origin}/aprovar/${clientToken}`;
+        const link = shortUrl(window.location.origin, "a", clientToken);
         try { await navigator.clipboard.writeText(weekClientMsg(link, w.label, w.week)); } catch { /* sem clipboard */ }
         alert("Semana enviada! A mensagem com o link já foi copiada — cole no WhatsApp do cliente.");
       } else {

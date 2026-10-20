@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { shortUrl } from "@/lib/shortLink";
 
 /**
  * Menu de ações por post (botão "⋯" + dropdown). Fonte única das ações
@@ -80,7 +81,7 @@ export default function PostActionsMenu({
   function copyClientMsg() {
     setOpen(false);
     if (!clientToken) return;
-    const link = `${window.location.origin}/aprovar/${clientToken}`;
+    const link = shortUrl(window.location.origin, "a", clientToken);
     const msg = `Olá! 😊 Temos novos conteúdos prontos para a sua aprovação.\n\nÉ rápido: abra o link, veja cada post e toque em *Aprovar* ✅ ou peça um *Ajuste* ✏️.\n\n👉 ${link}`;
     navigator.clipboard.writeText(msg);
     alert("Mensagem + link do cliente copiados! Cole no grupo/WhatsApp do cliente.");
